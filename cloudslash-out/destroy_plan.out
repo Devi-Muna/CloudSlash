@@ -1,0 +1,14 @@
+CloudSlash Destruction Plan
+===========================
+
+[80] arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345 (AWS::EC2::NatGateway)
+    Reason: Unused NAT Gateway (Mocked)
+
+[40] arn:aws:s3:::mock-bucket/upload-1 (AWS::S3::MultipartUpload)
+    Reason: Stale S3 Multipart Upload (> 7 days)
+    Command: aws s3api abort-multipart-upload --bucket  --key "" --upload-id 
+
+[90] arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890 (AWS::EC2::Volume)
+    Reason: Unattached EBS Volume
+
+Total Waste Items: 3

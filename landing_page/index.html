@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudSlash - Forensic Accounting for AWS</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <div class="logo" id="glitch-logo" data-text="CLOUDSLASH">CLOUDSLASH</div>
+            <nav>
+                <a href="https://github.com/saujanyayaya/CloudSlash" target="_blank" class="github-link">
+                    <svg height="24" width="24" viewBox="0 0 16 16" fill="#fff">
+                        <path
+                            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+                        </path>
+                    </svg>
+                </a>
+                <a href="#features">Features</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#contact">Contact</a>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Forensic Accounting for AWS</h1>
+            <p class="subtitle">A CLI tool for DevOps engineers to identify infrastructure waste, zombie resources, and
+                security risks.</p>
+            <div class="terminal-container">
+                <canvas id="matrix-canvas"></canvas>
+
+                <!-- Trial Mode Terminal -->
+                <div class="terminal-window" id="trial-terminal">
+                    <div class="terminal-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span class="title">user@mac: ~/cloudslash (TRIAL)</span>
+                    </div>
+                    <div class="terminal-body">
+                        <p class="cmd">$ ./cloudslash</p>
+                        <p class="output">No license key provided. Running in TRIAL MODE.</p>
+                        <p class="output">Resource IDs will be redacted.</p>
+                        <br>
+                        <p class="output">BOUNTIES FOUND:</p>
+                        <p class="output">&gt; - [90] arn:aws:ec2:... (AWS::EC2::Volume)</p>
+                        <p class="output">&nbsp;&nbsp;- [80] arn:aws:ec2:... (AWS::EC2::NatGateway)</p>
+                        <br>
+                        <div class="locked-box">
+                            <p>[LOCKED] Buy license to view properties and fix.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pro Mode Terminal (Hidden initially or side-by-side) -->
+                <div class="terminal-window" id="pro-terminal" style="display: none;">
+                    <div class="terminal-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span class="title">user@mac: ~/cloudslash (PRO)</span>
+                    </div>
+                    <div class="terminal-body">
+                        <p class="cmd">$ ./cloudslash -license PRO-ACME</p>
+                        <p class="output success">License Verified. Enterprise Mode Active.</p>
+                        <br>
+                        <p class="output">BOUNTIES FOUND:</p>
+                        <p class="output">&gt; - [90] vol-0mockZombie (Zombie EBS)</p>
+                        <p class="output">&nbsp;&nbsp;- [80] nat-0mock12345 (Unused NAT)</p>
+                        <br>
+                        <div class="detail-box">
+                            <p>ID: vol-0mockZombie</p>
+                            <p>Risk: 90 (Critical)</p>
+                            <p>Reason: Attached to stopped instance > 30 days</p>
+                        </div>
+                        <br>
+                        <p class="output">Generating Fix...</p>
+                        <p class="output">Created: <span class="file">cloudslash-out/waste.tf</span></p>
+                        <p class="output">Created: <span class="file">cloudslash-out/import.sh</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="toggle-container">
+                <button class="btn-toggle active" onclick="showTerminal('trial')">See Trial Mode</button>
+                <button class="btn-toggle" onclick="showTerminal('pro')">See Pro Mode</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="container">
+            <h2>Why CloudSlash?</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Read-Only Analysis</h3>
+                    <p>Zero risk. CloudSlash scans your infrastructure without making any changes. You get a report, you
+                        decide what to delete.</p>
+                </div>
+                <div class="card">
+                    <h3>Heuristic Detection</h3>
+                    <p>Finds "Zombie" resources that standard tools miss: stopped instances with attached volumes,
+                        unused NAT gateways, and stale S3 uploads.</p>
+                </div>
+                <div class="card">
+                    <h3>Terraform Ready</h3>
+                    <p>Generates <code>waste.tf</code> and import scripts automatically. Fix your infrastructure using
+                        your existing workflow.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="pricing">
+        <div class="container">
+            <h2>Pricing</h2>
+            <div class="pricing-card">
+                <h3>Enterprise License</h3>
+                <div class="price">$399<span>/year</span></div>
+                <ul>
+                    <li>Unlimited Scans</li>
+                    <li>Full Source Code Access</li>
+                    <li>Commercial Use License</li>
+                    <li>Priority Support</li>
+                </ul>
+                <a href="mailto:thedevihq@gmail.com?subject=CloudSlash Enterprise License Inquiry" class="btn">Contact
+                    Sales</a>
+                <p class="small">Manual invoicing via Payoneer available.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="download">
+        <div class="container">
+            <h2>Download Trial</h2>
+            <p>Try it before you buy. No credit card required.</p>
+            <div class="download-grid">
+                <a href="https://github.com/saujanyayaya/CloudSlash/releases/latest/download/cloudslash-darwin-amd64"
+                    class="download-btn">
+                    <span class="icon">🍎</span> macOS (Intel)
+                </a>
+                <a href="https://github.com/saujanyayaya/CloudSlash/releases/latest/download/cloudslash-darwin-arm64"
+                    class="download-btn">
+                    <span class="icon">🍎</span> macOS (M1/M2)
+                </a>
+                <a href="https://github.com/saujanyayaya/CloudSlash/releases/latest/download/cloudslash-linux-amd64"
+                    class="download-btn">
+                    <span class="icon">🐧</span> Linux (AMD64)
+                </a>
+                <a href="https://github.com/saujanyayaya/CloudSlash/releases/latest/download/cloudslash-windows-amd64.exe"
+                    class="download-btn">
+                    <span class="icon">🪟</span> Windows
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="contact">
+        <div class="container">
+            <h2>Contact Us</h2>
+            <p>Ready to clean up your cloud?</p>
+            <p>Email: <a href="mailto:thedevihq@gmail.com">thedevihq@gmail.com</a></p>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 CloudSlash. All rights reserved.</p>
+            <div class="legal">
+                <a href="privacy.html">Privacy Policy</a>
+                <a href="terms.html">Terms of Service</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Easter Egg: Konami Code
+        const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+        let konamiIndex = 0;
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === konamiCode[konamiIndex]) {
+                konamiIndex++;
+                if (konamiIndex === konamiCode.length) {
+                    activateMatrixMode();
+                    konamiIndex = 0;
+                }
+            } else {
+                konamiIndex = 0;
+            }
+        });
+
+        function activateMatrixMode() {
+            console.log("Wake up, Neo...");
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvas.style.display = 'block';
+
+            const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン';
+            const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const nums = '0123456789';
+            const alphabet = katakana + latin + nums;
+
+            const fontSize = 16;
+            const columns = canvas.width / fontSize;
+
+            const rainDrops = [];
+            for (let x = 0; x < columns; x++) {
+                rainDrops[x] = 1;
+            }
+
+            const draw = () => {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = '#0F0';
+                ctx.font = fontSize + 'px monospace';
+
+                for (let i = 0; i < rainDrops.length; i++) {
+                    const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+                    ctx.fillText(text, i * fontSize, rainDrops[i] * fontSize);
+
+                    if (rainDrops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                        rainDrops[i] = 0;
+                    }
+                    rainDrops[i]++;
+                }
+            };
+
+            setInterval(draw, 30);
+
+            document.body.style.fontFamily = "'JetBrains Mono', monospace";
+            document.body.style.color = "#00ff00";
+            document.querySelectorAll('*').forEach(el => {
+                el.style.borderColor = "#00ff00";
+            });
+            alert("System Breach Detected. Welcome, Operator.");
+        }
+
+        function showTerminal(mode) {
+            document.getElementById('trial-terminal').style.display = mode === 'trial' ? 'block' : 'none';
+            document.getElementById('pro-terminal').style.display = mode === 'pro' ? 'block' : 'none';
+
+            document.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+
+        // Console Easter Egg
+        console.log("%c CLOUDSLASH v1.0 ", "background: #000; color: #00ff00; font-size: 20px; font-weight: bold;");
+        console.log("Looking for the source code? Buy a license ;)");
+    </script>
+</body>
+
+</html>

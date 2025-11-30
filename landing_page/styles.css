@@ -1,0 +1,479 @@
+:root {
+    --bg-color: #0a0a0a;
+    --text-color: #e0e0e0;
+    --accent-color: #00ff00;
+    --secondary-color: #1a1a1a;
+    --card-bg: #111;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Inter', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Header */
+header {
+    padding: 20px 0;
+    border-bottom: 1px solid #333;
+}
+
+header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--accent-color);
+    letter-spacing: -1px;
+    position: relative;
+    cursor: pointer;
+}
+
+/* Glitch Effect on Hover */
+.logo:hover {
+    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+}
+
+.logo:hover::before,
+.logo:hover::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-color);
+}
+
+.logo:hover::before {
+    left: 2px;
+    text-shadow: -1px 0 #ff00c1;
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim 5s infinite linear alternate-reverse;
+}
+
+.logo:hover::after {
+    left: -2px;
+    text-shadow: -1px 0 #00fff9;
+    clip: rect(44px, 450px, 56px, 0);
+    animation: glitch-anim2 5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch {
+    0% {
+        transform: translate(0)
+    }
+
+    20% {
+        transform: translate(-2px, 2px)
+    }
+
+    40% {
+        transform: translate(-2px, -2px)
+    }
+
+    60% {
+        transform: translate(2px, 2px)
+    }
+
+    80% {
+        transform: translate(2px, -2px)
+    }
+
+    100% {
+        transform: translate(0)
+    }
+}
+
+@keyframes glitch-anim {
+    0% {
+        clip: rect(14px, 9999px, 127px, 0);
+    }
+
+    20% {
+        clip: rect(8px, 9999px, 18px, 0);
+    }
+
+    40% {
+        clip: rect(102px, 9999px, 11px, 0);
+    }
+
+    60% {
+        clip: rect(35px, 9999px, 92px, 0);
+    }
+
+    80% {
+        clip: rect(66px, 9999px, 33px, 0);
+    }
+
+    100% {
+        clip: rect(2px, 9999px, 82px, 0);
+    }
+}
+
+@keyframes glitch-anim2 {
+    0% {
+        clip: rect(12px, 9999px, 12px, 0);
+    }
+
+    20% {
+        clip: rect(81px, 9999px, 100px, 0);
+    }
+
+    40% {
+        clip: rect(2px, 9999px, 11px, 0);
+    }
+
+    60% {
+        clip: rect(35px, 9999px, 92px, 0);
+    }
+
+    80% {
+        clip: rect(66px, 9999px, 33px, 0);
+    }
+
+    100% {
+        clip: rect(2px, 9999px, 82px, 0);
+    }
+}
+
+nav a {
+    color: var(--text-color);
+    text-decoration: none;
+    margin-left: 20px;
+    font-size: 0.9rem;
+    transition: color 0.3s;
+}
+
+nav a:hover {
+    color: var(--accent-color);
+}
+
+.github-link {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.github-link svg {
+    transition: fill 0.3s;
+}
+
+.github-link:hover svg {
+    fill: var(--accent-color);
+}
+
+/* Hero */
+.hero {
+    text-align: center;
+    padding: 80px 0;
+}
+
+.hero h1 {
+    font-size: 3.5rem;
+    margin-bottom: 20px;
+    background: linear-gradient(to right, #fff, #888);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    color: #888;
+    max-width: 600px;
+    margin: 0 auto 60px;
+}
+
+.terminal-container {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+#matrix-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    display: none;
+    opacity: 0.8;
+}
+
+.terminal-window {
+    background: #000;
+    border-radius: 8px;
+    box-shadow: 0 20px 50px rgba(0, 255, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid #333;
+    text-align: left;
+    font-family: var(--font-mono);
+}
+
+.terminal-header {
+    background: #222;
+    padding: 10px 15px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.terminal-header .title {
+    margin-left: 10px;
+    font-size: 0.8rem;
+    color: #888;
+}
+
+.terminal-body {
+    padding: 20px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+}
+
+.cmd {
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.cmd::before {
+    content: "$ ";
+    color: var(--accent-color);
+}
+
+.output {
+    color: #aaa;
+    margin-bottom: 2px;
+}
+
+.output.success {
+    color: var(--accent-color);
+}
+
+.file {
+    color: #58a6ff;
+    text-decoration: underline;
+}
+
+.locked-box {
+    border: 1px dashed #ff5f56;
+    color: #ff5f56;
+    padding: 10px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.detail-box {
+    border: 1px solid var(--accent-color);
+    color: var(--accent-color);
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.toggle-container {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-toggle {
+    background: #222;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: var(--font-sans);
+}
+
+.btn-toggle.active {
+    background: var(--accent-color);
+    color: #000;
+    border-color: var(--accent-color);
+}
+
+/* Download Section */
+.download {
+    padding: 80px 0;
+    text-align: center;
+    background: var(--secondary-color);
+}
+
+.download-grid {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+.download-btn {
+    background: #222;
+    border: 1px solid #333;
+    padding: 15px 25px;
+    border-radius: 8px;
+    color: #fff;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+}
+
+.download-btn:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+/* Features */
+.features {
+    padding: 80px 0;
+    background: var(--secondary-color);
+}
+
+.features h2 {
+    text-align: center;
+    margin-bottom: 60px;
+    font-size: 2rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px;
+}
+
+.card {
+    background: var(--card-bg);
+    padding: 30px;
+    border-radius: 8px;
+    border: 1px solid #333;
+}
+
+.card h3 {
+    color: var(--accent-color);
+    margin-bottom: 15px;
+    font-family: var(--font-mono);
+}
+
+/* Pricing */
+.pricing {
+    padding: 80px 0;
+    text-align: center;
+}
+
+.pricing-card {
+    background: var(--card-bg);
+    padding: 50px;
+    border-radius: 12px;
+    border: 1px solid var(--accent-color);
+    max-width: 400px;
+    margin: 0 auto;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.1);
+}
+
+.price {
+    font-size: 3rem;
+    font-weight: 700;
+    margin: 20px 0;
+}
+
+.price span {
+    font-size: 1rem;
+    color: #888;
+    font-weight: 400;
+}
+
+.pricing-card ul {
+    list-style: none;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.pricing-card li {
+    margin-bottom: 10px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.pricing-card li::before {
+    content: "✓";
+    color: var(--accent-color);
+    position: absolute;
+    left: 0;
+}
+
+.btn {
+    display: inline-block;
+    background: var(--accent-color);
+    color: #000;
+    padding: 15px 30px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: 700;
+    transition: transform 0.2s;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+}
+
+.small {
+    margin-top: 15px;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+/* Contact & Footer */
+.contact {
+    padding: 80px 0;
+    text-align: center;
+    background: var(--secondary-color);
+}
+
+.contact a {
+    color: var(--accent-color);
+}
+
+footer {
+    padding: 40px 0;
+    border-top: 1px solid #333;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+footer .container {
+    display: flex;
+    justify-content: space-between;
+}
+
+.legal a {
+    color: #666;
+    text-decoration: none;
+    margin-left: 20px;
+}
+
+.legal a:hover {
+    color: #fff;
+}
