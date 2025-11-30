@@ -1,4 +1,4 @@
-module github.com/saujanyayaya/cloudslash
+module github.com/DrSkyle/cloudslash
 
 go 1.25.4
 

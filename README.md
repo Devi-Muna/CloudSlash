@@ -31,7 +31,7 @@ Run the tool to see how much money you are burning. No license key required.
 ## 🚀 Quick Start
 
 ### 1. Download
-Download the binary for your OS from the [Releases Page](https://github.com/saujanyayaya/CloudSlash/releases).
+Download the binary for your OS from the [Releases Page](https://github.com/DrSkyle/CloudSlash/releases).
 
 ### 2. Run (Trial Mode)
 By default, CloudSlash runs in **Trial Mode**. It will show you what waste exists but hides the IDs and disables the fix generation.
