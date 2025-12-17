@@ -21,42 +21,44 @@ CloudSlash is a CLI tool that scans your AWS infrastructure for "Shadow IT" and 
   - **RDS & ELB**: Stopped DBs and unused Load Balancers.
 - **Reverse Terraform**: Generates `waste.tf` and `import.sh` to help you clean up safely.
 
-## 📦 Installation
+## 📦 Installation & Quick Start
 
-Download the latest binary for your platform from the [Releases](https://github.com/yourusername/cloudslash/releases) page.
-
-👉 **[Read the Full User Walkthrough](WALKTHROUGH.md)** for a deep dive into Multi-Account Scanning, Dashboards, and Safe Remediation.
-
-## ⚡ Quick Start (Trial Mode)
-
-Run the tool to see how much money you are burning. No license key required.
-
-## 🚀 Quick Start
-
-### 1. Download
-
-Download the binary for your OS from the [Releases Page](https://github.com/DrSkyle/CloudSlash/releases).
-
-### 2. Run (Trial Mode)
-
-By default, CloudSlash runs in **Trial Mode**. It will show you what waste exists but hides the IDs and disables the fix generation.
+### macOS (Apple Silicon / M1 / M2)
 
 ```bash
-# macOS / Linux
+curl -L -o cloudslash https://github.com/DrSkyle/CloudSlash/releases/latest/download/cloudslash-darwin-arm64
 chmod +x cloudslash
 ./cloudslash
+```
 
-# Windows
+### macOS (Intel)
+
+```bash
+curl -L -o cloudslash https://github.com/DrSkyle/CloudSlash/releases/latest/download/cloudslash-darwin-amd64
+chmod +x cloudslash
+./cloudslash
+```
+
+### Linux
+
+```bash
+curl -L -o cloudslash https://github.com/DrSkyle/CloudSlash/releases/latest/download/cloudslash-linux-amd64
+chmod +x cloudslash
+./cloudslash
+```
+
+### Windows (PowerShell)
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/DrSkyle/CloudSlash/releases/latest/download/cloudslash-windows-amd64.exe -OutFile cloudslash.exe
 .\cloudslash.exe
 ```
 
-### 3. Activate Pro Mode
+---
 
-To unlock the full features (Real IDs, Terraform Generation), you need a license key.
+## 📖 User Guide
 
-```bash
-./cloudslash -license PRO-YOUR-KEY
-```
+👉 **[Read the Full User Walkthrough](WALKTHROUGH.md)** for a deep dive into Multi-Account Scanning, Dashboards, and Safe Remediation.
 
 ## 🛠 Features
 
@@ -69,11 +71,18 @@ To unlock the full features (Real IDs, Terraform Generation), you need a license
 | **Generate `waste.tf`**    |      ❌       |    ✅    |
 | **Generate `import.sh`**   |      ❌       |    ✅    |
 
+### Activate Pro Mode
+
+To unlock full features (Real IDs, Terraform Generation), you need a license key.
+[**Get a Pro License Key**](https://cloudslash-web.pages.dev/#download)
+
+```bash
+./cloudslash -license PRO-YOUR-KEY
+```
+
 ## 📜 Licensing
 
 CloudSlash is sold under a standard commercial license.
-
-[**Get a Pro License Key**](https://cloudslash-web.pages.dev/#download) directly from our website.
 
 ## 🔒 Security
 
