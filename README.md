@@ -1,11 +1,14 @@
 # CloudSlash
 
-**Infrastructure Waste Analysis for AWS**
+**The Forensic Accountant for your AWS Infrastructure**
+
+> **Status:** Precision Engineered. Zero Error.
 
 CloudSlash identifies idle, orphaned, and underutilized resources in your AWS environment. Unlike tools that rely solely on "Status" checks, CloudSlash correlates CloudWatch metrics with resource topology to find actual waste (e.g., available volumes with no IOPS, NAT Gateways with low throughput).
 
 ![License](https://img.shields.io/badge/license-Commercial-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
+![Version](https://img.shields.io/badge/version-v1.0.1-brightgreen)
 
 ## Core Capabilities
 
@@ -16,13 +19,16 @@ CloudSlash identifies idle, orphaned, and underutilized resources in your AWS en
   - **Zombie EBS**: Detects available volumes or attached volumes with 0 IOPS/30 days.
   - **Idle NAT Gateways**: Identifies gateways costing hourly rates but processing minimal traffic.
   - **S3 Multipart Uploads**: Finds incomplete uploads consuming storage space.
+  - **Fossil Snapshots**: RDS Snapshots unlinked from any active cluster.
+  - **Orphaned ELBs**: Load Balancers with zero requests.
+  - **Loose EIPs**: Unassociated Elastic IPs.
 - **Remediation**: Generates `waste.tf` and `import.sh` for safe, managed cleanup.
 
 ## Installation
 
 ### macOS / Linux
 
-Open your terminal and run:
+Open your terminal and run the precision installer:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
@@ -36,23 +42,42 @@ Run as Administrator (optional, but recommended for PATH updates):
 irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
 ```
 
-> **Note:** CloudSlash is installed globally. You can run it from any terminal, anytime—even after rebooting. 🔄
+> **Note:** CloudSlash installs to `/usr/local/bin` (Unix) or `%LOCALAPPDATA%` (Windows) and is available globally.
 
 ## Usage
 
-**Trial Mode (Free)**
-Runs locally. Scans your setup and reports findings in the terminal UI. IDs are redacted.
+CloudSlash uses a modern, "Future-Glass" CLI interface.
+
+### 1. Interactive Mode (Default)
+
+Simply run the command to verify your environment and start the TUI.
 
 ```bash
-./cloudslash
+cloudslash
 ```
 
-**Pro Mode**
-Unlocks Resource IDs and Terraform generation.
-[Purchase License](https://cloudslash.pages.dev)
+### 2. Headless Scan (CI/CD)
+
+Run without the UI for automated pipeline integration.
 
 ```bash
-./cloudslash -license YOUR-KEY
+cloudslash scan --region us-west-2
+```
+
+### 3. Pro Mode (License)
+
+Unlock full reporting and Terraform generation. [Get a License](https://cloudslash.pages.dev).
+
+```bash
+cloudslash --license YOUR_KEY_HERE
+```
+
+### 4. Auto-Update
+
+CloudSlash checks for updates automatically. To upgrade manually:
+
+```bash
+cloudslash update
 ```
 
 ## Security
@@ -78,4 +103,5 @@ Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 
 ## Architecture
 
-Built in Go. Uses an in-memory graph to model resource relationships. The TUI is powered by Bubble Tea for responsive, real-time feedback during scans.
+Built in Go. Uses an in-memory graph to model resource relationships. The TUI is powered by Bubble Tea.
+The CLI is built with `Cobra` and `Viper` for maximum extensibility.
