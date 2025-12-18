@@ -17,6 +17,8 @@ CloudSlash is **Open Source** (AGPLv3). We believe in transparent security.
 - **Community Edition:** Free to use personally. Audit your own infrastructure. [Contribute on GitHub](CONTRIBUTING.md).
 - **Commercial License:** Unlocks automated reporting, Terraform remediation generation, and commercial support. [Get a License](https://cloudslash.pages.dev).
 
+> **Fair Use Check:** Yes, a developer could manually edit the source code to remove the license checks. **Let them.** If you are a student or hobbyist who cannot afford a license, you have our permission to modify the source for personal use. If you are using this commercially to save your company money, please buy a license to support development.
+
 ## Core Capabilities
 
 - **Zero Trust Scanning**: Verifies utilization via telemetry rather than metadata.
