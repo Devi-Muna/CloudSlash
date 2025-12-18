@@ -153,8 +153,8 @@
                             <li>✅ Priority Support</li>
                         </ul>
                         <div class="button-group" style="display: flex; gap: 10px; margin-top: 20px;">
-                            <button onclick="buyPlan(PLANS.MONTHLY)" class="btn-secondary-full" style="margin-top: 0; font-size: 0.9rem;">Monthly</button>
-                            <button onclick="buyPlan(PLANS.ANNUAL)" class="btn-primary-full" style="margin-top: 0; font-size: 0.9rem;">Annual</button>
+                            <a href="https://checkout.freemius.com/app/22411/plan/37513/?billing_cycle=monthly" target="_blank" class="btn-secondary-full" style="margin-top: 0; font-size: 0.9rem; text-align: center;">Monthly</a>
+                            <a href="https://checkout.freemius.com/app/22411/plan/37513/?billing_cycle=annual" target="_blank" class="btn-primary-full" style="margin-top: 0; font-size: 0.9rem; text-align: center;">Annual</a>
                         </div>
                     </div>
                     
@@ -242,42 +242,8 @@
 
     <script src="https://checkout.freemius.com/checkout.min.js"></script>
     <script>
-        // Make PLANS global immediately to avoid ReferenceError in onclick
-        window.PLANS = {
-            MONTHLY: 37513, // $49/mo
-            ANNUAL:  37513, // $499/yr
-            LIFETIME: 37513 // $1499
-        };
-
-        // Initialize Freemius Checkout
-        // Ensure handler is global to be accessed by buyPlan
-        window.fsHandler = FS.Checkout.configure({
-            plugin_id: '22411',
-            public_key: 'pk_fe7225bdb16e44cd1d9495f1be97c',
-            image: 'https://cloudslash.pages.dev/assets/logo.png',
-        });
-
-        function buyPlan(planId, pricingId) {
-            // TIP: You can find Plan IDs in Freemius Dashboard -> Plans
-            // If ID is unknown, the checkout will default to the first paid plan.
-            let config = {
-                plan_id: planId.toString(),
-                licenses: 1
-            };
-            
-            // If we have a specific billing cycle/pricing ID (optional)
-            if (pricingId) config.pricing_id = pricingId;
-
-            if (window.fsHandler) {
-                window.fsHandler.open(config);
-            } else {
-                console.error("Freemius handler not initialized.");
-                alert("Payment system is initializing. Please try again in moment.");
-            }
-        }
-
-        // Wire up buttons - OLD SELECTORS MIGHT BREAK WITH NEW BUTTON TAGS
-        // Adding explicit ID wiring or keeping inline onclicks which I added above.
+        // Direct Links are now used for robustness.
+        // Terminal effect script.
     </script>
     <script src="terminal.js"></script>
 </body>
