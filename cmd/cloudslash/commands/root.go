@@ -101,11 +101,15 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
     fmt.Println("The Forensic Cloud Accountant for AWS.\n")
     
     fmt.Println(titleStyle.Render("USAGE"))
-    fmt.Printf("  %s [flags]\n\n", cmd.UseLine())
+    fmt.Printf("  %s\n\n", cmd.UseLine())
 
     fmt.Println(titleStyle.Render("COMMANDS"))
-    fmt.Println("  scan        Run headless scan (CI/CD mode)")
-    fmt.Println("  help        Help about any command\n")
+    for _, c := range cmd.Commands() {
+        if c.IsAvailableCommand() {
+             fmt.Printf("  %-12s %s\n", c.Name(), c.Short)
+        }
+    }
+    fmt.Println("")
     
     fmt.Println(titleStyle.Render("FLAGS"))
     cmd.Flags().VisitAll(func(f *pflag.Flag) {
