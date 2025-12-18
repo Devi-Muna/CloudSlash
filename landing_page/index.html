@@ -140,34 +140,47 @@
                         </ul>
                         <a href="#download" class="btn-secondary-full">Download</a>
                     </div>
+                    
+                    <div class="price-card glass-panel featured-blue">
+                        <div class="badge-blue">Indie</div>
+                        <h3>Starter</h3>
+                        <div class="price">$49<span>/yr</span></div>
+                        <ul class="features-list">
+                            <li>✅ <strong>Single User</strong></li>
+                            <li>✅ Full Reporting</li>
+                            <li>✅ Terraform Scripts</li>
+                            <li>❌ Priority Support</li>
+                        </ul>
+                        <button onclick="buyPlan(PLANS.STARTER)" class="btn-primary-full">Buy License</button>
+                    </div>
+
                     <div class="price-card glass-panel featured">
                         <div class="badge">Agencies</div>
                         <h3>Pro License</h3>
                         <div class="price">$499<span>/yr</span></div>
                         <ul class="features-list">
-                            <li>✅ Unlimited Scans</li>
-                            <li>✅ TUI Dashboard</li>
-                            <li>✅ <strong>Full Reporting</strong></li>
-                            <li>✅ <strong>Terraform Scripts</strong></li>
+                            <li>✅ <strong>5 Team Seats</strong></li>
+                            <li>✅ Full Reporting</li>
+                            <li>✅ Terraform Scripts</li>
+                            <li>✅ Priority Support</li>
                         </ul>
                         <a href="https://checkout.freemius.com/app/22411/plan/37513/?billing_cycle=annual" target="_blank" class="btn-primary-full">Buy License</a>
                     </div>
+                    
                     <div class="price-card glass-panel">
                         <h3>Site License</h3>
                         <div class="price">$1,499</div>
                          <ul class="features-list">
                             <li>✅ Lifetime Access</li>
                             <li>✅ Unlimited Seats</li>
-                            <li>✅ Priority Support</li>
                             <li>✅ Source Modification</li>
+                            <li>✅ Dedicated Support</li>
                         </ul>
                         <a href="https://checkout.freemius.com/app/22411/plan/37513/?billing_cycle=lifetime" target="_blank" class="btn-secondary-full">Buy Lifetime</a>
                     </div>
                 </div>
-
             </div>
         </section>
-
 
         <section id="download" class="cta-section">
             <div class="container">
@@ -262,22 +275,13 @@
 
         // Simulating IDs - Replace these with real ones from Dashboard!
         const PLANS = {
-            MONTHLY: 37513, // Verified
-            ANNUAL:  37513, // Placeholder (using confirmed ID)
-            LIFETIME: 37513, // Placeholder (using confirmed ID)
-            SUPPORT: 37513   // User to Configure: "Pay what you want" Plan
+            STARTER: 37513, // $49/yr
+            ANNUAL:  37513, // $499/yr
+            LIFETIME: 37513 // $1499
         };
 
-        // Wire up buttons
-        document.querySelectorAll('.btn-secondary-full, .btn-primary-full').forEach((btn, index) => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                // Crude mapping based on button position
-                if (index === 0) buyPlan(PLANS.MONTHLY);
-                if (index === 1) buyPlan(PLANS.ANNUAL);
-                if (index === 2) buyPlan(PLANS.LIFETIME);
-            });
-        });
+        // Wire up buttons - OLD SELECTORS MIGHT BREAK WITH NEW BUTTON TAGS
+        // Adding explicit ID wiring or keeping inline onclicks which I added above.
     </script>
     <script src="terminal.js"></script>
 </body>
