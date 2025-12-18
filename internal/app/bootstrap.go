@@ -38,13 +38,13 @@ func Run(cfg Config) {
 	isTrial := false
 	if cfg.LicenseKey == "" {
 		if !cfg.Headless {
-			fmt.Println("No license key provided. Running in TRIAL MODE.")
+			fmt.Println("No license key provided. Running Community Edition.")
 		}
 		isTrial = true
 	} else {
 		if err := license.Check(cfg.LicenseKey); err != nil {
 			fmt.Printf("License check failed: %v\n", err)
-			fmt.Println("Falling back to TRIAL MODE.")
+			fmt.Println("Falling back to Community Edition.")
 			isTrial = true
 		}
 	}

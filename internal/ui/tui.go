@@ -142,7 +142,7 @@ func (m Model) View() string {
 	s.WriteString(titleStyle.Render("CLOUDSLASH PROTOCOL"))
     s.WriteString("\n")
     if m.isTrial {
-        s.WriteString(lipgloss.NewStyle().Foreground(warning).Render(" [ TRIAL MODE ] "))
+        s.WriteString(lipgloss.NewStyle().Foreground(warning).Render(" [ COMMUNITY EDITION ] "))
     } else {
         s.WriteString(lipgloss.NewStyle().Foreground(special).Render(" [ PRO MODE ACCESS ] "))
     }
