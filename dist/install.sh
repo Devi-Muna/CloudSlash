@@ -48,6 +48,12 @@ else
 fi
 
 sudo chmod +x "$TMP_FILE"
+
+# Explicitly remove old version to prevent overwriting issues
+if [ -f "$DEST_FILE" ]; then
+    sudo rm -f "$DEST_FILE"
+fi
+
 sudo mv "$TMP_FILE" "$DEST_FILE"
 
 echo "✅ Installed successfully to $DEST_FILE"
