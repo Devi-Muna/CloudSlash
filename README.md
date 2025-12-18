@@ -22,21 +22,21 @@ CloudSlash identifies idle, orphaned, and underutilized resources in your AWS en
 
 ### macOS / Linux
 
-**Option 1: Automated Install (from Release Zip)**
+Open your terminal and run:
 
 ```bash
-cd dist
-chmod +x install.sh
-./install.sh
+curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
 ```
 
-**Option 2: Manual Install**
-Move the binary for your platform (e.g., `cloudslash-linux-amd64`) to `/usr/local/bin/cloudslash` and make it executable.
+### Windows (PowerShell)
 
-### Windows
+Run as Administrator (optional, but recommended for PATH updates):
 
-**Manual Install**
-Download `cloudslash-windows-amd64.exe` from the `dist` folder. You can run it directly from PowerShell or add it to your PATH.
+```powershell
+irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
+```
+
+> **Note:** CloudSlash is installed globally. You can run it from any terminal, anytime—even after rebooting. 🔄
 
 ## Usage
 
@@ -67,12 +67,14 @@ To remove CloudSlash completely:
 **macOS / Linux:**
 
 ```bash
-./dist/uninstall.sh
-# Or manually: sudo rm /usr/local/bin/cloudslash
+sudo rm /usr/local/bin/cloudslash
 ```
 
 **Windows:**
-Simply delete the `.exe` file.
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
+```
 
 ## Architecture
 
