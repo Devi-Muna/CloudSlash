@@ -122,4 +122,10 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
         fmt.Println(flagStyle.Render(output))
     })
     fmt.Println("")
+
+    fmt.Println(titleStyle.Render("NEW FEATURES (v1.1)"))
+    fmt.Println(flagStyle.Render("  • Reverse-Terraform: Generates 'fix_terraform.sh' (Pro)"))
+    fmt.Println(flagStyle.Render("  • Owner Forensics:   Displays 'Who Created This?' (Pro)"))
+    fmt.Println(flagStyle.Render("  • Silent Killers:    Detects >1GB Log Groups & Fossil Snapshots"))
+    fmt.Println("")
 }

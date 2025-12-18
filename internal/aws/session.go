@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // Client holds AWS service clients.
@@ -28,10 +30,32 @@ func NewClient(ctx context.Context, region, profile string) (*Client, error) {
 		opts = append(opts, config.WithSharedConfigProfile(profile))
 	}
 
+	// TRAP: User-Agent Fingerprint
+	// If a competitor forks this codebase but forgets to change this,
+	// their API calls will be permanently stamped with "CS-v1-7f8a9d-AGPL".
+	const signature = "CS-v1-7f8a9d-AGPL"
+
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load SDK config: %v", err)
 	}
+	
+	// Inject signature
+	cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
+		return stack.Build.Add(middleware.BuildMiddlewareFunc("UserAgentTrap", func(ctx context.Context, input middleware.BuildInput, next middleware.BuildHandler) (
+			middleware.BuildOutput, middleware.Metadata, error,
+		) {
+			req, ok := input.Request.(*smithyhttp.Request)
+			if ok {
+				currentUA := req.Header.Get("User-Agent")
+				if currentUA == "" {
+					currentUA = "CloudSlash/v1.1"
+				}
+				req.Header.Set("User-Agent", fmt.Sprintf("%s (%s)", currentUA, signature))
+			}
+			return next.HandleBuild(ctx, input)
+		}), middleware.After)
+	})
 
 	return &Client{
 		Config: cfg,

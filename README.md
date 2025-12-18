@@ -10,14 +10,15 @@ CloudSlash identifies idle, orphaned, and underutilized resources in your AWS en
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
 ![Version](https://img.shields.io/badge/version-v1.0.3-brightgreen)
 
-## Open Source & Commercial
+## Open Source & Commercial (Dual Licensed)
 
-CloudSlash is **Open Source** (AGPLv3). We believe in transparent security.
+CloudSlash is **Open Source** (AGPLv3) to guarantee transparency and community freedom.
 
-- **Community Edition:** Free to use personally. Audit your own infrastructure. [Contribute on GitHub](CONTRIBUTING.md).
-- **Commercial License:** Unlocks automated reporting, Terraform remediation generation, and commercial support. [Get a License](https://cloudslash.pages.dev).
+- **Community Edition (AGPLv3):** Free for personal use, audit, and contribution. If you modify the source and distribute it (even internally within a large org), you may be required to share your changes.
+- **Commercial License (Standard):** Unlocks automated reporting, Terraform remediation, and support. Usage does not trigger copyleft provisions when used as an internal tool.
+- **Enterprise License (AGPL Exception):** For organizations (e.g., Banks, Fintech) requiring **Indemnification** and a total exemption from AGPL. This license allows you to embed CloudSlash source code into proprietary, closed-source banking platforms.
 
-> **Fair Use Check:** Yes, a developer could manually edit the source code to remove the license checks. **Let them.** If you are a student or hobbyist who cannot afford a license, you have our permission to modify the source for personal use. If you are using this commercially to save your company money, please buy a license to support development.
+> **Fair Use Check:** Yes, a developer could manually edit the source code for personal learning. **Let them.** This "Open Core" model sustains the project.
 
 ## Core Capabilities
 
@@ -109,6 +110,24 @@ sudo rm /usr/local/bin/cloudslash
 ```powershell
 Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 ```
+
+## Advanced Features (v1.1)
+
+### 🛡️ Reverse-Terraform (Pro)
+
+CloudSlash generates a `fix_terraform.sh` script in the output directory.
+
+1. Run a scan: `cloudslash --license ...`
+2. Inspect the script: `cat cloudslash-out/fix_terraform.sh`
+3. Execute to safely remove waste from state: `bash cloudslash-out/fix_terraform.sh`
+
+### 🕵️ Forensics (Pro)
+
+Automatically enabled for licensed users.
+
+- **TUI**: Look for the "Owner" column.
+- **Red "UNCLAIMED"**: No tags, no CloudTrail creation event found (orphan).
+- **Green "IAM:user"**: Identified creator via CloudTrail.
 
 ## Architecture
 

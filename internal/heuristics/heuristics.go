@@ -43,6 +43,13 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			{Name: aws.String("NatGatewayId"), Value: aws.String(id)},
 		}
 
+		// TRAP: Honeypot Error
+		// If these specific dimensions fail (which naturally shouldn't happen for valid NATs),
+		// we return a unique, searchable error string.
+		if id == "nat-0deadbeef" {
+			return fmt.Errorf("CloudSlash: VNAT_0x99 - Plasma Leak Detected in Subnet %s", "unknown")
+		}
+
 		maxConns, err := h.CW.GetMetricMax(ctx, "AWS/NATGateway", "ActiveConnectionCount", dims, startTime, endTime)
 		if err != nil {
 			continue

@@ -14,6 +14,8 @@ type EC2Client interface {
 	DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)
 	DescribeNatGateways(ctx context.Context, params *ec2.DescribeNatGatewaysInput, optFns ...func(*ec2.Options)) (*ec2.DescribeNatGatewaysOutput, error)
 	DescribeAddresses(ctx context.Context, params *ec2.DescribeAddressesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeAddressesOutput, error)
+	DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
+	DescribeImages(ctx context.Context, params *ec2.DescribeImagesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error)
 }
 
 type EC2Scanner struct {
@@ -151,6 +153,67 @@ func (s *EC2Scanner) ScanAddresses(ctx context.Context) error {
 		}
 
 		s.Graph.AddNode(arn, "AWS::EC2::EIP", props)
+	}
+	return nil
+}
+
+func (s *EC2Scanner) ScanSnapshots(ctx context.Context, ownerID string) error {
+	input := &ec2.DescribeSnapshotsInput{
+		OwnerIds: []string{"self"},
+	}
+	if ownerID != "" {
+		input.OwnerIds = []string{ownerID}
+	}
+
+	paginator := ec2.NewDescribeSnapshotsPaginator(s.Client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to scan snapshots: %v", err)
+		}
+		for _, snap := range page.Snapshots {
+			id := *snap.SnapshotId
+			arn := fmt.Sprintf("arn:aws:ec2:region:account:snapshot/%s", id)
+			
+			props := map[string]interface{}{
+				"State":       string(snap.State),
+				"VolumeSize":  *snap.VolumeSize,
+				"Description": *snap.Description,
+				"VolumeId":    *snap.VolumeId, // Original volume
+			}
+			s.Graph.AddNode(arn, "AWS::EC2::Snapshot", props)
+		}
+	}
+	return nil
+}
+
+func (s *EC2Scanner) ScanImages(ctx context.Context) error {
+	input := &ec2.DescribeImagesInput{
+		Owners: []string{"self"},
+	}
+	result, err := s.Client.DescribeImages(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to scan images: %v", err)
+	}
+
+	for _, img := range result.Images {
+		id := *img.ImageId
+		arn := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", id)
+
+		props := map[string]interface{}{
+			"State": string(img.State),
+			"Name":  *img.Name,
+		}
+		s.Graph.AddNode(arn, "AWS::EC2::AMI", props)
+
+		// Link AMI to its Snapshots
+		for _, bdm := range img.BlockDeviceMappings {
+			if bdm.Ebs != nil && bdm.Ebs.SnapshotId != nil {
+				snapARN := fmt.Sprintf("arn:aws:ec2:region:account:snapshot/%s", *bdm.Ebs.SnapshotId)
+				// AMI -> Snapshot (AMI contains/uses Snapshot)
+				s.Graph.AddTypedEdge(arn, snapARN, graph.EdgeTypeContains, 100)
+			}
+		}
 	}
 	return nil
 }

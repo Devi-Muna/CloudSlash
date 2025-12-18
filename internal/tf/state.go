@@ -61,3 +61,24 @@ func (s *State) GetManagedResourceIDs() map[string]bool {
 
 	return managed
 }
+
+// GetResourceMapping returns a map of Resource ID -> Terraform Address
+// e.g. "i-12345" -> "aws_instance.web_server"
+func (s *State) GetResourceMapping() map[string]string {
+	mapping := make(map[string]string)
+
+	for _, res := range s.Resources {
+		// Construct address: type.name
+		address := fmt.Sprintf("%s.%s", res.Type, res.Name)
+
+		for _, inst := range res.Instances {
+			if id, ok := inst.Attributes["id"].(string); ok {
+				mapping[id] = address
+			}
+			if arn, ok := inst.Attributes["arn"].(string); ok {
+				mapping[arn] = address
+			}
+		}
+	}
+	return mapping
+}

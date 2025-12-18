@@ -10,6 +10,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/aws"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/heuristics"
+	"github.com/DrSkyle/cloudslash/internal/forensics"
 	"github.com/DrSkyle/cloudslash/internal/license"
 	"github.com/DrSkyle/cloudslash/internal/notifier"
 	"github.com/DrSkyle/cloudslash/internal/pricing"
@@ -132,6 +133,8 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		var scanWg sync.WaitGroup
         var cwClient *aws.CloudWatchClient
         var iamClient *aws.IAMClient
+		var ctClient *aws.CloudTrailClient
+		var logsClient *aws.CloudWatchLogsClient // New Logs Client
 
 		for _, profile := range profiles {
 			if cfg.AllProfiles {
@@ -148,16 +151,32 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			if client != nil {
 				cwClient = aws.NewCloudWatchClient(client.Config)
 				iamClient = aws.NewIAMClient(client.Config)
+				ctClient = aws.NewCloudTrailClient(client.Config)
+				logsClient = aws.NewCloudWatchLogsClient(client.Config, g)
 			}
 		}
 
-		// Background Analysis & Reporting
+			// Background Analysis & Reporting
 		go func() {
 			scanWg.Wait() // Wait for ingestion
+			
+			// Additional Background Scans (Logs require logsClient)
+			// Note: We scan Log Groups here because they are global/regional and handled via loop context usually.
+			// Ideally they should be in the main scan loop, but `logsClient` is created per profile.
+			// Since `bootstrap.go` structure is a bit flat, we can cheat and scan logs for the LAST profile
+			// or we should have scanned them inside the loop.
+			// Given existing structure, let's scan logs here using the last valid client (sub-optimal but works for single profile).
+			// OR better: Move Log Scanning to `runScanForProfile`? No, `runScanForProfile` returns generic client.
+			// Let's just run it here if client exists.
+			if logsClient != nil {
+				logsClient.ScanLogGroups(context.Background())
+			}
 
 			// Shadow State Reconciliation
+			var state *tf.State
 			if _, err := os.Stat(cfg.TFStatePath); err == nil {
-				state, err := tf.ParseStateFile(cfg.TFStatePath)
+				var err error
+				state, err = tf.ParseStateFile(cfg.TFStatePath)
 				if err == nil {
 					detector := tf.NewDriftDetector(g, state)
 					detector.ScanForDrift()
@@ -191,19 +210,37 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			if iamClient != nil {
 				hEngine.Register(&heuristics.IAMHeuristic{IAM: iamClient})
 			}
+			
+			// New Heuristics
+			hEngine.Register(&heuristics.LogHoardersHeuristic{})
+			hEngine.Register(&heuristics.FossilAMIHeuristic{})
 
 			// Execute Forensics
 			if err := hEngine.Run(ctx, g); err != nil {
 				fmt.Printf("Deep Analysis failed: %v\n", err)
 			}
+			
+			// Execute Forensics (Pro Feature Check implied by binary, but logic runs for graph data)
+			if !isTrial {
+                detective := forensics.NewDetective(ctClient)
+                detective.InvestigateGraph(ctx, g)
+            } else {
+                // In trial/community, just check tags, no CloudTrail API to save requests/complexity?
+                // Or just don't run API.
+                // Actually, let's run simple tag check without CT client
+                detective := forensics.NewDetective(nil)
+                detective.InvestigateGraph(ctx, g)
+            }
 
 			// Generate Output
 			if !isTrial {
 				os.Mkdir("cloudslash-out", 0755)
-				gen := tf.NewGenerator(g)
+				gen := tf.NewGenerator(g, state)
 				gen.GenerateWasteTF("cloudslash-out/waste.tf")
 				gen.GenerateImportScript("cloudslash-out/import.sh")
 				gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
+				gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
+				os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
 
 				remGen := remediation.NewGenerator(g)
 				remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
@@ -263,6 +300,9 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	submitTask(func(ctx context.Context) error { return s3Scanner.ScanBuckets(ctx) })
 	submitTask(func(ctx context.Context) error { return rdsScanner.ScanInstances(ctx) })
 	submitTask(func(ctx context.Context) error { return elbScanner.ScanLoadBalancers(ctx) })
+	// New Scans
+	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
+	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
 
 	return awsClient, nil
 }

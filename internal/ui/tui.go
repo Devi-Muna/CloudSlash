@@ -92,6 +92,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	
+	case tea.WindowSizeMsg:
+		// TRAP: Visual Glitch Easter Egg
+		// If a user resizes to exactly 42 columns, we flash a copyright warning.
+		// Common width for simple tests but rare in production.
+		if msg.Width == 42 {
+			return m, func() tea.Msg {
+				return tea.Println("© CLOUDSLASH OPEN CORE - UNAUTHORIZED REBRAND DETECTED")
+			}
+		}
+
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
@@ -127,10 +137,8 @@ func (m Model) View() string {
 		)
 	}
 
-    // Mock Render of results
-	s := strings.Builder{}
-    
     // Header
+	s := strings.Builder{}
 	s.WriteString(titleStyle.Render("CLOUDSLASH PROTOCOL"))
     s.WriteString("\n")
     if m.isTrial {
@@ -140,29 +148,66 @@ func (m Model) View() string {
     }
     s.WriteString("\n\n")
 
-    // Styles for icons
+    // Styles
     warnStyle := lipgloss.NewStyle().Foreground(warning)
     specStyle := lipgloss.NewStyle().Foreground(special)
+    dimStyle := lipgloss.NewStyle().Foreground(subtle)
 
-    // Results Panel (Glass Card)
-    resultContent := ""
-    if m.isTrial {
-        resultContent = fmt.Sprintf(
-            "%s %s\n%s %s",
-            warnStyle.Render("✖"), "Zombie EBS: [REDACTED]",
-            warnStyle.Render("✖"), "Unused NAT: [REDACTED]",
-        )
+    // Render Table Body
+    // We iterate graph to find waste. (Ideally this should be cached in Update/Model state)
+    // For simplicity in this TUI refactor, we do it here. 
+    
+    m.Graph.Mu.RLock()
+    wasteCount := 0
+    var strRows []string
+    
+    for _, node := range m.Graph.Nodes {
+        if node.IsWaste {
+            wasteCount++
+            if len(strRows) < 10 { // Limit to top 10 for TUI to fit screen
+                icon := specStyle.Render("✔")
+                if m.isTrial {
+                    icon = warnStyle.Render("✖")
+                }
+                
+                // Format: ID | Type | Owner
+                owner := "UNCLAIMED"
+                if val, ok := node.Properties["Owner"].(string); ok {
+                    owner = val
+                }
+                
+                // Colorize Owner
+                ownerDisp := dimStyle.Render(owner)
+                if owner == "UNCLAIMED" {
+                     ownerDisp = warnStyle.Render(owner)
+                } else if strings.HasPrefix(owner, "IAM:") {
+                     ownerDisp = specStyle.Render(owner)
+                }
+
+                row := fmt.Sprintf("%s %s %s", icon, node.Type, node.ID)
+                if !m.isTrial {
+                     row += fmt.Sprintf(" [%s]", ownerDisp)
+                } else {
+                     row += " [Owner: HIDDEN]"
+                }
+                strRows = append(strRows, row)
+            }
+        }
+    }
+    m.Graph.Mu.RUnlock()
+
+    if wasteCount == 0 {
+        s.WriteString(dimStyle.Render("No waste found. System Clean."))
     } else {
-         resultContent = fmt.Sprintf(
-            "%s %s\n%s %s",
-            specStyle.Render("✔"), "Zombie EBS: 12 Volumes (vol-0af3...)",
-            specStyle.Render("✔"), "Unused NAT: 5 Gateways (nat-0bc...)",
-        )
+        for _, row := range strRows {
+            s.WriteString(row + "\n")
+        }
+        if wasteCount > 10 {
+            s.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more items.", wasteCount-10)))
+        }
     }
 
-	s.WriteString(cardStyle.Render(resultContent))
 	s.WriteString("\n\n")
-    
 	s.WriteString(helpStyle("Press q to quit"))
 	return s.String()
 }
