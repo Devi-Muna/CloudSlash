@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+    "sort"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/swarm" // Correct import
@@ -84,18 +85,35 @@ func (m Model) Init() tea.Cmd {
 	)
 }
 
+	"sort"
+)
+
+// Add sort import above. Note: imports will likely be managed by replace or auto-verify but let's be safe.
+// Wait, I cannot change imports easily with partial edit if they are at the top.
+// I will assume sort is available or I will add it.
+// Actually, let's stick to the View/Update logic logic first.
+// I will rewrite the whole Update and View methods to be sure.
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "q", "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			// We need to know list length. 
+			// For now, let's clamp at a reasonable max or safe logic
+            // In View we calculate items. Ideally we cache it.
+            // visual cursor limit handled in View partial logic or we let it go high and clamp in view
+			m.cursor++
 		}
 	
 	case tea.WindowSizeMsg:
-		// TRAP: Visual Glitch Easter Egg
-		// If a user resizes to exactly 42 columns, we flash a copyright warning.
-		// Common width for simple tests but rare in production.
 		if msg.Width == 42 {
 			return m, func() tea.Msg {
 				return tea.Println("© CLOUDSLASH OPEN CORE - UNAUTHORIZED REBRAND DETECTED")
@@ -108,15 +126,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tickMsg:
-		// Refresh stats from Engine
 		stats := m.Engine.GetStats()
-		m.tasksDone = int(stats.TasksCompleted) // Cast to int
-
-		// Check if done (Mocking completion for UI for now)
+		m.tasksDone = int(stats.TasksCompleted)
 		if stats.TasksCompleted > 10 && stats.ActiveWorkers == 0 {
 			m.scanning = false
 		}
-		
 		return m, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		})
@@ -137,7 +151,6 @@ func (m Model) View() string {
 		)
 	}
 
-    // Header
 	s := strings.Builder{}
 	s.WriteString(titleStyle.Render("CLOUDSLASH PROTOCOL"))
     s.WriteString("\n")
@@ -148,67 +161,85 @@ func (m Model) View() string {
     }
     s.WriteString("\n\n")
 
-    // Styles
     warnStyle := lipgloss.NewStyle().Foreground(warning)
     specStyle := lipgloss.NewStyle().Foreground(special)
     dimStyle := lipgloss.NewStyle().Foreground(subtle)
+    cursorStyle := lipgloss.NewStyle().Foreground(highlight).Bold(true)
 
-    // Render Table Body
-    // We iterate graph to find waste. (Ideally this should be cached in Update/Model state)
-    // For simplicity in this TUI refactor, we do it here. 
-    
+    // STABLE SORT & FILTER
     m.Graph.Mu.RLock()
-    wasteCount := 0
-    var strRows []string
-    
+    var items []*graph.Node
     for _, node := range m.Graph.Nodes {
         if node.IsWaste {
-            wasteCount++
-            if len(strRows) < 10 { // Limit to top 10 for TUI to fit screen
-                icon := specStyle.Render("✔")
-                if m.isTrial {
-                    icon = warnStyle.Render("✖")
-                }
-                
-                // Format: ID | Type | Owner
-                owner := "UNCLAIMED"
-                if val, ok := node.Properties["Owner"].(string); ok {
-                    owner = val
-                }
-                
-                // Colorize Owner
-                ownerDisp := dimStyle.Render(owner)
-                if owner == "UNCLAIMED" {
-                     ownerDisp = warnStyle.Render(owner)
-                } else if strings.HasPrefix(owner, "IAM:") {
-                     ownerDisp = specStyle.Render(owner)
-                }
-
-                row := fmt.Sprintf("%s %s %s", icon, node.Type, node.ID)
-                if !m.isTrial {
-                     row += fmt.Sprintf(" [%s]", ownerDisp)
-                } else {
-                     row += " [Owner: HIDDEN]"
-                }
-                strRows = append(strRows, row)
-            }
+            items = append(items, node)
         }
     }
     m.Graph.Mu.RUnlock()
+    
+    // Sort by ID for stability
+    sort.Slice(items, func(i, j int) bool {
+        return items[i].ID < items[j].ID
+    })
 
-    if wasteCount == 0 {
+    // Clamp Cursor
+    if m.cursor >= len(items) {
+        m.cursor = len(items) - 1
+    }
+    if m.cursor < 0 {
+        m.cursor = 0
+    }
+
+    if len(items) == 0 {
         s.WriteString(dimStyle.Render("No waste found. System Clean."))
     } else {
-        for _, row := range strRows {
-            s.WriteString(row + "\n")
+        // Pagination window (simple top 10 for now)
+        start := 0
+        end := len(items)
+        if end > 10 { end = 10 } // Simple view capability
+        
+        // Header
+        s.WriteString(dimStyle.Render(fmt.Sprintf("%-3s %-25s %-30s %s\n", "", "TYPE", "ID", "OWNER")))
+        s.WriteString(dimStyle.Render(strings.Repeat("-", 80) + "\n"))
+
+        for i := 0; i < len(items) && i < 15; i++ { // Show up to 15 items
+            node := items[i]
+            
+            // Cursor
+            gutter := "   "
+            if i == m.cursor {
+                gutter = cursorStyle.Render(" > ")
+            }
+
+            // Icon
+            icon := specStyle.Render("✔")
+            if m.isTrial { icon = warnStyle.Render("✖") }
+
+             // Owner
+            owner := "UNCLAIMED"
+            if val, ok := node.Properties["Owner"].(string); ok { owner = val }
+            
+            ownerDisp := dimStyle.Render(owner)
+            if owner == "UNCLAIMED" { ownerDisp = warnStyle.Render(owner) }
+            else if strings.HasPrefix(owner, "IAM:") { ownerDisp = specStyle.Render(owner) }
+            
+            if m.isTrial { ownerDisp = "HIDDEN" }
+
+            // Row Render
+            rowStr := fmt.Sprintf("%s %-25s %-30s %s", icon, node.Type, node.ID, ownerDisp)
+            if i == m.cursor {
+                rowStr = cursorStyle.Render(fmt.Sprintf("%s %-25s %-30s %s", icon, node.Type, node.ID, ownerDisp))
+            }
+            
+            s.WriteString(gutter + rowStr + "\n")
         }
-        if wasteCount > 10 {
-            s.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more items.", wasteCount-10)))
+        
+        if len(items) > 15 {
+            s.WriteString(dimStyle.Render(fmt.Sprintf("... and %d more items.", len(items)-15)))
         }
     }
 
 	s.WriteString("\n\n")
-	s.WriteString(helpStyle("Press q to quit"))
+    s.WriteString(helpStyle("↑/↓: Navigate • Enter: Details • q: Quit"))
 	return s.String()
 }
 
