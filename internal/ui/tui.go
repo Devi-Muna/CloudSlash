@@ -85,9 +85,6 @@ func (m Model) Init() tea.Cmd {
 	)
 }
 
-	"sort"
-)
-
 // Add sort import above. Note: imports will likely be managed by replace or auto-verify but let's be safe.
 // Wait, I cannot change imports easily with partial edit if they are at the top.
 // I will assume sort is available or I will add it.
@@ -192,10 +189,7 @@ func (m Model) View() string {
     if len(items) == 0 {
         s.WriteString(dimStyle.Render("No waste found. System Clean."))
     } else {
-        // Pagination window (simple top 10 for now)
-        start := 0
-        end := len(items)
-        if end > 10 { end = 10 } // Simple view capability
+        // Pagination window (simple top 15 for now)
         
         // Header
         s.WriteString(dimStyle.Render(fmt.Sprintf("%-3s %-25s %-30s %s\n", "", "TYPE", "ID", "OWNER")))
@@ -219,8 +213,11 @@ func (m Model) View() string {
             if val, ok := node.Properties["Owner"].(string); ok { owner = val }
             
             ownerDisp := dimStyle.Render(owner)
-            if owner == "UNCLAIMED" { ownerDisp = warnStyle.Render(owner) }
-            else if strings.HasPrefix(owner, "IAM:") { ownerDisp = specStyle.Render(owner) }
+            if owner == "UNCLAIMED" { 
+                ownerDisp = warnStyle.Render(owner) 
+            } else if strings.HasPrefix(owner, "IAM:") { 
+                ownerDisp = specStyle.Render(owner) 
+            }
             
             if m.isTrial { ownerDisp = "HIDDEN" }
 
