@@ -17,6 +17,12 @@ Thumbs.db
 license-server/node_modules/
 .wrangler/
 
+# Credentials & Local Config
+astra.toml
+debug_plans.js
+sync.sh
+setup_env.sh
+
 # Terraform
 *.tfstate
 *.tfstate.backup
