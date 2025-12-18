@@ -31,16 +31,18 @@ export default {
           );
         }
 
-        // Use Product ID for scope by default (assuming Product Keys)
-        const scopeId = env.PRODUCT_ID;
+        // Use Developer ID for scope (assuming Developer Secret Key)
+        const scopeId = env.FREEMIUS_ID;
 
         // 1. Check License via Freemius API (Using /plugins/ endpoint)
-        const path = `/v1/plugins/${env.PRODUCT_ID}/licenses.json?filter=key=${licenseKey}&count=1`;
+        // Query params MUST be sorted alphabetically for signature to match!
+        // count (c) comes before filter (f)
+        const path = `/v1/plugins/${env.PRODUCT_ID}/licenses.json?count=1&filter=key=${licenseKey}`;
         const fsUrl = `https://api.freemius.com${path}`;
 
         const authHeaders = await signFreemiusRequest(
           "GET",
-          path,
+          path, // Sign the full path including /v1
           scopeId,
           env.FREEMIUS_PUBLIC_KEY,
           env.FREEMIUS_SECRET_KEY
@@ -52,11 +54,11 @@ export default {
         });
 
         if (!fsResp.ok) {
-          // console.error("Freemius API Error:", fsResp.status, await fsResp.text());
+          const errText = await fsResp.text();
           return new Response(
             JSON.stringify({
               valid: false,
-              reason: "Verification Server Error",
+              reason: `Freemius Error ${fsResp.status}: ${errText}`,
             }),
             {
               headers: { "Content-Type": "application/json" },
