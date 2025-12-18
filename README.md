@@ -6,9 +6,16 @@
 
 CloudSlash identifies idle, orphaned, and underutilized resources in your AWS environment. Unlike tools that rely solely on "Status" checks, CloudSlash correlates CloudWatch metrics with resource topology to find actual waste (e.g., available volumes with no IOPS, NAT Gateways with low throughput).
 
-![License](https://img.shields.io/badge/license-Commercial-blue.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
 ![Version](https://img.shields.io/badge/version-v1.0.3-brightgreen)
+
+## Open Source & Commercial
+
+CloudSlash is **Open Source** (AGPLv3). We believe in transparent security.
+
+- **Community Edition:** Free to use personally. Audit your own infrastructure. [Contribute on GitHub](CONTRIBUTING.md).
+- **Commercial License:** Unlocks automated reporting, Terraform remediation generation, and commercial support. [Get a License](https://cloudslash.pages.dev).
 
 ## Core Capabilities
 
