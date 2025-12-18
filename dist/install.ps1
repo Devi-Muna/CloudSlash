@@ -3,8 +3,9 @@
 
 $RepoUser = "DrSkyle"
 $RepoName = "CloudSlash"
-$Branch = "main"
-$BaseUrl = "https://raw.githubusercontent.com/$RepoUser/$RepoName/$Branch/dist"
+$RepoUser = "DrSkyle"
+$RepoName = "CloudSlash"
+$BaseUrl = "https://github.com/$RepoUser/$RepoName/releases/latest/download"
 
 $BinaryName = "cloudslash-windows-amd64.exe"
 $TargetUrl = "$BaseUrl/$BinaryName"
