@@ -42,7 +42,7 @@ export default {
 
         const authHeaders = await signFreemiusRequest(
           "GET",
-          path, // Sign the full path including /v1
+          path.replace('/v1', ''), // Signing path without /v1 (as seen in error logs)
           scopeId,
           env.FREEMIUS_PUBLIC_KEY,
           env.FREEMIUS_SECRET_KEY

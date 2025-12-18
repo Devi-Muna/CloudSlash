@@ -10,7 +10,7 @@ id = "e0f419014671448f929ca73d78a62349"
 [vars]
 # Freemius Configuration
 PRODUCT_ID = "22411"
-FREEMIUS_ID = "10501"
+FREEMIUS_ID = "22411"
 FREEMIUS_PUBLIC_KEY = "pk_fe7225bdb16e44cd1d9495f1be97c"
 # Secrets (Set via `npx wrangler secret put ...`):
 # - FREEMIUS_SECRET_KEY
