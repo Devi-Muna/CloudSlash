@@ -52,3 +52,25 @@ jobs:
 
       - name: Smoke Test - Mock Scan
         run: ./cloudslash scan --mock
+
+  # 3. macOS Verification
+  verify-mac:
+    name: macOS Latest (ARM64)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Build Binary
+        run: go build -v -ldflags="-X 'github.com/DrSkyle/CloudSlash/cmd/cloudslash/commands.CurrentVersion=v1.0.3-CI'" -o cloudslash ./cmd/cloudslash
+
+      - name: Smoke Test - Version
+        run: ./cloudslash --version
+
+      - name: Smoke Test - Mock Scan
+        run: ./cloudslash scan --mock
