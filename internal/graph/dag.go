@@ -2,6 +2,7 @@ package graph
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"sync"
@@ -27,12 +28,14 @@ type Edge struct {
 
 // Node represents a resource in the infrastructure graph.
 type Node struct {
-	ID         string                 // Unique Identifier (ARN)
-	Type       string                 // Resource Type (e.g., "AWS::EC2::Instance")
-	Properties map[string]interface{} // Resource attributes
-	IsWaste    bool                   // Flagged as waste?
-	RiskScore  int                    // 0-100
-	Cost       float64                // Monthly cost estimate
+	ID            string                 // Unique Identifier (ARN)
+	Type          string                 // Resource Type (e.g., "AWS::EC2::Instance")
+	Properties    map[string]interface{} // Resource attributes
+	IsWaste       bool                   // Flagged as waste?
+	Justified     bool                   // Is this accepted/known waste?
+	Justification string                 // Reason for justification
+	RiskScore     int                    // 0-100
+	Cost          float64                // Monthly cost estimate
 }
 
 // Graph represents the infrastructure topology as a Weighted DAG.
@@ -178,11 +181,32 @@ func (g *Graph) MarkWaste(id string, score int) {
 		if tags, ok := node.Properties["Tags"].(map[string]string); ok {
 			if val, ok := tags["cloudslash:ignore"]; ok {
 				val = strings.ToLower(strings.TrimSpace(val))
+				
 				// 1. Ignore Forever
 				if val == "true" {
 					return
 				}
-				// 2. Ignore Until Date (YYYY-MM-DD)
+				
+				// 2. Cost-Based Ignore (cost<10.50)
+				if strings.HasPrefix(val, "cost<") {
+					limitStr := strings.TrimPrefix(val, "cost<")
+					if limit, err := strconv.ParseFloat(limitStr, 64); err == nil {
+						if node.Cost < limit {
+							return
+						}
+					}
+				}
+
+				// 3. Justified Waste (justified:compliance)
+				if strings.HasPrefix(val, "justified:") {
+					node.IsWaste = true
+					node.Justified = true
+					node.Justification = strings.TrimPrefix(val, "justified:")
+					node.RiskScore = score
+					return
+				}
+
+				// 4. Ignore Until Date (YYYY-MM-DD)
 				if ignoreUntil, err := time.Parse("2006-01-02", val); err == nil {
 					if time.Now().Before(ignoreUntil) {
 						return

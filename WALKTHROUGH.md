@@ -66,6 +66,15 @@ Helper script for remediation.
 
 (Pro Only) Generates Terraform code representing the waste resources, allowing you to `terraform import` them and manage their destruction via IaC.
 
+### 4. Suppression (`ignore_resources.sh`)
+
+If you want to keep the resources but stop CloudSlash from reporting them:
+
+1.  Review the `cloudslash-out/ignore_resources.sh` script.
+2.  Run it: `bash cloudslash-out/ignore_resources.sh`
+3.  It applies a `cloudslash:ignore=true` tag.
+4.  Subsequent scans will respect this tag and exclude the resource from waste reports.
+
 ---
 
 ## 4. Heuristic Logic

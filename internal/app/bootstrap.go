@@ -246,6 +246,9 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 				remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
 				os.Chmod("cloudslash-out/safe_cleanup.sh", 0755)
 
+				remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
+				os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
+
 				if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
 					fmt.Printf("Failed to generate dashboard: %v\n", err)
 				}

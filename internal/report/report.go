@@ -19,6 +19,7 @@ type ReportData struct {
 	TotalResources   int
 	ProjectedSavings float64 // Annual
 	WasteItems       []WasteItem
+	JustifiedItems   []WasteItem // New selection for justified waste
 
 	// Chart Data
 	ChartLabelsJSON template.JS
@@ -157,8 +158,12 @@ const htmlTemplate = `
                 <div class="metric-value money">${{printf "%.2f" .ProjectedSavings}}</div>
             </div>
             <div class="card">
-                <span class="metric-label">Wasted Resources Identified</span>
+                <span class="metric-label">Actionable Waste</span>
                 <div class="metric-value count">{{.TotalWaste}} / {{.TotalResources}}</div>
+            </div>
+            <div class="card" style="opacity: 0.7;">
+                <span class="metric-label">Justified / Ignored Risks</span>
+                <div class="metric-value">{{len .JustifiedItems}}</div>
             </div>
         </div>
 
@@ -213,6 +218,50 @@ const htmlTemplate = `
                     {{end}}
                 </tbody>
             </table>
+        </div>
+
+        {{if .JustifiedItems}}
+        <div class="card" style="margin-top: 3rem; opacity: 0.8;">
+            <h2 style="margin-top:0; margin-bottom:1.5rem; color: var(--text-secondary);">Justified Risks (Excluded from Remediation)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Resource ID</th>
+                        <th>Type</th>
+                        <th>Justification</th>
+                        <th>Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .JustifiedItems}}
+                    <tr>
+                        <td style="font-family: monospace;">{{.ID}}</td>
+                        <td><span class="badge">{{.Type}}</span></td>
+                        <td>{{.Reason}}</td>
+                        <td>${{printf "%.2f" .Cost}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{end}}
+
+        <div class="card" style="margin-top: 3rem;">
+            <h2 style="margin-top:0; margin-bottom:1rem;">Next Steps</h2>
+            <div class="grid" style="margin-bottom:0;">
+                 <div>
+                    <h3 style="margin-top:0;">🧹 Remediation</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/safe_cleanup.sh</code> to snapshot and delete identify waste.</p>
+                </div>
+                 <div>
+                    <h3 style="margin-top:0;">🙈 Suppression</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/ignore_resources.sh</code> to tag resources as ignored (<code>cloudslash:ignore</code>).</p>
+                </div>
+                 <div>
+                    <h3 style="margin-top:0;">🏗️ Terraform</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/fix_terraform.sh</code> to remove waste from your state file (Pro Only).</p>
+                </div>
+            </div>
         </div>
         
         <footer style="margin-top: 3rem; text-align: center; color: var(--text-secondary); font-size: 0.75rem;">
@@ -299,13 +348,9 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 	data.TotalResources = len(g.Nodes)
 	for _, node := range g.Nodes {
 		if node.IsWaste {
-			data.TotalWaste++
-			data.TotalWasteCost += node.Cost
-
 			// Short Type Name
 			parts := strings.Split(node.Type, "::")
 			shortType := parts[len(parts)-1]
-			costByType[shortType] += node.Cost
 
 			// Simple ID formatting
 			idShort := node.ID
@@ -318,13 +363,23 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 				reason = r
 			}
 
-			data.WasteItems = append(data.WasteItems, WasteItem{
+			item := WasteItem{
 				ID:        idShort,
 				Type:      shortType,
-				Reason:    reason,
+				Reason:    reason, // Default reason
 				Cost:      node.Cost,
 				RiskScore: node.RiskScore,
-			})
+			}
+
+			if node.Justified {
+				item.Reason = node.Justification // Override reason with justification
+				data.JustifiedItems = append(data.JustifiedItems, item)
+			} else {
+				data.TotalWaste++
+				data.TotalWasteCost += node.Cost
+				costByType[shortType] += node.Cost
+				data.WasteItems = append(data.WasteItems, item)
+			}
 		}
 	}
 	g.Mu.RUnlock()

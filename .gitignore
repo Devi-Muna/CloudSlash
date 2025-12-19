@@ -39,3 +39,8 @@ npm-debug.log*
 # Astra/Agent Reports (Optional, keeping repo clean)
 astra-*-report.html
 report.pdf
+
+# Local Dev Junk (Do Not Commit)
+cloudslash_local
+go/
+*.tar.gz

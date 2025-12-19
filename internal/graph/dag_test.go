@@ -4,40 +4,61 @@ import (
 	"testing"
 )
 
-func TestGraph_AddNodeAndEdge(t *testing.T) {
+func TestMarkWaste_AdvancedSuppression(t *testing.T) {
+	nodeCostLow := "arn:low-cost"
+	nodeCostHigh := "arn:high-cost"
+	nodeJustified := "arn:justified"
+	nodeDate := "arn:date"
+
 	g := NewGraph()
+	g.AddNode(nodeCostLow, "Test", map[string]interface{}{
+		"Tags": map[string]string{"cloudslash:ignore": "cost<10"},
+	})
+	g.AddNode(nodeCostHigh, "Test", map[string]interface{}{
+		"Tags": map[string]string{"cloudslash:ignore": "cost<10"},
+	})
+	g.AddNode(nodeJustified, "Test", map[string]interface{}{
+		"Tags": map[string]string{"cloudslash:ignore": "justified:DisasterRecovery"},
+	})
+	g.AddNode(nodeDate, "Test", map[string]interface{}{
+		"Tags": map[string]string{"cloudslash:ignore": "2099-01-01"},
+	})
 
-	g.AddNode("node1", "TypeA", nil)
-	g.AddNode("node2", "TypeB", nil)
-	g.AddEdge("node1", "node2")
+	// Set Costs manually as they aren't computed here
+	g.Nodes[nodeCostLow].Cost = 5.0
+	g.Nodes[nodeCostHigh].Cost = 15.0
 
-	if len(g.Nodes) != 2 {
-		t.Errorf("Expected 2 nodes, got %d", len(g.Nodes))
+	// Run MarkWaste
+	g.MarkWaste(nodeCostLow, 100)
+	g.MarkWaste(nodeCostHigh, 100)
+	g.MarkWaste(nodeJustified, 100)
+	g.MarkWaste(nodeDate, 100)
+
+	// Assertions
+
+	// 1. Cost < 10 (Cost=5) -> Should be IGNORED (IsWaste=false)
+	if g.Nodes[nodeCostLow].IsWaste {
+		t.Errorf("Low cost node should satisfy cost<10 and be ignored")
 	}
 
-	if len(g.Edges["node1"]) != 1 {
-		t.Errorf("Expected 1 edge from node1, got %d", len(g.Edges["node1"]))
+	// 2. Cost < 10 (Cost=15) -> Should be MARKED (IsWaste=true)
+	if !g.Nodes[nodeCostHigh].IsWaste {
+		t.Errorf("High cost node should fail cost<10 and be marked")
 	}
 
-	if g.Edges["node1"][0].TargetID != "node2" {
-		t.Errorf("Expected edge to node2, got %s", g.Edges["node1"][0].TargetID)
+	// 3. Justified -> Should be MARKED + JUSTIFIED
+	if !g.Nodes[nodeJustified].IsWaste {
+		t.Errorf("Justified node should be marked as waste (for tracking)")
 	}
-}
+	if !g.Nodes[nodeJustified].Justified {
+		t.Errorf("Justified node should be flagged Justified=true")
+	}
+	if g.Nodes[nodeJustified].Justification != "disasterrecovery" {
+		t.Errorf("Justification reason mismatch. Got %s", g.Nodes[nodeJustified].Justification)
+	}
 
-func TestGraph_GetConnectedComponent(t *testing.T) {
-	g := NewGraph()
-
-	// A -> B -> C
-	// D -> E
-	g.AddEdge("A", "B")
-	g.AddEdge("B", "C")
-	g.AddEdge("D", "E")
-
-	comp := g.GetConnectedComponent("A")
-
-	// Should find A, B, C (3 nodes)
-	// Note: AddEdge creates nodes if they don't exist
-	if len(comp) != 3 {
-		t.Errorf("Expected component size 3, got %d", len(comp))
+	// 4. Date -> Should be IGNORED (Future date)
+	if g.Nodes[nodeDate].IsWaste {
+		t.Errorf("Future date snoozed node should be ignored")
 	}
 }

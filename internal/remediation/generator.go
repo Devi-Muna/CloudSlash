@@ -3,6 +3,7 @@ package remediation
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -85,6 +86,74 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 		fmt.Fprintf(f, "echo \"No waste found to remediate.\"\n")
 	} else {
 		fmt.Fprintf(f, "echo \"Safe Remediation Complete. %d resources processed.\"\n", wasteCount)
+	}
+
+	return nil
+}
+
+// GenerateIgnoreScript creates a script to tag resources as ignored.
+func (g *Generator) GenerateIgnoreScript(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	g.Graph.Mu.RLock()
+	defer g.Graph.Mu.RUnlock()
+
+	fmt.Fprintf(f, "#!/bin/bash\n")
+	fmt.Fprintf(f, "# CloudSlash Ignore Tagging Script\n")
+	fmt.Fprintf(f, "# Generated: %s\n\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintf(f, "# Run this script to suppressed reporting for these resources in future scans.\n")
+	fmt.Fprintf(f, "set -e\n\n")
+
+	// Collect waste nodes first to sort them for deterministic output
+	type wasteItem struct {
+		ID   string
+		Type string
+	}
+	var items []wasteItem
+
+	for _, node := range g.Graph.Nodes {
+		if node.IsWaste && !node.Justified {
+			items = append(items, wasteItem{ID: node.ID, Type: node.Type})
+		}
+	}
+
+	// Sort by ID
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ID < items[j].ID
+	})
+
+	count := 0
+	for _, item := range items {
+		resourceID := extractResourceID(item.ID)
+		
+		// Map CloudFormation/Graph types to AWS CLI resource types/service prefixes if needed?
+		// aws resourcegroupstaggingapi tag-resources takes ARNs.
+		// CloudSlash Nodes usually have ARNs as ID, except maybe some.
+		// Let's check if ID looks like an ARN.
+		
+		arg := item.ID
+		if !strings.HasPrefix(item.ID, "arn:") {
+			// If it's not an ARN, resourcegroupstaggingapi might fail or we might need service specific command.
+			// However, CloudSlash tries to use ARNs for most things.
+			// For those that aren't ARNs, we might skip or try best effort.
+			// Let's comment in the script.
+			fmt.Fprintf(f, "# Skipping non-ARN resource: %s\n", item.ID)
+			continue
+		}
+
+		fmt.Fprintf(f, "echo \"Ignoring: %s\"\n", resourceID)
+		fmt.Fprintf(f, "aws resourcegroupstaggingapi tag-resources --resource-arn-list %s --tags cloudslash:ignore=true\n", arg)
+		count++
+	}
+
+	if count == 0 {
+		fmt.Fprintf(f, "echo \"No waste found to ignore.\"\n")
+	} else {
+		fmt.Fprintf(f, "echo \"Ignore Tagging Complete. %d resources tagged.\"\n", count)
 	}
 
 	return nil

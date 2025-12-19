@@ -131,6 +131,15 @@ Automatically enabled for licensed users.
 - **Red "UNCLAIMED"**: No tags, no CloudTrail creation event found (orphan).
 - **Green "IAM:user"**: Identified creator via CloudTrail.
 
+### 🏷️ Suppression (Tags)
+
+CloudSlash allows you to "ack" waste without deleting it.
+
+1. Run a scan.
+2. Execute `bash cloudslash-out/ignore_resources.sh`.
+3. This applies the `cloudslash:ignore=true` tag to all currently identified waste.
+4. Future scans will skip these resources (or un-mark them as waste).
+
 ## Architecture
 
 Built in Go. Uses an in-memory graph to model resource relationships. The TUI is powered by Bubble Tea.
