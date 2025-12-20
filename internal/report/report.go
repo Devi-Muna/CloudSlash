@@ -33,6 +33,7 @@ type WasteItem struct {
 	Reason    string
 	Cost      float64
 	RiskScore int
+	SrcLoc    string
 }
 
 const htmlTemplate = `
@@ -193,6 +194,7 @@ const htmlTemplate = `
                         <th>Type</th>
                         <th>Risk Score</th>
                         <th>Est. Monthly Cost</th>
+                        <th>Source</th>
                         <th>Reason</th>
                     </tr>
                 </thead>
@@ -209,11 +211,12 @@ const htmlTemplate = `
                             {{end}}
                         </td>
                         <td>${{printf "%.2f" .Cost}}</td>
+                        <td style="font-family: monospace; font-size: 0.8em; color: var(--accent);">{{.SrcLoc}}</td>
                         <td>{{.Reason}}</td>
                     </tr>
                     {{else}}
                     <tr>
-                        <td colspan="5" style="text-align: center; padding: 2rem;">No waste found! Your infrastructure is clean. ✨</td>
+                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No waste identified. Infrastructure is optimized.</td>
                     </tr>
                     {{end}}
                 </tbody>
@@ -247,18 +250,18 @@ const htmlTemplate = `
         {{end}}
 
         <div class="card" style="margin-top: 3rem;">
-            <h2 style="margin-top:0; margin-bottom:1rem;">Next Steps</h2>
+            <h2 style="margin-top:0; margin-bottom:1rem;">Recommended Actions</h2>
             <div class="grid" style="margin-bottom:0;">
                  <div>
-                    <h3 style="margin-top:0;">🧹 Remediation</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/safe_cleanup.sh</code> to snapshot and delete identify waste.</p>
+                    <h3 style="margin-top:0; color: var(--accent);">Remediation</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/safe_cleanup.sh</code> to snapshot and delete identified waste.</p>
                 </div>
                  <div>
-                    <h3 style="margin-top:0;">🙈 Suppression</h3>
+                    <h3 style="margin-top:0; color: var(--text-primary);">Suppression</h3>
                     <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/ignore_resources.sh</code> to tag resources as ignored (<code>cloudslash:ignore</code>).</p>
                 </div>
                  <div>
-                    <h3 style="margin-top:0;">🏗️ Terraform</h3>
+                    <h3 style="margin-top:0; color: var(--text-primary);">Terraform</h3>
                     <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/fix_terraform.sh</code> to remove waste from your state file (Pro Only).</p>
                 </div>
             </div>
@@ -369,6 +372,7 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 				Reason:    reason, // Default reason
 				Cost:      node.Cost,
 				RiskScore: node.RiskScore,
+				SrcLoc:    node.SourceLocation, // Populate Source Location
 			}
 
 			if node.Justified {

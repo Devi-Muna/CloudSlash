@@ -15,7 +15,8 @@ import (
 
 // NATGatewayHeuristic checks for unused NAT Gateways.
 type NATGatewayHeuristic struct {
-	CW *internalaws.CloudWatchClient
+	CW      *internalaws.CloudWatchClient
+	Pricing *pricing.Client
 }
 
 func (h *NATGatewayHeuristic) Name() string { return "NATGatewayHeuristic" }
@@ -62,6 +63,14 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		if maxConns < 5 && sumBytes < 1e9 {
 			g.MarkWaste(node.ID, 80)
 			node.Properties["Reason"] = fmt.Sprintf("Unused NAT Gateway: MaxConns=%.0f, BytesOut=%.0f", maxConns, sumBytes)
+			
+			if h.Pricing != nil {
+				// NAT is usually region-based, but we can assume us-east-1 for simple estimate or parse region from ARN
+				cost, err := h.Pricing.GetNATGatewayPrice(ctx, "us-east-1")
+				if err == nil {
+					node.Cost = cost
+				}
+			}
 		}
 	}
 	return nil
@@ -158,7 +167,9 @@ func (h *ZombieEBSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 }
 
 // ElasticIPHeuristic checks for EIPs attached to stopped instances or unattached.
-type ElasticIPHeuristic struct{}
+type ElasticIPHeuristic struct{
+	Pricing *pricing.Client
+}
 
 func (h *ElasticIPHeuristic) Name() string { return "ElasticIPHeuristic" }
 
@@ -176,6 +187,13 @@ func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			node.IsWaste = true
 			node.RiskScore = 50
 			node.Properties["Reason"] = "Unattached Elastic IP"
+
+			if h.Pricing != nil {
+				cost, err := h.Pricing.GetEIPPrice(ctx, "us-east-1")
+				if err == nil {
+					node.Cost = cost
+				}
+			}
 			continue
 		}
 
@@ -477,5 +495,66 @@ func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			}
 		}
 	}
+	return nil
+}
+
+// SnapshotChildrenHeuristic finds snapshots created from Waste Volumes.
+// "The Time Machine" Feature.
+type SnapshotChildrenHeuristic struct {
+	Pricing *pricing.Client
+}
+
+func (h *SnapshotChildrenHeuristic) Name() string { return "SnapshotChildrenHeuristic" }
+
+func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+	g.Mu.RLock()
+	var snapshots []*graph.Node
+	wasteVolumes := make(map[string]bool)
+
+	// 1. Identify Waste Volumes first
+	for _, node := range g.Nodes {
+		if node.Type == "AWS::EC2::Volume" && node.IsWaste {
+			// Extract ID from ARN usually, or assume ID is in Properties if graph builder put it there.
+			// Graph builder usually uses ARN as ID. We need the raw ID (vol-xyz).
+			// Let's parse it from ARN "arn:aws:ec2:region:account:volume/vol-123".
+			parts := strings.Split(node.ID, "/")
+			if len(parts) > 1 {
+				volID := parts[len(parts)-1]
+				wasteVolumes[volID] = true
+			}
+		}
+		if node.Type == "AWS::EC2::Snapshot" {
+			snapshots = append(snapshots, node)
+		}
+	}
+	g.Mu.RUnlock()
+
+	// 2. Check Snapshots against Waste Volumes
+	for _, snap := range snapshots {
+		volID, ok := snap.Properties["VolumeId"].(string)
+		if !ok || volID == "" {
+			continue
+		}
+
+		if wasteVolumes[volID] {
+			// It's a snapshot of a zombie volume!
+			g.MarkWaste(snap.ID, 90) // High confidence
+			snap.Properties["Reason"] = fmt.Sprintf("Snapshot of Waste Volume (%s)", volID)
+
+			// Calculate Cost
+			// Snapshot pricing is complex (incremental), but $0.05/GB is a safe standard upper bound for standard tier.
+			sizeGB := 0
+			if s, ok := snap.Properties["VolumeSize"].(int32); ok {
+				sizeGB = int(s)
+			} else if s, ok := snap.Properties["VolumeSize"].(int); ok {
+				sizeGB = s
+			}
+
+			if sizeGB > 0 {
+				snap.Cost = float64(sizeGB) * 0.05
+			}
+		}
+	}
+
 	return nil
 }

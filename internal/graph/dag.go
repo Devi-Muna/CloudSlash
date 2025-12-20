@@ -36,6 +36,7 @@ type Node struct {
 	Justification string                 // Reason for justification
 	RiskScore     int                    // 0-100
 	Cost          float64                // Monthly cost estimate
+	SourceLocation string                // e.g. "storage.tf:24"
 }
 
 // Graph represents the infrastructure topology as a Weighted DAG.

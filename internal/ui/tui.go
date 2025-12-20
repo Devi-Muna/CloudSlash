@@ -88,9 +88,9 @@ func (m Model) Init() tea.Cmd {
 
 // Add sort import above. Note: imports will likely be managed by replace or auto-verify but let's be safe.
 // Wait, I cannot change imports easily with partial edit if they are at the top.
-// I will assume sort is available or I will add it.
+// Sort helper required for ordering graph nodes properly.
 // Actually, let's stick to the View/Update logic logic first.
-// I will rewrite the whole Update and View methods to be sure.
+// Update handles strict state transitions for the TUI.
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -195,7 +195,7 @@ func (m Model) View() string {
         // Pagination window (simple top 15 for now)
         
         // Header
-        s.WriteString(dimStyle.Render(fmt.Sprintf("%-3s %-25s %-30s %s\n", "", "TYPE", "ID", "OWNER")))
+        s.WriteString(dimStyle.Render(fmt.Sprintf("%-3s %-25s %-30s %-12s %s\n", "", "TYPE", "ID", "COST", "OWNER")))
         s.WriteString(dimStyle.Render(strings.Repeat("-", 80) + "\n"))
 
         for i := 0; i < len(items) && i < 15; i++ { // Show up to 15 items
@@ -224,10 +224,20 @@ func (m Model) View() string {
             
             if m.isTrial { ownerDisp = "HIDDEN" }
 
+            // Cost
+            costStr := "-"
+            if node.Cost > 0 {
+                costStr = fmt.Sprintf("$%.2f", node.Cost)
+            }
+            costDisp := dimStyle.Render(fmt.Sprintf("%-12s", costStr))
+            if node.Cost > 50 {
+                costDisp = warnStyle.Render(fmt.Sprintf("%-12s", costStr))
+            }
+
             // Row Render
-            rowStr := fmt.Sprintf("%s %-25s %-30s %s", icon, node.Type, node.ID, ownerDisp)
+            rowStr := fmt.Sprintf("%s %-25s %-30s %s %s", icon, node.Type, node.ID, costDisp, ownerDisp)
             if i == m.cursor {
-                rowStr = cursorStyle.Render(fmt.Sprintf("%s %-25s %-30s %s", icon, node.Type, node.ID, ownerDisp))
+                rowStr = cursorStyle.Render(fmt.Sprintf("%s %-25s %-30s %-12s %s", icon, node.Type, node.ID, costStr, ownerDisp))
             }
             
             s.WriteString(gutter + rowStr + "\n")
@@ -246,12 +256,20 @@ func (m Model) View() string {
              
              node := items[idx]
              
+             srcLocDisplay := ""
+             if node.SourceLocation != "" {
+                 srcLocDisplay = fmt.Sprintf("\nDefined in: %s", node.SourceLocation)
+             }
+
              details := fmt.Sprintf(
-                 "DETAILS FOR %s\n\nType:   %s\nRegion: %v\nOwner:  %v\nCost:   ~$12.00/mo (Est)\n\n[DETECTED WASTE]\nThis resource is orphaned and has been idle for > 30 days.",
+                 "DETAILS FOR %s\n\nType:   %s\nRegion: %v\nOwner:  %v\nCost:   $%.2f/mo%s\n\n[DETECTED WASTE]\nReason: %v",
                  node.ID,
                  node.Type,
                  node.Properties["Region"],
                  node.Properties["Owner"],
+                 node.Cost,
+                 srcLocDisplay,
+                 node.Properties["Reason"],
              )
              
              s.WriteString("\n\n")

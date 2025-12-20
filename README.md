@@ -39,7 +39,7 @@ CloudSlash is **Open Source** (AGPLv3) to guarantee transparency and community f
 
 Unlike AWS Trusted Advisor, which primarily lists idle resources, CloudSlash offers:
 
-1.  **Reverse-Terraform**: Generates a `fix_terraform.sh` script to surgically remove waste from the Terraform State, preventing re-creation during the next apply.
+1.  **Orphaned Resource Cleanup**: Generates scripts to remove resources that have detached from your infrastructure logic (e.g. Volumes left behind after termination).
 2.  **Owner Forensics**: Traces CloudTrail logs to identify the IAM User or Role responsible for the resource creation.
 3.  **Blast Radius Calculation**: Analyzes graph dependencies to ensure safe deletion of connected components.
 
