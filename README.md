@@ -8,7 +8,7 @@ CloudSlash identifies idle, orphaned, and underutilized resources in AWS environ
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
-![Version](https://img.shields.io/badge/version-v1.1.8-brightgreen)
+![Version](https://img.shields.io/badge/version-v1.2--beta-orange)
 
 > **New to CloudSlash?** Check out the complete [**User Walkthrough**](WALKTHROUGH.md) for a step-by-step guide.
 
@@ -25,11 +25,12 @@ CloudSlash is **Open Source** (AGPLv3) to guarantee transparency and community f
 - **Zero Trust Scanning**: Verifies utilization via telemetry rather than metadata.
 - **Read-Only**: Operates with `ViewOnlyAccess`. No write permissions required.
 - **Graph-Based Detection**: Builds a resource dependency graph to calculate blast radius and identify connected clusters of waste.
-- **Drift Detection**: Compares live infrastructure against Terraform state.
+- **Terraform Code Auditor**: Maps waste resources back to the exact file and line number in your local Terraform code (Reverse-Lookup).
 - **Heuristic Analysis**:
   - **Zombie EBS**: Detects available volumes or attached volumes with 0 IOPS/30 days.
   - **Idle NAT Gateways**: Identifies gateways costing hourly rates but processing minimal traffic (<1GB/month).
   - **S3 Multipart Uploads**: Finds incomplete uploads consuming storage space.
+  - **The Time Machine**: Recursively identifies snapshots created from waste volumes.
   - **Fossil Snapshots**: RDS Snapshots unlinked from any active cluster.
   - **Orphaned ELBs**: Load Balancers with zero requests.
   - **Loose EIPs**: Unassociated Elastic IPs.
@@ -95,6 +96,14 @@ CloudSlash checks for updates automatically. To upgrade manually:
 
 ```bash
 cloudslash update
+```
+
+### 5. Safety Brake (Interactive Nuke)
+
+Interactively delete identified waste with a confirmation safety net.
+
+```bash
+cloudslash nuke
 ```
 
 ## Security

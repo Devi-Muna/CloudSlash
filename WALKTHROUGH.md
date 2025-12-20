@@ -48,7 +48,32 @@ CloudSlash queries the AWS Price List API to calculate the monthly cost of ident
 
 ---
 
-## 3. Artifacts and Remediation
+## 3. Advanced Features (v1.2)
+
+### Terraform Code Auditor
+
+Instead of modifying state, CloudSlash now tells you _where_ to delete code.
+
+- **How it works**: Parses `terraform.tfstate` to map the Resource ID (e.g., `vol-0a...`) to a Terraform address (`aws_ebs_volume.logs`), then scans your `.tf` files to find the definition.
+- **Output**: Displayed in the TUI as `Defined in: modules/storage/main.tf:45`.
+
+### The Time Machine
+
+Heuristic that finds snapshots of waste volumes.
+
+- **Logic**: If Volume A is waste, and Snapshot B was created from Volume A, then Snapshot B is also waste.
+- **Impact**: Recursively calculates hidden storage costs.
+
+### Safety Brake (`cloudslash nuke`)
+
+Interactive cleanup mode.
+
+- **Usage**: `cloudslash nuke`
+- **Flow**: Presents each waste item and asks for explicit confirmation before calling the AWS Delete API.
+
+---
+
+## 4. Artifacts and Remediation
 
 After a scan completes, the `cloudslash-out/` directory contains the following artifacts:
 
@@ -66,9 +91,9 @@ Helper script for remediation.
 
 (Pro Feature) Generates Terraform code representing the waste resources, allowing them to be imported via `terraform import` managed destruction via IaC.
 
-### 4. Reverse Terraform (`fix_terraform.sh`)
+### 4. SaaS Killer Export (`waste_report.csv` / `.json`)
 
-(Pro Feature) Generates a script to remove the waste resources from the Terraform State files (`.tfstate`), preventing them from being recreated by Terraform during the next apply.
+(Pro Feature) Generates raw data exports in CSV and JSON format, suitable for external consulting reports or custom dashboards.
 
 ### 5. Suppression (`ignore_resources.sh`)
 
