@@ -127,39 +127,42 @@ sudo rm /usr/local/bin/cloudslash
 Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 ```
 
-## Advanced Features (v1.1)
+## Feature Matrix (v1.2.2 Released)
 
-### Reverse-Terraform (Pro)
+We are constantly crushing bugs and adding features. Here is what's new:
 
-CloudSlash generates a `fix_terraform.sh` script in the output directory.
+### ⚡ Core Engine
 
-1. Run a scan: `cloudslash --license ...`
-2. Inspect the script: `cat cloudslash-out/fix_terraform.sh`
-3. Execute to safely remove waste from state: `bash cloudslash-out/fix_terraform.sh`
+- **Robust Installer**: Now features a progress bar, pipe-safety, and auto-architecture detection (v1.2.2).
+- **Auto-Update**: CloudSlash now identifies new versions and prompts you to upgrade.
+- **Dynamic Versioning**: Smartly handles Pre-release and Stable tags for seamless upgrades.
+- **Zero-Dependency**: Static binaries for Mac, Linux (x86/ARM), and Windows.
 
-### Forensics (Pro)
+### 💰 Cost Intelligence
 
-Automatically enabled for licensed users.
+- **Real-Time Calculation**: Queries public AWS pricing APIs to value your waste.
+- **Daily Burn Rate**: See exactly how much money you lose every 24 hours.
+- **Annual Projection**: Forensics on how much you save per year by cleaning up.
 
-- **TUI**: Look for the "Owner" column.
-- **UNCLAIMED**: No tags, no CloudTrail creation event found (orphan).
-- **IAM:user**: Identified creator via CloudTrail.
+### 🕵️ Forensics & Audit
 
-### Cost Intelligence (v1.2)
+- **Owner Identification**: Traces CloudTrail to find _who_ created the resource ("The Blame Game").
+- **Reverse-Terraform**: Generates `fix_terraform.sh` to surgical remove waste from your `.tf` state.
+- **Fossil Snapshots**: Detects RDS/EBS snapshots that have no active parent volume or cluster.
+- **Silent Killers**: Identifies expensive "sleeping" costs like unattached NAT Gateways and massive Log Groups (>1GB).
 
-Cost is calculated in real-time based on public AWS pricing APIs. CloudSlash estimates:
+### 🛡️ Remediation
 
-- **Daily Waste Rate**: How much you are bleeding every 24h.
-- **Monthly Projection**: The annualized savings if waste is removed.
+- **Safety Brake**: `cloudslash nuke` now includes an interactive confirmation step.
+- **Suppression Tags**: Mark resources as `cloudslash:ignore` to whitelist them from future scans.
+- **Non-Destructive**: Defaults to Read-Only mode. Destruction requires explicit user intent.
 
-### Suppression (Tags)
+### Usage Flow (Remediation)
 
-CloudSlash allows marking resources to be ignored during future scans.
-
-1. Run a scan.
-2. Execute `bash cloudslash-out/ignore_resources.sh`.
-3. This applies the `cloudslash:ignore=true` tag to all currently identified waste.
-4. Future scans will skip these resources.
+1. **Scan**: Run `cloudslash` to identify waste.
+2. **Review**: Check the dashboard and `waste_report.csv`.
+3. **Suppress**: Run `bash cloudslash-out/ignore_resources.sh` to tag false positives.
+4. **Fix**: Run `bash cloudslash-out/fix_terraform.sh` to update state (Pro).
 
 ## Architecture
 
