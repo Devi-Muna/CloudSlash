@@ -51,7 +51,7 @@ Unlike AWS Trusted Advisor, which primarily lists idle resources, CloudSlash off
 Open a terminal and run the installer:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
+curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/v1.2-beta/dist/install.sh | bash
 ```
 
 ### Windows (PowerShell)
@@ -59,7 +59,7 @@ curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.
 Run as Administrator:
 
 ```powershell
-irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
+irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/v1.2-beta/dist/install.ps1 | iex
 ```
 
 > **Note:** CloudSlash installs to `/usr/local/bin` (Unix) or `%LOCALAPPDATA%` (Windows) and is available globally.
