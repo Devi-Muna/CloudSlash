@@ -14,7 +14,7 @@ import (
 
 // This usually comes from -ldflags "-X ...CurrentVersion=..."
 // But for this simple implementation, we can hardcode or use the version.txt strategy.
-var CurrentVersion = "v1.1.8"
+var CurrentVersion = "v1.2.0"
 const VersionURL = "https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/version.txt"
 
 var updateCmd = &cobra.Command{
