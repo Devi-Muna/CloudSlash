@@ -25,10 +25,15 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"LaunchTime": time.Now().Add(-60 * 24 * time.Hour), // 60 days old
 	})
 
-	// 2. Unattached Volume
+	// 2. Unattached Volume (v1.2 Auditor Test)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890", "AWS::EC2::Volume", map[string]interface{}{
 		"State": "available",
+		"Size":  100, // GB
 	})
+    if node, ok := s.Graph.Nodes["arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890"]; ok {
+        node.Cost = 8.00 // Manually set cost to test TUI
+        node.SourceLocation = "terraform/storage.tf:24" // Manually set source to test TUI
+    }
 
 	// 3. Zombie Volume (Attached to stopped instance)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockZombie", "AWS::EC2::Volume", map[string]interface{}{
@@ -44,8 +49,16 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	s.Graph.MarkWaste("arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345", 80)
 	if node, ok := s.Graph.Nodes["arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"]; ok {
 		node.Properties["Reason"] = "Unused NAT Gateway (Mocked)"
-		node.Cost = 32.40 // Approx $0.045/hr * 720
+		node.Cost = 32.85 // v1.2 Fixed Rate
 	}
+
+    // 5. Mock Snapshot (Time Machine Test)
+    // Parent volume is vol-0mock1234567890 (which is waste)
+    s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild", "AWS::EC2::Snapshot", map[string]interface{}{
+        "State": "completed",
+        "VolumeId": "vol-0mock1234567890", // Links to waste vol
+        "VolumeSize": 100,
+    })
 
 	// 5. Stale S3 Multipart Upload
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket/upload-1", "AWS::S3::MultipartUpload", map[string]interface{}{

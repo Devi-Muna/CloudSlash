@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
@@ -43,9 +44,7 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 			continue
 		}
 
-		// Resource ID extraction helpers
-		// Typically ID is ARN or ID.
-		// For commands we usually need the ID.
+		// Resource ID extraction using robust ARN parsing
 		resourceID := extractResourceID(node.ID)
 
 		switch node.Type {
@@ -130,17 +129,8 @@ func (g *Generator) GenerateIgnoreScript(path string) error {
 	for _, item := range items {
 		resourceID := extractResourceID(item.ID)
 		
-		// Map CloudFormation/Graph types to AWS CLI resource types/service prefixes if needed?
-		// aws resourcegroupstaggingapi tag-resources takes ARNs.
-		// CloudSlash Nodes usually have ARNs as ID, except maybe some.
-		// Let's check if ID looks like an ARN.
-		
 		arg := item.ID
 		if !strings.HasPrefix(item.ID, "arn:") {
-			// If it's not an ARN, resourcegroupstaggingapi might fail or we might need service specific command.
-			// However, CloudSlash tries to use ARNs for most things.
-			// For those that aren't ARNs, we might skip or try best effort.
-			// Let's comment in the script.
 			fmt.Fprintf(f, "# Skipping non-ARN resource: %s\n", item.ID)
 			continue
 		}
@@ -160,16 +150,19 @@ func (g *Generator) GenerateIgnoreScript(path string) error {
 }
 
 func extractResourceID(id string) string {
-	// Simple ARN parser: arn:aws:service:region:account:type/id
-	parts := strings.Split(id, "/")
-	if len(parts) > 1 {
-		return parts[len(parts)-1]
+	// Robust ARN parsing using official library
+	// This helps avoid fragile string splitting errors
+	if parsed, err := arn.Parse(id); err == nil {
+		// Use fields function to split by / or : safely
+		parts := strings.FieldsFunc(parsed.Resource, func(r rune) bool {
+			return r == '/' || r == ':'
+		})
+		if len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+		return parsed.Resource
 	}
-	// Some ARNs use : separator for ID (e.g. SNS)
-	parts = strings.Split(id, ":")
-	if len(parts) > 6 {
-		return parts[6] // arn:aws:sns:us-east-1:123456:topic-name (index 5 or 6 depending on split)
-	}
-	// Fallback: return as is assuming it's already an ID if not ARN
+
+	// Fallback for non-ARN inputs (e.g. raw IDs)
 	return id
 }

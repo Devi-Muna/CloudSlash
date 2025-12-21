@@ -96,15 +96,21 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 		heuristicEngine := heuristics.NewEngine()
 		heuristicEngine.Register(&heuristics.ZombieEBSHeuristic{})
 		heuristicEngine.Register(&heuristics.S3MultipartHeuristic{})
-
 		if err := heuristicEngine.Run(ctx, g); err != nil {
 			fmt.Printf("Heuristic run failed: %v\n", err)
 		}
+
+        // Second Pass (Time Machine)
+        hEngine2 := heuristics.NewEngine()
+        hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{})
+        hEngine2.Run(ctx, g)
 
 		os.Mkdir("cloudslash-out", 0755)
 		if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
 			fmt.Printf("Failed to generate mock dashboard: %v\n", err)
 		}
+		report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
+		report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 }
 
 func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, isTrial bool) (*aws.CloudWatchClient, *aws.IAMClient, *pricing.Client) {
@@ -180,16 +186,39 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 				if err == nil {
 					detector := tf.NewDriftDetector(g, state)
 					detector.ScanForDrift()
+					
+					// Code Auditor (v1.2 Feature)
+					cwd, _ := os.Getwd() // Default to current directory
+					auditor := tf.NewCodeAuditor(state)
+					
+					g.Mu.Lock()
+					for _, node := range g.Nodes {
+						if node.IsWaste {
+							file, line, err := auditor.FindSource(node.ID, cwd)
+							if err == nil {
+								node.SourceLocation = fmt.Sprintf("%s:%d", file, line)
+							}
+						}
+					}
+					g.Mu.Unlock()
 				}
 			}
 
 			// Run Genius Heuristic Engine
 			hEngine := heuristics.NewEngine()
-			hEngine.Register(&heuristics.ElasticIPHeuristic{})
+			if pricingClient != nil {
+				hEngine.Register(&heuristics.ElasticIPHeuristic{Pricing: pricingClient})
+			} else {
+				hEngine.Register(&heuristics.ElasticIPHeuristic{})
+			}
 			hEngine.Register(&heuristics.S3MultipartHeuristic{})
 
 			if cwClient != nil {
-				hEngine.Register(&heuristics.NATGatewayHeuristic{CW: cwClient})
+				if pricingClient != nil {
+					hEngine.Register(&heuristics.NATGatewayHeuristic{CW: cwClient, Pricing: pricingClient})
+				} else {
+					hEngine.Register(&heuristics.NATGatewayHeuristic{CW: cwClient})
+				}
 				hEngine.Register(&heuristics.RDSHeuristic{CW: cwClient})
 				hEngine.Register(&heuristics.ELBHeuristic{CW: cwClient})
 				if pricingClient != nil {
@@ -218,6 +247,18 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			// Execute Forensics
 			if err := hEngine.Run(ctx, g); err != nil {
 				fmt.Printf("Deep Analysis failed: %v\n", err)
+			}
+
+			// SECOND PASS (Dependent Heuristics)
+			// "The Time Machine" needs Volume Waste to be identified first.
+			hEngine2 := heuristics.NewEngine()
+			if pricingClient != nil {
+				hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{Pricing: pricingClient})
+			} else {
+				hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{})
+			}
+			if err := hEngine2.Run(ctx, g); err != nil {
+				fmt.Printf("Time Machine Analysis failed: %v\n", err)
 			}
 			
 			// Execute Forensics (Pro Feature Check implied by binary, but logic runs for graph data)
@@ -252,6 +293,10 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 				if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
 					fmt.Printf("Failed to generate dashboard: %v\n", err)
 				}
+				
+				// Generate data export artifacts for external processing.
+				report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
+				report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
 				if cfg.SlackWebhook != "" {
 					if err := notifier.SendSlackReport(cfg.SlackWebhook, g); err != nil {
