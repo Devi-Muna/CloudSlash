@@ -1,137 +1,115 @@
-# CloudSlash User Guide
+# CloudSlash User Documentation
 
-This guide details the operation of CloudSlash for identifying AWS infrastructure waste and performing safe remediation.
-
----
-
-## 1. Quick Start
-
-### Installation
-
-Refer to the [README](README.md) for installation instructions specific to the operating system.
-
-### Authentication
-
-CloudSlash utilizes standard AWS credentials located in `~/.aws/credentials` or `~/.aws/config`.
-
-1.  **Configure AWS CLI**: `aws configure`
-2.  **SSO Login** (if applicable): `aws sso login`
-3.  **Permissions**: Ensure the user or role has `ReadOnlyAccess` and `ViewOnlyAccess`.
+This reference manual documents the operational capabilities of CloudSlash, a zero-trust infrastructure analysis engine designed to identify and eliminate cloud waste with forensic precision.
 
 ---
 
-## 2. Workflows
+## 1. Core Architecture
 
-### Standard Scan (Single Account)
+CloudSlash is deployed as a single, static binary with no external dependencies. The core engine is built on four pillars:
 
-Run CloudSlash to scan the default profile configured in `~/.aws/credentials`.
+### Robust Installation Strategy
 
-```bash
-cloudslash
-```
+The installation subsystem (introduced in v1.2.2) employs a pipe-safe execution wrapper. This ensures that network interruptions or `sudo` password prompts do not truncate the script execution stream. It dynamically detects the host operating system (Darwin/Linux/Windows) and CPU architecture (AMD64/ARM64) to fetch the optimized binary, displaying real-time download progress via a standard progress bar.
 
-### Multi-Account Scan
+### Dynamic Update System
 
-To scan **every AWS account** defined in the local configuration:
+The tool includes a self-awareness mechanism that checks the remote repository for new releases. It intelligently distinguishes between `stable` releases and `pre-release` (beta) tags, ensuring users can opt into bleeding-edge features without breaking production workflows. Run `cloudslash update` to perform an in-place upgrade.
 
-```bash
-cloudslash --license PRO-YOUR-KEY --all-profiles
-```
+### Zero-Dependency Design
 
-- **Behavior**: Iterates through all profiles in `~/.aws/config`, checking for waste in each, and making a consolidated report.
-
-### Cost Analysis
-
-CloudSlash queries the AWS Price List API to calculate the monthly cost of identified waste.
-
-- **Example**: A 50GB `gp2` volume unused for 30 days is estimated at ~$5.00/mo waste.
+CloudSlash requires no language runtimes (Python, Node.js) or external libraries. It communicates directly with the AWS API using the standard SDK, authenticating via the default `~/.aws/credentials` chain.
 
 ---
 
-## 3. Advanced Features (v1.2)
+## 2. Cost Intelligence Subsystem
 
-### Terraform Code Auditor
+CloudSlash moves beyond simple resource counting by integrating directly with the AWS Price List API.
 
-Instead of modifying state, CloudSlash now tells you _where_ to delete code.
+### Real-Time Valuation
 
-- **How it works**: Parses `terraform.tfstate` to map the Resource ID (e.g., `vol-0a...`) to a Terraform address (`aws_ebs_volume.logs`), then scans your `.tf` files to find the definition.
-- **Output**: Displayed in the TUI as `Defined in: modules/storage/main.tf:45`.
+For every identified waste resource, the engine queries the current on-demand pricing for that specific region and instance type. This provides a dollar-accurate valuation of the waste, rather than a generic estimate.
 
-### The Time Machine
+### Burn Rate Forensics
 
-Heuristic that finds snapshots of waste volumes.
-
-- **Logic**: If Volume A is waste, and Snapshot B was created from Volume A, then Snapshot B is also waste.
-- **Impact**: Recursively calculates hidden storage costs.
-
-### Safety Brake (`cloudslash nuke`)
-
-Interactive cleanup mode.
-
-- **Usage**: `cloudslash nuke`
-- **Flow**: Presents each waste item and asks for explicit confirmation before calling the AWS Delete API.
+- **Daily Burn Rate**: Calculates the exact amount of capital lost every 24 hours.
+- **Annual Projection**: Extrapolates the daily waste to a 365-day forecast, accounting for monthly storage costs and hourly instance rates.
 
 ---
 
-## 4. Artifacts and Remediation
+## 3. Forensic Audit Capabilities
 
-After a scan completes, the `cloudslash-out/` directory contains the following artifacts:
+CloudSlash maps resources not just to their technical state, but to their human origins and code definitions.
 
-### 1. Dashboard (`dashboard.html`)
+### Owner Identification ("The Blame Game")
 
-Open in any web browser. Contains charts (Cost by Resource Type) and a sortable risk table.
+The engine correlates resource metadata with CloudTrail logs. It searches for `RunInstances`, `CreateVolume`, and similar events to identify the specific IAM User or Role responsible for creating the waste.
 
-### 2. Safeguard (`safe_cleanup.sh`)
+- **Output**: displayed in the TUI as `Creator: arn:aws:iam::123:user/jdoe`.
 
-Helper script for remediation.
+### Reverse-Terraform Mapping
 
-- **Logic**: For every resource ID listed in the waste report, it attempts to create a snapshot or backup before deletion.
+This feature bridges the gap between the AWS Console and Infrastructure-as-Code.
 
-### 3. Terraform (`waste.tf`)
+1. The engine scans the local `terraform.tfstate` file.
+2. It maps the AWS Resource ID (e.g., `vol-0af...`) to its Terraform resource address (e.g., `module.db.aws_ebs_volume.main`).
+3. It generates a `fix_terraform.sh` script containing precise `terraform state rm` commands to surgically remove the waste from state without affecting other infrastructure.
 
-(Pro Feature) Generates Terraform code representing the waste resources, allowing them to be imported via `terraform import` managed destruction via IaC.
+### Fossil Snapshot Detection
 
-### 4. SaaS Killer Export (`waste_report.csv` / `.json`)
+Standard tools often miss "Fossil" snapshots—RDS or EBS snapshots that are no longer linked to an active volume or cluster. CloudSlash constructs a dependency graph to identify these orphaned chains, flagging snapshots that have no lineage to a live production resource.
 
-(Pro Feature) Generates raw data exports in CSV and JSON format, suitable for external consulting reports or custom dashboards.
+### Silent Killer Detection
 
-### 5. Suppression (`ignore_resources.sh`)
+The engine heuristically identifies resources that accrue cost silently:
 
-If specific resources should be retained but excluded from reports:
-
-1.  Review the `cloudslash-out/ignore_resources.sh` script.
-2.  Run it: `bash cloudslash-out/ignore_resources.sh`
-3.  It applies a `cloudslash:ignore=true` tag.
-4.  Subsequent scans will respect this tag and exclude the resource from waste reports.
+- **Unattached NAT Gateways**: These incur hourly charges even with zero traffic.
+- **Massive Log Groups**: CloudWatch Log Groups exceeding 1GB that have not been accessed or rotated.
 
 ---
 
-## 4. Heuristic Logic
+## 4. Remediation Workflows
 
-| Resource          | Logic                                                           |
-| :---------------- | :-------------------------------------------------------------- |
-| **EBS Volumes**   | State is `available` OR attached to instance stopped > 30 days. |
-| **EC2 Instances** | Max CPU < 5% over 7 days (Right-Sizing).                        |
-| **NAT Gateways**  | Traffic < 1GB/mo AND Active Connections < 5.                    |
-| **S3 Buckets**    | Incomplete Multipart Uploads > 7 days old.                      |
-| **RDS**           | DB connections == 0 for 7 days OR status `stopped`.             |
-| **Elastic IPs**   | Not attached to any network interface.                          |
+CloudSlash enforces a "Safety First" philosophy. By default, it operates in strict Read-Only mode.
+
+### Usage Flow
+
+1.  **Scan**: Execute `cloudslash` to analyze the environment.
+    - _Result_: A localized graph graph in memory and a TUI report. No data leaves the machine.
+2.  **Review**: Analyze the interactive dashboard and `waste_report.csv`.
+3.  **Suppress**: If a resource is valid (e.g., a Disaster Recovery copy), use the generated suppression script.
+    - Run `bash cloudslash-out/ignore_resources.sh`.
+    - This applies the `cloudslash:ignore=true` tag. Future scans will skip these resources.
+4.  **Fix (Code)**: For resources managed by Terraform, execute `bash cloudslash-out/fix_terraform.sh`.
+5.  **Fix (Direct)**: For unmanaged resources, use the interactive nuke command.
+
+### Interactive Nuke (`cloudslash nuke`)
+
+This command initiates the cleanup sequence. It iterates through the identified waste list, presenting a final confirmation prompt for each item. This functions as a "dead man's switch," preventing accidental deletion of critical data.
 
 ---
 
-## 5. Command Reference
+## 5. Artifact Reference
 
-| Flag                     | Description                                                            |
-| :----------------------- | :--------------------------------------------------------------------- |
-| `--license [KEY]`        | Activate Pro features.                                                 |
-| `--region [REGION]`      | Override default region (e.g., `us-west-2`).                           |
-| `--all-profiles`         | Scan all configured AWS profiles.                                      |
-| `--tfstate [PATH]`       | Path to local `.tfstate` for drift detection.                          |
-| `--required-tags [LIST]` | Comma-separated list of tags that must be present (e.g., `Env,Owner`). |
-| `--slack-webhook [URL]`  | Send summary report to Slack.                                          |
+Analysis results are persisted to the `cloudslash-out/` directory:
 
-### Commands
+| Artifact              | Detection     | Description                                                   |
+| :-------------------- | :------------ | :------------------------------------------------------------ |
+| `dashboard.html`      | Visualization | Client-side HTML dashboard with charts and risk heatmaps.     |
+| `waste_report.csv`    | Data Export   | Raw CSV export suitable for ingestion into Excel or BI tools. |
+| `fix_terraform.sh`    | Remediation   | Shell script to remove waste from Terraform state.            |
+| `ignore_resources.sh` | Suppression   | Script to tag identified resources as ignored.                |
+| `safe_cleanup.sh`     | Remediation   | Legacy script for snapshot-before-delete workflows.           |
 
-- **scan**: Run a headless scan without the TUI (useful for CI/CD).
-- **update**: Update CloudSlash to the latest version.
-- **completion**: Generate autocompletion script for shell.
+---
+
+## 6. Heuristic Logic Reference
+
+| Resource          | Detection Logic                                                   |
+| :---------------- | :---------------------------------------------------------------- |
+| **EBS Volumes**   | State is `available` OR attached to `stopped` instance > 30 days. |
+| **EC2 Instances** | Max CPU utilization < 5% over 7 days (Right-Sizing).              |
+| **NAT Gateways**  | Data processed < 1GB/month AND Active Connections < 5.            |
+| **S3 Buckets**    | Contains incomplete multipart uploads older than 7 days.          |
+| **RDS Clusters**  | Zero active connections for 7 days OR status is `stopped`.        |
+| **Elastic IPs**   | Valid public IP not associated with any network interface.        |
