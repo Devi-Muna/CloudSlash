@@ -53,9 +53,35 @@ ${BOLD}CloudSlash Installer${NC}
 ===================="
     log_info "Detected: ${OS} / ${ARCH}"
 
-    # -- 2. Construct Download URL --
-    # Uses 'latest' release from GitHub
-    local DOWNLOAD_URL="https://github.com/${OWNER}/${REPO}/releases/latest/download/${TARGET_BINARY}"
+    # -- 2. Resolve Version --
+    local RELEASE_TAG="$1"
+    
+    if [ -z "${RELEASE_TAG}" ]; then
+        # Try to get the latest tag (including pre-releases) from GitHub API
+        # We verify if we are in a rate-limit scenario or network failure by checking empty output
+        local API_RESPONSE
+        API_RESPONSE=$(curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases")
+        
+        # Extract the first "tag_name": "..." occurrence
+        RELEASE_TAG=$(echo "$API_RESPONSE" | grep -o '"tag_name": "[^"]*"' | head -n 1 | cut -d '"' -f 4)
+        
+        if [ -z "${RELEASE_TAG}" ]; then
+            echo "   (Warning: Could not resolve latest version via API. Defaulting to 'latest' stable alias.)"
+            RELEASE_TAG="latest"
+        else
+             log_info "Resolved Latest Ver: ${RELEASE_TAG}"
+        fi
+    fi
+
+    # -- 3. Construct Download URL --
+    local DOWNLOAD_URL
+    if [ "${RELEASE_TAG}" = "latest" ]; then
+        # Use the magic 'latest' endpoint which redirects to the latest stable release
+        DOWNLOAD_URL="https://github.com/${OWNER}/${REPO}/releases/latest/download/${TARGET_BINARY}"
+    else
+        # Use the specific tag endpoint
+        DOWNLOAD_URL="https://github.com/${OWNER}/${REPO}/releases/download/${RELEASE_TAG}/${TARGET_BINARY}"
+    fi
 
     log_info "Fetching: ${DOWNLOAD_URL}"
 
