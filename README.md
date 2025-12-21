@@ -131,27 +131,27 @@ Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 
 We are constantly crushing bugs and adding features. Here is what's new:
 
-### ⚡ Core Engine
+### Core Engine
 
 - **Robust Installer**: Now features a progress bar, pipe-safety, and auto-architecture detection (v1.2.2).
 - **Auto-Update**: CloudSlash now identifies new versions and prompts you to upgrade.
 - **Dynamic Versioning**: Smartly handles Pre-release and Stable tags for seamless upgrades.
 - **Zero-Dependency**: Static binaries for Mac, Linux (x86/ARM), and Windows.
 
-### 💰 Cost Intelligence
+### Cost Intelligence
 
 - **Real-Time Calculation**: Queries public AWS pricing APIs to value your waste.
 - **Daily Burn Rate**: See exactly how much money you lose every 24 hours.
 - **Annual Projection**: Forensics on how much you save per year by cleaning up.
 
-### 🕵️ Forensics & Audit
+### Forensics & Audit
 
 - **Owner Identification**: Traces CloudTrail to find _who_ created the resource ("The Blame Game").
 - **Reverse-Terraform**: Generates `fix_terraform.sh` to surgical remove waste from your `.tf` state.
 - **Fossil Snapshots**: Detects RDS/EBS snapshots that have no active parent volume or cluster.
 - **Silent Killers**: Identifies expensive "sleeping" costs like unattached NAT Gateways and massive Log Groups (>1GB).
 
-### 🛡️ Remediation
+### Remediation
 
 - **Safety Brake**: `cloudslash nuke` now includes an interactive confirmation step.
 - **Suppression Tags**: Mark resources as `cloudslash:ignore` to whitelist them from future scans.
