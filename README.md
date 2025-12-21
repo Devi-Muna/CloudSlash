@@ -8,7 +8,7 @@ CloudSlash identifies idle, orphaned, and underutilized resources in AWS environ
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
-![Version](https://img.shields.io/badge/version-v1.2.0-green)
+![Version](https://img.shields.io/badge/version-v1.2.1-green)
 
 > **New to CloudSlash?** Check out the complete [**User Walkthrough**](WALKTHROUGH.md) for a step-by-step guide.
 
@@ -145,7 +145,7 @@ Automatically enabled for licensed users.
 - **UNCLAIMED**: No tags, no CloudTrail creation event found (orphan).
 - **IAM:user**: Identified creator via CloudTrail.
 
-### Cost Intelligence (v1.3)
+### Cost Intelligence (v1.2)
 
 Cost is calculated in real-time based on public AWS pricing APIs. CloudSlash estimates:
 
