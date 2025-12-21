@@ -91,8 +91,10 @@ ${BOLD}CloudSlash Installer${NC}
     # Ensure cleanup happens even if we exit early
     trap 'rm -rf -- "$TMP_DIR"' EXIT
 
+    # Download with progress bar to stderr, capture HTTP status code to stdout
+    log_info "Downloading binary..."
     local HTTP_CODE
-    HTTP_CODE=$(curl -sL -w "%{http_code}" -o "${TMP_DIR}/${BINARY_NAME}" "${DOWNLOAD_URL}")
+    HTTP_CODE=$(curl --progress-bar -L -w "%{http_code}" -o "${TMP_DIR}/${BINARY_NAME}" "${DOWNLOAD_URL}")
 
     if [ "${HTTP_CODE}" -ne 200 ]; then
         log_error "Download failed. (HTTP ${HTTP_CODE})"
