@@ -127,9 +127,9 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
     })
     fmt.Println("")
 
-    fmt.Println(titleStyle.Render("NEW FEATURES (v1.1)"))
-    fmt.Println(flagStyle.Render("  • Reverse-Terraform: Generates 'fix_terraform.sh' (Pro)"))
-    fmt.Println(flagStyle.Render("  • Owner Forensics:   Displays 'Who Created This?' (Pro)"))
-    fmt.Println(flagStyle.Render("  • Silent Killers:    Detects >1GB Log Groups & Fossil Snapshots"))
+    fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.3)"))
+    fmt.Println(flagStyle.Render("  • Zombie EKS:        Detects empty Control Planes (>7 days, $72/mo)"))
+    fmt.Println(flagStyle.Render("  • Data Export:       Generates CSV/JSON/HTML reports (Headless)"))
+    fmt.Println(flagStyle.Render("  • Smart Ignore:      Support for relative time (30d) and cost (<$10)"))
     fmt.Println("")
 }
