@@ -106,7 +106,16 @@ cloudslash update
 Interactively delete identified waste with a confirmation safety net.
 
 ```bash
+
 cloudslash nuke
+```
+
+### 6. Data Export
+
+Generate CSV, JSON, and HTML reports without the interactive TUI.
+
+```bash
+cloudslash export
 ```
 
 ## Security
