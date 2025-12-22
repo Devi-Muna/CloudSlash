@@ -20,9 +20,14 @@ type EKSClient interface {
 	ListFargateProfiles(ctx context.Context, params *eks.ListFargateProfilesInput, optFns ...func(*eks.Options)) (*eks.ListFargateProfilesOutput, error)
 }
 
+// EKSEC2Client defines only the methods we need from EC2
+type EKSEC2Client interface {
+	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
+}
+
 type EKSScanner struct {
 	Client    EKSClient
-	EC2Client *ec2.Client // Needed for Self-Managed Node check
+	EC2Client EKSEC2Client // Interface for testing
 	Graph     *graph.Graph
 }
 
