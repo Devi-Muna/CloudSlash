@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -210,14 +211,69 @@ func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string)
 // GetNATGatewayPrice returns the monthly cost for a NAT Gateway.
 // UsageType: "NatGateway-Hours"
 func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64, error) {
-	// NAT Gateway pricing is fairly standard ($0.045/hr in most US regions).
-	// We can try to fetch, but fallback is safe.
-	// 730 hours/month * $0.045 = $32.85
-	
-	// Note: Using standard US-East pricing for high-throughput NATs.
-	// Regional variance is typically < 10%, treating this as a safe baseline.
-	return 0.045 * 730, nil
+	cacheKey := fmt.Sprintf("nat-%s", region)
+
+	c.mu.RLock()
+	pricePerHour, ok := c.cache[cacheKey]
+	c.mu.RUnlock()
+
+	if !ok {
+		// Optimization: Fail fast (2s) if Pricing API is sluggish
+		tCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+
+		var err error
+		pricePerHour, err = c.fetchNATPrice(tCtx, region)
+		if err != nil {
+			// Fallback (Safe Mode): Return standard US-East price ($0.045/hr)
+			// This ensures the UI never hangs on network latency.
+			return 0.045 * 730, nil 
+		}
+		c.mu.Lock()
+		c.cache[cacheKey] = pricePerHour
+		c.mu.Unlock()
+	}
+
+	return pricePerHour * 730, nil
 }
+
+func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, error) {
+	filters := []types.Filter{
+		{
+			Type:  types.FilterTypeTermMatch,
+			Field: aws.String("serviceCode"),
+			Value: aws.String("AmazonEC2"),
+		},
+		{
+			Type:  types.FilterTypeTermMatch,
+			Field: aws.String("regionCode"),
+			Value: aws.String(region),
+		},
+		{
+			Type:  types.FilterTypeTermMatch,
+			Field: aws.String("productFamily"),
+			Value: aws.String("NAT Gateway"),
+		},
+	}
+
+	input := &pricing.GetProductsInput{
+		ServiceCode: aws.String("AmazonEC2"),
+		Filters:     filters,
+		MaxResults:  aws.Int32(1),
+	}
+
+	out, err := c.svc.GetProducts(ctx, input)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(out.PriceList) == 0 {
+		return 0, fmt.Errorf("no pricing found for NAT Gateway in %s", region)
+	}
+
+	return parsePriceFromJSON(out.PriceList[0])
+}
+
 
 // GetEIPPrice returns the monthly cost for an unassociated Elastic IP.
 // Pricing: $0.005/hr for unattached/remapped.

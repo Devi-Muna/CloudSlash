@@ -45,8 +45,15 @@ func (d *Detective) IdentifyOwner(ctx context.Context, node *graph.Node) string 
 		// Extract Resource ID (strip ARN if needed)
 		resourceID := node.ID
 		// Basic ARN stripping logic
+
+		// Robust ARN stripping logic
+		// Pattern 1: Slash separated (arn:aws:ec2:region:account:volume/vol-123)
 		if strings.Contains(resourceID, "/") {
 			parts := strings.Split(resourceID, "/")
+			resourceID = parts[len(parts)-1]
+		} else if strings.Count(resourceID, ":") >= 5 {
+			// Pattern 2: Colon separated (arn:aws:s3:::bucket-name OR arn:aws:sns:region:acc:topic)
+			parts := strings.Split(resourceID, ":")
 			resourceID = parts[len(parts)-1]
 		}
 

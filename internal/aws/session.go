@@ -81,9 +81,18 @@ func ListProfiles() ([]string, error) {
 	}
 
 	profiles := make(map[string]bool)
-	paths := []string{
-		filepath.Join(home, ".aws", "config"),
-		filepath.Join(home, ".aws", "credentials"),
+	paths := []string{}
+	// Check standard env vars first
+	if cfgPath := os.Getenv("AWS_CONFIG_FILE"); cfgPath != "" {
+		paths = append(paths, cfgPath)
+	} else {
+		paths = append(paths, filepath.Join(home, ".aws", "config"))
+	}
+
+	if credPath := os.Getenv("AWS_SHARED_CREDENTIALS_FILE"); credPath != "" {
+		paths = append(paths, credPath)
+	} else {
+		paths = append(paths, filepath.Join(home, ".aws", "credentials"))
 	}
 
 	// Regex to find [profile name] or [name]
