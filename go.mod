@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.52.5
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.63.0
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.275.0
+	github.com/aws/aws-sdk-go-v2/service/eks v1.76.3
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.54.2
 	github.com/aws/aws-sdk-go-v2/service/iam v1.53.0
 	github.com/aws/aws-sdk-go-v2/service/pricing v1.40.8

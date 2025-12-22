@@ -243,6 +243,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			// New Heuristics
 			hEngine.Register(&heuristics.LogHoardersHeuristic{})
 			hEngine.Register(&heuristics.FossilAMIHeuristic{})
+			hEngine.Register(&heuristics.ZombieEKSHeuristic{})
 
 			// Execute Forensics
 			if err := hEngine.Run(ctx, g); err != nil {
@@ -332,6 +333,7 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	s3Scanner := aws.NewS3Scanner(awsClient.Config, g)
 	rdsScanner := aws.NewRDSScanner(awsClient.Config, g)
 	elbScanner := aws.NewELBScanner(awsClient.Config, g)
+	eksScanner := aws.NewEKSScanner(awsClient.Config, g)
 
 	submitTask := func(task func(ctx context.Context) error) {
 		scanWg.Add(1)
@@ -351,6 +353,7 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	// New Scans
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
+	submitTask(func(ctx context.Context) error { return eksScanner.ScanClusters(ctx) })
 
 	return awsClient, nil
 }
