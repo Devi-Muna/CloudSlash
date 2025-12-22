@@ -213,6 +213,57 @@ func (g *Graph) MarkWaste(id string, score int) {
 						return
 					}
 				}
+
+				// 5. Grace Period / TTL (e.g., "ignore:3d" => Ignore if younger than 3 days)
+				// Useful for ephemeral dev resources that shouldn't be flagged immediately.
+				// Requires "LaunchTime" property to be set by scanner.
+				if strings.HasSuffix(val, "d") || strings.HasSuffix(val, "h") {
+					// Parse "30d" -> 720h manually
+					var hours int
+					var conversionErr error
+					
+					if strings.HasSuffix(val, "d") {
+						daysStr := strings.TrimSuffix(val, "d")
+						days, err := strconv.Atoi(daysStr)
+						if err == nil {
+							hours = days * 24
+						} else {
+							conversionErr = err
+						}
+					} else { // "h"
+						hoursStr := strings.TrimSuffix(val, "h")
+						h, err := strconv.Atoi(hoursStr)
+						if err == nil {
+							hours = h
+						} else {
+							conversionErr = err
+						}
+					}
+
+					if conversionErr == nil {
+						// Look for resource creation time
+						// Try common keys: LaunchTime (EC2), CreateTime (EBS/S3), StartTime (RDS)
+						var launchTime time.Time
+						foundTime := false
+						
+						timeKeys := []string{"LaunchTime", "CreateTime", "StartTime", "Created"}
+						for _, key := range timeKeys {
+							if tVal, ok := node.Properties[key].(time.Time); ok {
+								launchTime = tVal
+								foundTime = true
+								break
+							}
+							// Handle string timestamps if needed? (Scanners usually use native types)
+						}
+
+						if foundTime {
+							age := time.Since(launchTime)
+							if age.Hours() < float64(hours) {
+								return // IGNORED: Within grace period
+							}
+						}
+					}
+				}
 			}
 		}
 

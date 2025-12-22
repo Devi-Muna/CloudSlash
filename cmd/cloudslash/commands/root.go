@@ -65,6 +65,9 @@ func init() {
              checkUpdate()
         }
     }
+
+    // Register Sub-Commands
+    rootCmd.AddCommand(NukeCmd)
 }
 
 func checkUpdate() {
