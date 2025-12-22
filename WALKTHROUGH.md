@@ -132,7 +132,22 @@ All analysis outputs are stored in the `./cloudslash-out` directory.
 - `fix_terraform.sh`: Script to align Terraform state.
 - `ignore_resources.sh`: Script to automatically tag current waste as ignored (bulk suppression).
 
-## 6. Security Model
+## 6. Detection Logic Details (New in v1.2.3)
+
+CloudSlash employs multi-stage verification to ensure zero false positives.
+
+### Zombie EKS Control Planes
+
+EKS clusters incur a base cost of ~$72/month even without worker nodes. CloudSlash identifies these "Zombie Control Planes" using a composite check:
+
+1.  **Status Check**: Cluster must be `ACTIVE` and created more than 7 days ago.
+2.  **Capacity Verification (The Triad)**:
+    - **Managed Node Groups**: Must have zero groups or groups with `desiredSize` 0.
+    - **Fargate Profiles**: Must have zero profiles defined.
+    - **Self-Managed Nodes**: We query all EC2 instances for the tag `kubernetes.io/cluster/<name>`. If 0 instances are found, the cluster is deemed empty.
+3.  **Safety Net**: Clusters tagged with `karpenter.sh/discovery` are automatically ignored to protect auto-scaling environments that scale to zero.
+
+## 7. Security Model
 
 CloudSlash is designed with a "Least Privilege" mindset.
 

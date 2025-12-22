@@ -11,7 +11,7 @@ CloudSlash identifies idle, orphaned, and underutilized resources in AWS environ
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
-![Version](https://img.shields.io/badge/version-v1.2.2-green)
+![Version](https://img.shields.io/badge/version-v1.2.3-green)
 
 > **New to CloudSlash?** Check out the complete [**User Walkthrough**](WALKTHROUGH.md) for a step-by-step guide.
 
@@ -31,6 +31,7 @@ CloudSlash is **Open Source** (AGPLv3) to guarantee transparency and community f
 - **Terraform Code Auditor**: Maps waste resources back to the exact file and line number in your local Terraform code (Reverse-Lookup).
 - **Heuristic Analysis**:
   - **Zombie EBS**: Detects available volumes or attached volumes with 0 IOPS/30 days.
+  - **Zombie Control Planes**: Identifies EKS Clusters that are active but have zero compute nodes (Node Groups, Fargate, or EC2) for > 7 days.
   - **Idle NAT Gateways**: Identifies gateways costing hourly rates but processing minimal traffic (<1GB/month).
   - **S3 Multipart Uploads**: Finds incomplete uploads consuming storage space.
   - **The Time Machine**: Recursively identifies snapshots created from waste volumes.
@@ -139,9 +140,15 @@ sudo rm /usr/local/bin/cloudslash
 Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 ```
 
-## Feature Matrix (v1.2.2 Released)
+## Release History
 
-We are constantly crushing bugs and adding features. Here is what's new:
+### v1.2.3 (Current)
+
+- **Zombie Control Planes**: Algorithm to detect abandoned EKS Clusters ($0.10/hr) by verifying compute capacity across Managed Node Groups, Fargate Profiles, and Self-Managed Instances.
+- **Data Export**: New `cloudslash export` command for generating reports without user interaction.
+- **Smart Suppression**: Added relative time support for ignore tags (e.g., `cloudslash:ignore=30d`).
+
+### v1.2.2
 
 ### Core Engine
 
