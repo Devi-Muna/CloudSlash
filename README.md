@@ -1,5 +1,8 @@
 # CloudSlash
 
+[CloudSlash Dashboard]
+![CloudSlash Dashboard](assets/dashboard_preview.png)
+
 **The Forensic Accountant for AWS Infrastructure**
 
 > **Status:** Precision Engineered. Zero Error.
