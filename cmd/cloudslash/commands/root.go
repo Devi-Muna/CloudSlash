@@ -68,6 +68,7 @@ func init() {
 
     // Register Sub-Commands
     rootCmd.AddCommand(NukeCmd)
+    rootCmd.AddCommand(ExportCmd)
 }
 
 func checkUpdate() {
