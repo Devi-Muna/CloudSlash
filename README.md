@@ -143,7 +143,12 @@ Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 
 ## Release History
 
-### v1.2.4 (Latest)
+### v1.2.5 (Latest)
+
+- **Trap Door Analysis**: Detects **Abandoned Fargate Profiles**. Checks for broken namespace links (Layer 1), zero active pods (Layer 2), and "Ghost Town" controllers that have been scaled to 0 for >30 days (Layer 3).
+- **Risk Removal**: Identifies "Configuration Debt" that poses a risk of accidental serverless billing.
+
+### v1.2.4
 
 - **Ghost Detector**: Identifies EKS Node Groups that are active but serving zero real user workloads by filtering out DaemonSets and System pods.
 - **Orphaned Load Balancer**: Detections for ELBs left behind by deleted EKS clusters (Zombie Clusters).

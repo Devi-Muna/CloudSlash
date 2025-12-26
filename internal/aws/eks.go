@@ -18,6 +18,7 @@ type EKSClient interface {
 	ListNodegroups(ctx context.Context, params *eks.ListNodegroupsInput, optFns ...func(*eks.Options)) (*eks.ListNodegroupsOutput, error)
 	DescribeNodegroup(ctx context.Context, params *eks.DescribeNodegroupInput, optFns ...func(*eks.Options)) (*eks.DescribeNodegroupOutput, error)
 	ListFargateProfiles(ctx context.Context, params *eks.ListFargateProfilesInput, optFns ...func(*eks.Options)) (*eks.ListFargateProfilesOutput, error)
+	DescribeFargateProfile(ctx context.Context, params *eks.DescribeFargateProfileInput, optFns ...func(*eks.Options)) (*eks.DescribeFargateProfileOutput, error)
 }
 
 // EKSEC2Client defines only the methods we need from EC2
@@ -78,8 +79,8 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 		return err
 	}
 
-	// 2. Check Fargate Profiles
-	hasFargate, err := s.checkFargate(ctx, name)
+	// 2. Check Fargate Profiles (and ingest them)
+	hasFargate, err := s.scanFargateProfiles(ctx, name, arn)
 	if err != nil {
 		return err
 	}
@@ -143,23 +144,52 @@ func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) 
 	return false, nil
 }
 
-func (s *EKSScanner) checkFargate(ctx context.Context, clusterName string) (bool, error) {
+func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clusterARN string) (bool, error) {
 	paginator := eks.NewListFargateProfilesPaginator(s.Client, &eks.ListFargateProfilesInput{ClusterName: &clusterName})
+	
+	hasProfiles := false
+	
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return false, err
 		}
+		
 		if len(page.FargateProfileNames) > 0 {
-			// Existence of a profile implies capacity capability. 
-			// Ideally we check for running pods, but for v1.2.3, profile existence is a good proxy for intent.
-			// Or we assume empty unless proven otherwise? 
-			// User Plan: "If profiles exist... mark it safe or check if any pods are actually running."
-			// Implementing Conservative Check: If profile exists, assume NOT zombie for now.
-			return true, nil
+			hasProfiles = true
+		}
+
+		for _, profileName := range page.FargateProfileNames {
+			resp, err := s.Client.DescribeFargateProfile(ctx, &eks.DescribeFargateProfileInput{
+				ClusterName:        &clusterName,
+				FargateProfileName: &profileName,
+			})
+			if err != nil {
+				// Don't fail the whole scan for one profile
+				fmt.Printf("   [Warning] Failed to describe Fargate Profile %s: %v\n", profileName, err)
+				continue
+			}
+			
+			fp := resp.FargateProfile
+			if fp == nil { continue }
+			
+			// Ingest into Graph
+			props := map[string]interface{}{
+				"ProfileName": *fp.FargateProfileName,
+				"ClusterName": clusterName,
+				"ClusterARN": clusterARN,
+				"CreatedAt": fp.CreatedAt,
+				"Selectors": fp.Selectors, // Stores internal K8s Types (Namespace, Labels)
+				// PodExecutionRoleArn, Subnets, etc. can be added if needed
+			}
+			
+			s.Graph.AddNode(*fp.FargateProfileArn, "AWS::EKS::FargateProfile", props)
+			
+			// Link to Cluster
+			s.Graph.AddEdge(*fp.FargateProfileArn, clusterARN)
 		}
 	}
-	return false, nil
+	return hasProfiles, nil
 }
 
 func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName string) (bool, error) {

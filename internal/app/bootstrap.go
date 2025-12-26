@@ -34,7 +34,7 @@ type Config struct {
 	Headless     bool // New: Don't run TUI
 }
 
-func Run(cfg Config) {
+func Run(cfg Config) (bool, *graph.Graph, error) {
 	// 1. License Check (Fail-Open / Trial Mode)
 	isTrial := false
 	if cfg.LicenseKey == "" {
@@ -59,10 +59,12 @@ func Run(cfg Config) {
 	engine = swarm.NewEngine()
 	engine.Start(ctx)
 
+	var doneChan <-chan struct{}
+
 	if cfg.MockMode {
-		runMockMode(ctx, g, engine, cfg.Headless)
+		runMockMode(ctx, g, engine, cfg.Headless) // Mock mode is synchronous
 	} else {
-		_, _, _ = runRealMode(ctx, cfg, g, engine, isTrial)
+		doneChan = runRealMode(ctx, cfg, g, engine, isTrial)
 	}
 
     // 3. Start Interface (TUI vs Headless)
@@ -74,13 +76,14 @@ func Run(cfg Config) {
             os.Exit(1)
         }
     } else {
-        // Just wait for completion if headless (simplified logic usually handles waitgroup)
-        // Implementation note: The real mode logic has a waitgroup. 
-        // We should ensure that completes.
-        // For simplicity in this refactor, headless relies on heuristics triggering logic.
-        // But heuristics were in a goroutine in main.go.
-        // We need to keep that logic.
+        // Headless: Wait for background analysis to complete
+        if doneChan != nil {
+            <-doneChan
+        }
     }
+	
+	// Return true if PRO (not trial), graph for analytics, and nil error
+	return !isTrial, g, nil
 }
 
 // Logic extracted from original main.go
@@ -114,7 +117,9 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 		report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 }
 
-func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, isTrial bool) (*aws.CloudWatchClient, *aws.IAMClient, *pricing.Client) {
+func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, isTrial bool) <-chan struct{} {
+		done := make(chan struct{})
+		
 		var pricingClient *pricing.Client
 		if !isTrial {
 			var err error
@@ -147,7 +152,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			if cfg.AllProfiles {
 				fmt.Printf(">>> Scanning Profile: %s\n", profile)
 			}
-
+ 
             // Using local helper (needs to be moved/exported or copied)
 			client, err := runScanForProfile(ctx, cfg.Region, profile, g, engine, &scanWg)
 			if err != nil {
@@ -163,8 +168,9 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			}
 		}
 
-			// Background Analysis & Reporting
+		// Background Analysis & Reporting
 		go func() {
+			defer close(done) // Signal completion when done
 			scanWg.Wait() // Wait for ingestion
 			
 			// Additional Background Scans (Logs require logsClient)
@@ -246,6 +252,14 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			hEngine.Register(&heuristics.FossilAMIHeuristic{})
 			hEngine.Register(&heuristics.ZombieEKSHeuristic{})
 			hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
+            
+            // v1.2.5 Fargate Analysis
+            if k8sClient, err := k8s.NewClient(); err == nil {
+                 hEngine.Register(&heuristics.AbandonedFargateHeuristic{K8sClient: k8sClient})
+            } else {
+                 // Register with nil client (heuristic will skip)
+                 hEngine.Register(&heuristics.AbandonedFargateHeuristic{K8sClient: nil})
+            }
 
 			// Execute Forensics
 			if err := hEngine.Run(ctx, g); err != nil {
@@ -309,7 +323,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			}
 		}()
         
-        return cwClient, iamClient, pricingClient
+        return done
 }
 
 
