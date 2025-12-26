@@ -1,4 +1,4 @@
-# CloudSlash Technical Manual (v1.2.3)
+# CloudSlash Technical Manual (v1.2.4)
 
 This document describes the operational procedures, core architecture, and usage workflows of CloudSlash. It serves as the primary reference for system administrators and DevOps engineers using the tool for infrastructure analysis and forensic cleanup.
 
@@ -132,11 +132,31 @@ All analysis outputs are stored in the `./cloudslash-out` directory.
 - `fix_terraform.sh`: Script to align Terraform state.
 - `ignore_resources.sh`: Script to automatically tag current waste as ignored (bulk suppression).
 
-## 6. Detection Logic Details (New in v1.2.3)
+## 6. Detection Logic Details (New in v1.2.4)
 
 CloudSlash employs multi-stage verification to ensure zero false positives.
 
-### Zombie EKS Control Planes
+### Ghost Detector (v1.2.4)
+
+Identifies EKS Node Groups that are incurring cost but running no user workloads.
+
+1.  **Scope**: Scans all Nodes belonging to an EKS Node Group (via `eks.amazonaws.com/nodegroup` label).
+2.  **The Funnel Filter**:
+    - Ignores Pods that are `Succeeded` or `Failed`.
+    - Ignores Pods owned by a `DaemonSet` (Infrastructure noise).
+    - Ignores `kube-system` Pods.
+    - Ignores Mirror Pods.
+3.  **The Verdict**: If a Node Group has >0 nodes but 0 surviving "Real Workload" pods, it is flagged as a Ghost.
+
+### Orphaned Load Balancers (v1.2.3)
+
+Detects ELBs that were left behind after an EKS cluster was deleted.
+
+1.  **Tag Analysis**: Looks for ELBs tagged with `kubernetes.io/cluster/<name> = owned`.
+2.  **Cluster Verification**: Checks if the referenced cluster `<name>` still exists in EKS.
+3.  **Verdict**: If the cluster is missing, the ELB is orphaned waste.
+
+### Zombie EKS Control Planes (v1.2.3)
 
 EKS clusters incur a base cost of ~$72/month even without worker nodes. CloudSlash identifies these "Zombie Control Planes" using a composite check:
 
