@@ -15,7 +15,7 @@ Example:
   cloudslash scan --region us-west-2`,
 	Run: func(cmd *cobra.Command, args []string) {
         config.Headless = true
-		app.Run(config)
+		_, _, _ = app.Run(config)
 	},
 }
 

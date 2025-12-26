@@ -148,6 +148,16 @@ Identifies EKS Node Groups that are incurring cost but running no user workloads
     - Ignores Mirror Pods.
 3.  **The Verdict**: If a Node Group has >0 nodes but 0 surviving "Real Workload" pods, it is flagged as a Ghost.
 
+### Fargate Trap Door Analysis (v1.2.5)
+
+Detects **Abandoned Fargate Profiles**. Fargate profiles are trap doors that wait for pods. If nothing falls through them, they are "Configuration Debt". They don't cost money directly, but they represent risk (accidental billing if someone deploys there).
+
+1.  **Scope**: Scans all `AWS::EKS::FargateProfile` nodes.
+2.  **Whitelist**: Automatically ignores `fp-default` and profiles targeting `kube-system`.
+3.  **Layer 1 (Broken Link)**: Checks if the target Kubernetes Namespace even exists. If not -> **ABANDONED**.
+4.  **Layer 2 (The Pulse)**: Checks if any ACTIVE pods currently match the profile selectors.
+5.  **Layer 3 (Ghost Town)**: If 0 pods, checks for **Controllers** (Deployments, StatefulSets) in that namespace. If no controllers match the selector, or if they are scaled to 0, the profile is flagged as **ABANDONED**.
+
 ### Orphaned Load Balancers (v1.2.3)
 
 Detects ELBs that were left behind after an EKS cluster was deleted.

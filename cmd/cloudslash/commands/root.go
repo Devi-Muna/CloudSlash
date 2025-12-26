@@ -27,7 +27,7 @@ Identify. Audit. Slash.`,
 	Run: func(cmd *cobra.Command, args []string) {
         // Default action: Run TUI
         config.Headless = false
-		app.Run(config)
+		_, _, _ = app.Run(config)
 	},
 }
 
@@ -127,9 +127,9 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
     })
     fmt.Println("")
 
-    fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.3)"))
-    fmt.Println(flagStyle.Render("  • Zombie EKS:        Detects empty Control Planes (>7 days, $72/mo)"))
-    fmt.Println(flagStyle.Render("  • Data Export:       Generates CSV/JSON/HTML reports (Headless)"))
-    fmt.Println(flagStyle.Render("  • Smart Ignore:      Support for relative time (30d) and cost (<$10)"))
+    fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.5)"))
+    fmt.Println(flagStyle.Render("  • Trap Door Analysis:  Detects Abandoned Fargate Profiles"))
+    fmt.Println(flagStyle.Render("  • Ghost Town Check:    Deep k8s forensics for 30-day stale controllers"))
+    fmt.Println(flagStyle.Render("  • Configuration Debt:  Identifies risky, broken namespace links"))
     fmt.Println("")
 }
