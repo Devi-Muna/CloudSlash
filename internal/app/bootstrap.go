@@ -19,6 +19,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/swarm"
 	"github.com/DrSkyle/cloudslash/internal/tf"
 	"github.com/DrSkyle/cloudslash/internal/ui"
+	"github.com/DrSkyle/cloudslash/internal/k8s"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -244,6 +245,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			hEngine.Register(&heuristics.LogHoardersHeuristic{})
 			hEngine.Register(&heuristics.FossilAMIHeuristic{})
 			hEngine.Register(&heuristics.ZombieEKSHeuristic{})
+			hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
 
 			// Execute Forensics
 			if err := hEngine.Run(ctx, g); err != nil {
@@ -354,6 +356,16 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
 	submitTask(func(ctx context.Context) error { return eksScanner.ScanClusters(ctx) })
+
+	// K8s Scanner (Ghost Detector v1.2.4)
+	// Only run if we can create a client
+	if k8sClient, err := k8s.NewClient(); err == nil {
+		k8sScanner := k8s.NewScanner(k8sClient, g)
+		submitTask(func(ctx context.Context) error { return k8sScanner.Scan(ctx) })
+	} else {
+		// Log warning but don't fail, as this might be running outside k8s context
+		// fmt.Printf("Skipping K8s Scan (Ghost Detector): %v\n", err)
+	}
 
 	return awsClient, nil
 }

@@ -32,6 +32,7 @@ CloudSlash is **Open Source** (AGPLv3) to guarantee transparency and community f
 - **Heuristic Analysis**:
   - **Zombie EBS**: Detects available volumes or attached volumes with 0 IOPS/30 days.
   - **Zombie Control Planes**: Identifies EKS Clusters that are active but have zero compute nodes (Node Groups, Fargate, or EC2) for > 7 days.
+  - **Ghost Detector (v1.2.4)**: Identifies EKS Node Groups active but serving zero real user workloads (filtering out DaemonSets/System pods).
   - **Idle NAT Gateways**: Identifies gateways costing hourly rates but processing minimal traffic (<1GB/month).
   - **S3 Multipart Uploads**: Finds incomplete uploads consuming storage space.
   - **The Time Machine**: Recursively identifies snapshots created from waste volumes.
@@ -142,7 +143,13 @@ Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 
 ## Release History
 
-### v1.2.3 (Current)
+### v1.2.4 (Latest)
+
+- **Ghost Detector**: Identifies EKS Node Groups that are active but serving zero real user workloads by filtering out DaemonSets and System pods.
+- **Orphaned Load Balancer**: Detections for ELBs left behind by deleted EKS clusters (Zombie Clusters).
+- **Core Update**: Integrated Kubernetes Client for direct API scanning.
+
+### v1.2.3
 
 - **Zombie Control Planes**: Algorithm to detect abandoned EKS Clusters ($0.10/hr) by verifying compute capacity across Managed Node Groups, Fargate Profiles, and Self-Managed Instances.
 - **Data Export**: New `cloudslash export` command for generating reports without user interaction.
