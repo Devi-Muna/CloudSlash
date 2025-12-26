@@ -34,6 +34,13 @@ var updateCmd = &cobra.Command{
             return
         }
         
+        // Basic semantic check to prevent "downgrade" notifications if local > remote
+        // (Assuming format vX.Y.Z)
+        if latest < CurrentVersion {
+             fmt.Printf("You are running a newer version (%s) than the latest release (%s). Dev build? 🚀\n", CurrentVersion, latest)
+             return
+        }
+        
         fmt.Printf("Found new version: %s (Current: %s)\n", latest, CurrentVersion)
         fmt.Println("Downloading update...")
         
