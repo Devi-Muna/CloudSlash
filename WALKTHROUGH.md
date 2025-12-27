@@ -137,13 +137,40 @@ Detects Elastic Load Balancers (ALB/NLB) that persist after their parent EKS clu
 
 ## 4. Advanced Suppression System
 
-Operators can suppress findings using the `cloudslash:ignore` tag on AWS resources. This supports complex logic for "Justified Waste" (e.g., Disaster Recovery pilots).
+## 4. Advanced Suppression System
 
-**Tag Format:** `cloudslash:ignore` = `[VALUE]`
+CloudSlash allows you to "Safelist" resources so they are ignored during scans. This is done by applying a standard AWS Tag to the resource itself (via Console, CLI, or Terraform). CloudSlash reads these tags during its discovery phase.
+
+### How to Ignore a Resource
+
+**Option 1: AWS Console**
+
+1.  Navigate to the resource (e.g., EC2 Dashboard -> Instances).
+2.  Select the resource and click **Tags** -> **Manage Tags**.
+3.  Add New Tag:
+    - **Key**: `cloudslash:ignore`
+    - **Value**: `true` (or see options below)
+4.  Save. The next `cloudslash scan` will automatically skip this resource.
+
+**Option 2: Terraform / IaC**
+Simply add the tag to your resource definition:
+
+```hcl
+resource "aws_instance" "bastion" {
+  # ... other config ...
+  tags = {
+    "cloudslash:ignore" = "true"
+  }
+}
+```
+
+### Tag Value Options
+
+Apply the tag `cloudslash:ignore` with one of the following values to control behavior:
 
 | Value Format | Behavior                                                                             | Use Case                                                                     |
 | :----------- | :----------------------------------------------------------------------------------- | :--------------------------------------------------------------------------- |
-| `true`       | **Permanent Ignore**<br>Resource is excluded from all reports indefinitely.          | Critical infrastructure with irregular usage patterns (e.g., Bastion Hosts). |
+| `true`       | **Permanent Ignore**<br>Resource is completely hidden from the CLI and all reports.  | Critical infrastructure with irregular usage patterns (e.g., Bastion Hosts). |
 | `YYYY-MM-DD` | **Date Expiry**<br>Resource is ignored until the specified date.                     | Temporary projects or proof-of-concept resources.                            |
 | `30d`        | **Relative Grace Period**<br>Resource is ignored if created within the last 30 days. | New deployments that are still being configured.                             |
 | `cost<15.00` | **Cost Threshold**<br>Resource is ignored if monthly cost is below the value.        | Ignoring low-value noise to focus on high-impact savings.                    |
