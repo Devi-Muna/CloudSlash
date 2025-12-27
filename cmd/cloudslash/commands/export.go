@@ -52,6 +52,7 @@ Default output directory: ./cloudslash-out/`,
             fmt.Println("   Data export and detailed reports are locked.")
             fmt.Printf("   Unlock full visibility to save $%.2f every year.\n\n", monthlyWaste * 12)
             fmt.Println("   > cloudslash --license [KEY]")
+            fmt.Println("\n   (Get a license at https://cloudslash.pages.dev/)")
         }
 	},
 }
