@@ -1,186 +1,160 @@
-# CloudSlash Technical Manual (v1.2.4)
+# CloudSlash Technical Documentation (v1.2.5)
 
-This document describes the operational procedures, core architecture, and usage workflows of CloudSlash. It serves as the primary reference for system administrators and DevOps engineers using the tool for infrastructure analysis and forensic cleanup.
+This document serves as the primary technical reference for the CloudSlash forensic engine. It details the system architecture, operational workflows, detection logic, and remediation protocols. It is intended for Site Reliability Engineers (SREs), DevOps practitioners, and FinOps stakeholders.
 
-## 1. System Overview
+## 1. System Architecture
 
-CloudSlash functions as a local forensic analysis engine. Unlike SaaS platforms that require broad IAM roles and data export, CloudSlash runs entirely on your local machine or CI/CD runner. It builds an in-memory dependency graph of your AWS infrastructure to identify inefficiencies, security risks, and financial waste.
+CloudSlash operates as a local-first, zero-trust forensic scanner. It diverges from traditional SaaS cost management platforms by executing entirely within the user's secure environment, requiring no external data exfiltration or long-term IAM role assumption by third parties.
 
-### Key Capabilities
+### Core Components
 
-- **Zero-Trust Analysis**: Verifies resource utilization via CloudWatch metrics rather than trusting static status tags.
-- **Forensic Graphing**: Maps dependencies (e.g., Snapshots -> Volumes -> Instances) to safely identify orphaned resources without breaking active chains.
-- **Code Correlation**: Traces identified waste back to its origin in your Terraform state files and CloudTrail logs.
+1.  **Forensic Graph Engine**: CloudSlash constructs an in-memory Directed Acyclic Graph (DAG) of the target AWS environment. Nodes represent infrastructure assets (EC2 Instances, EBS Volumes, EKS Clusters), and edges represent functional dependencies (Attachment, Hosting, Security Group Association).
+2.  **Telemetry Ingest**: The system queries AWS CloudWatch metrics directly to determine resource utilization (CPU, Network I/O, Connection Count) over a 30-day window, ensuring analysis is based on historical evidence rather than instantaneous state.
+3.  **Heuristic Analyzers**: A suite of specialized logic modules runs against the graph to identify specific patterns of waste ("Zombie", "Ghost", "Orphan").
 
-## 2. Command Reference
+### Security Model
 
-CloudSlash provides a suite of commands tailored for interactive audit, automated scanning, and controlled remediation.
+- **Execution scope**: Local CLI binary.
+- **Authentication**: Uses the standard AWS credential provider chain (`~/.aws/credentials`, `AWS_PROFILE`, IAM Instance Profiles).
+- **Permissions**: Read-only access (`ViewOnlyAccess`) is sufficient for scanning. Remediation features require specific `Delete` permissions.
 
-### The Scan Command (Default)
+## 2. CLI Command Reference
 
-The `cloudslash` command (or `cloudslash scan`) initiates a forensic sweep of the environment. It authenticates using the standard AWS credential chain.
+### Scan Operation
 
-**Usage:**
+The primary operation mode. Scans the target AWS region, builds the graph, and outputs a summary to the terminal.
 
 ```bash
-cloudslash scan --region us-east-1
+cloudslash scan [flags]
 ```
 
-**Behavior:**
+**Flags:**
 
-1.  **Discovery**: Enumerates resources across EC2, RDS, S3, and ELB.
-2.  **Telemetry**: Fetches 30-day metric history (CPU, I/O, Network) for every asset.
-3.  **Graph Construction**: Builds the dependency graph to calculate blast radius.
-4.  **Reporting**: Outputs findings to the `cloudslash-out/` directory.
+- `--region`: Specify the target AWS region (e.g., `us-east-1`). Defaults to the environment variable configuration.
+- `--headless`: Runs without the interactive Terminal User Interface (TUI), suitable for CI/CD logs.
 
-### The Export Command
+### Export Operation
 
-The `cloudslash export` command allows you to generate forensic artifacts without launching the TUI. It is designed for integration with external BI tools or archiving systems.
-
-**Usage:**
+Generates detailed forensic artifacts for offline analysis or auditing.
 
 ```bash
 cloudslash export
 ```
 
-**Artifacts Generated:**
+**Generated Artifacts (in `./cloudslash-out`):**
 
-- `waste_report.csv`: A structured dataset of all identified waste, including monthly cost estimates and risk scores.
-- `waste_report.json`: A hierarchical JSON dump of the waste graph, suitable for programmatic parsing.
-- `dashboard.html`: A standalone HTML report for visualized consumption.
+- `dashboard.html`: A self-contained, interactive HTML report visualizing cost distribution and specific waste items.
+- `waste_report.csv`: A tabular dataset containing Resource IDs, Risk Scores, and Estimated Monthly Costs.
+- `waste_report.json`: A hierarchical JSON export of the waste graph for programmatic integration.
 
-### The Nuke Command (Safety Brake)
+### Remediation Operation (Safety Brake)
 
-The `cloudslash nuke` command triggers the interactive remediation protocol. This is known as the "Safety Brake" mechanism. Unlike automated cleanups that can be dangerous, Nuke forces a manual verification step for every deletion.
-
-**Usage:**
+Interactive cleanup protocol.
 
 ```bash
 cloudslash nuke
 ```
 
-**Workflow:**
+**Safety Protocol:**
 
-1.  System re-scans the environment to ensure state is current.
-2.  Identified waste is presented sequentially.
-3.  User must explicitly confirm deletion (y/N) for each resource.
-4.  Deletion API calls are issued immediately upon confirmation.
+1.  **Re-Verify**: The system performs a fresh scan to ensure the state has not drifted since the last report.
+2.  **Interactive Confirmation**: The user is presented with each identified waste resource sequentially.
+3.  **Explicit Consent**: Deletion API calls require affirmative user input (`y/N`) for every individual resource.
 
-### The Update Command
+### Update Operation
 
-To ensure you are using the latest heuristics and pricing models, use the built-in update mechanism.
-
-**Usage:**
+Updates the local binary to the latest version, ensuring access to the newest heuristics and pricing data.
 
 ```bash
 cloudslash update
 ```
 
-## 3. Advanced Tagging & Suppression
+## 3. Heuristic Detection Logic
 
-CloudSlash supports a robust suppression system using the `cloudslash:ignore` tag. This allows operators to whitelist resources that are false positives (e.g., warm standbys) or temporary experimental resources.
+CloudSlash v1.2.5 includes advanced heuristics designed to detect subtle forms of infrastructure waste that escape simple tag-based filtering.
 
-### Suppression Logic
+### Trap Door Analysis (Fargate Profiles)
 
-Apply the tag `cloudslash:ignore` with one of the following value formats to control suppression behavior:
+**Introduced in v1.2.5**
 
-**1. Permanent Ignore**
+This heuristic targets "Abandoned" Fargate Profiles in Amazon EKS. A Fargate Profile acts as a configuration listener; if no Pods match its selectors, it represents configuration debt and a risk of accidental billing.
 
-- **Value:** `true`
-- **Effect:** The resource will never be flagged as waste.
+**Detection Layers:**
 
-**2. Absolute Date Expiry**
+1.  **Broken Link Check**: Verifies if the Kubernetes Namespace defined in the profile selector exists. If the namespace is missing, the profile is flagged as broken/abandoned.
+2.  **Utilization Pulse**: Queries for active Pods in the target namespace that match the profile's labels. If valid pods exist, the profile is active.
+3.  **Ghost Town Forensics**: If no pods exist, the system analyzes Controllers (Deployments, StatefulSets). If no controllers match the profile selectors, or if all matching controllers have been scaled to zero for an extended period, the profile is deemed abandoned.
+4.  **Allow-List**: Profiles acting on the `kube-system` namespace or named `fp-default` are automatically excluded to prevent disruption of cluster-critical infrastructure.
 
-- **Value:** `YYYY-MM-DD` (e.g., `2025-12-31`)
-- **Effect:** The resource is ignored until the specified date. After this date, it will be re-evaluated.
+### Ghost Detector (EKS Node Groups)
 
-**3. Relative Grace Period (New)**
+**Introduced in v1.2.4**
 
-- **Value:** `Nd` or `Nh` (e.g., `30d`, `72h`)
-- **Effect:** The resource is ignored if its creation time is within the specified duration (e.g., created less than 30 days ago). This is useful for "fresh" dev resources that haven't had time to prove utilization yet.
+Identifies EKS Node Groups that incur compute costs but serve zero generic user workloads. This addresses "Hollow Clusters" where scaling logic has failed to scale down empty groups.
 
-**4. Cost Threshold**
+**Detection Logic:**
 
-- **Value:** `cost<N` (e.g., `cost<10.00`)
-- **Effect:** The resource is ignored if its monthly cost is below N dollars.
+1.  **Node Enumeration**: Lists all nodes associated with a specific Node Group.
+2.  **Pod Filtration**: Examines all pods running on these nodes, filtering out:
+    - DaemonSet pods (infrastructure overhead).
+    - System pods (CoreDNS, VPC CNI).
+    - Completed Jobs/Pods.
+3.  **Verdict**: If a Node Group contains active EC2 instances but runs zero qualifying application workloads, it is flagged as a Ghost Node Group.
 
-## 4. Remediation & Forensics
+### Zombie Control Planes (EKS Clusters)
 
-When waste is identified, CloudSlash provides multiple paths for remediation, respecting the "Infrastructure as Code" integrity.
+**Introduced in v1.2.3**
 
-### Terraform Logic (Reverse-Terraform)
+Detects EKS Clusters that consist only of a Control Plane (costing ~$72/month) with no attached compute capacity.
 
-For teams using Terraform, deleting resources via the AWS Console (or Nuke) introduces configuration drift. CloudSlash solves this by analyzing the local `terraform.tfstate` file.
+**Detection Logic:**
 
-**Mechanism:**
-The engine generates a script `cloudslash-out/fix_terraform.sh`. This script contains precise `terraform state rm` commands targeting the specific resource addresses of identified waste. Running this script removes the waste from your state file, ensuring your next `terraform apply` effectively destroys the resource (or cleans up the reference).
+1.  **Age Threshold**: Ignores clusters created within the last 7 days (provisioning window).
+2.  **Capacity Triangulation**: Checks for the absence of:
+    - Managed Node Groups.
+    - Fargate Profiles.
+    - Self-Managed EC2 instances marked with the cluster's ownership tags.
+3.  **Verdict**: If all capacity checks return negative, the cluster is flagged as a Zombie.
 
-### Owner Forensics (The Blame Game)
+### Vampire NAT Gateways
 
-To prevent waste recurrence, you must identify the source. CloudSlash analyzes CloudTrail logs to find the IAM Principal responsible for creating the resource.
+Identifies NAT Gateways that incur high hourly charges but process negligible traffic.
 
-- **Data Point:** The `Owner` field in reports will display the IAM ARN (e.g., `arn:aws:iam::123:user/dev-ops`).
-- **Scope:** Traces back to original `RunInstances`, `CreateVolume`, or `CreateBucket` events.
+**Thresholds:**
 
-## 5. Artifact Reference
+- **Traffic Volume**: Less than 1 GB of data processed over a 30-day window.
+- **Verdict**: High fixed cost with low utilization suggests an architectural inefficiency (e.g., a NAT Gateway for a subnet that has no active outbound traffic requirements).
 
-All analysis outputs are stored in the `./cloudslash-out` directory.
+### Orphaned Load Balancers
 
-- `dashboard.html`: Visual report for stakeholders.
-- `waste_report.csv`: Flat data file for inventory tracking.
-- `waste_report.json`: Deep data file for automation.
-- `fix_terraform.sh`: Script to align Terraform state.
-- `ignore_resources.sh`: Script to automatically tag current waste as ignored (bulk suppression).
+Detects Elastic Load Balancers (ALB/NLB) that persist after their parent EKS cluster has been deleted.
 
-## 6. Detection Logic Details (New in v1.2.4)
+**Logic:**
 
-CloudSlash employs multi-stage verification to ensure zero false positives.
+1.  **Tag Inspection**: Identifies Resources tagged with `kubernetes.io/cluster/<name>`.
+2.  **Parent Verification**: Queries EKS Service to verify if cluster `<name>` exists.
+3.  **Verdict**: If the parent cluster is not found, the Load Balancer is confirmed as orphaned waste.
 
-### Ghost Detector (v1.2.4)
+## 4. Advanced Suppression System
 
-Identifies EKS Node Groups that are incurring cost but running no user workloads.
+Operators can suppress findings using the `cloudslash:ignore` tag on AWS resources. This supports complex logic for "Justified Waste" (e.g., Disaster Recovery pilots).
 
-1.  **Scope**: Scans all Nodes belonging to an EKS Node Group (via `eks.amazonaws.com/nodegroup` label).
-2.  **The Funnel Filter**:
-    - Ignores Pods that are `Succeeded` or `Failed`.
-    - Ignores Pods owned by a `DaemonSet` (Infrastructure noise).
-    - Ignores `kube-system` Pods.
-    - Ignores Mirror Pods.
-3.  **The Verdict**: If a Node Group has >0 nodes but 0 surviving "Real Workload" pods, it is flagged as a Ghost.
+**Tag Format:** `cloudslash:ignore` = `[VALUE]`
 
-### Fargate Trap Door Analysis (v1.2.5)
+| Value Format | Behavior                                                                             | Use Case                                                                     |
+| :----------- | :----------------------------------------------------------------------------------- | :--------------------------------------------------------------------------- |
+| `true`       | **Permanent Ignore**<br>Resource is excluded from all reports indefinitely.          | Critical infrastructure with irregular usage patterns (e.g., Bastion Hosts). |
+| `YYYY-MM-DD` | **Date Expiry**<br>Resource is ignored until the specified date.                     | Temporary projects or proof-of-concept resources.                            |
+| `30d`        | **Relative Grace Period**<br>Resource is ignored if created within the last 30 days. | New deployments that are still being configured.                             |
+| `cost<15.00` | **Cost Threshold**<br>Resource is ignored if monthly cost is below the value.        | Ignoring low-value noise to focus on high-impact savings.                    |
 
-Detects **Abandoned Fargate Profiles**. Fargate profiles are trap doors that wait for pods. If nothing falls through them, they are "Configuration Debt". They don't cost money directly, but they represent risk (accidental billing if someone deploys there).
+## 5. Remediation Scripts
 
-1.  **Scope**: Scans all `AWS::EKS::FargateProfile` nodes.
-2.  **Whitelist**: Automatically ignores `fp-default` and profiles targeting `kube-system`.
-3.  **Layer 1 (Broken Link)**: Checks if the target Kubernetes Namespace even exists. If not -> **ABANDONED**.
-4.  **Layer 2 (The Pulse)**: Checks if any ACTIVE pods currently match the profile selectors.
-5.  **Layer 3 (Ghost Town)**: If 0 pods, checks for **Controllers** (Deployments, StatefulSets) in that namespace. If no controllers match the selector, or if they are scaled to 0, the profile is flagged as **ABANDONED**.
+In addition to the interactive `nuke` command, CloudSlash generates remediation artifacts for Infrastructure-as-Code workflows.
 
-### Orphaned Load Balancers (v1.2.3)
+- **Terraform Remediation**: The `fix_terraform.sh` script parses the local `terraform.tfstate` and generates `terraform state rm` commands. This allows engineers to safely decouple waste resources from state management before physical deletion, preventing state-drift errors.
+- **Owner Traceability**: Reports include the IAM Principal responsible for the resource creation (extracted from CloudTrail `RunInstances` or equivalent events), facilitating accountability.
 
-Detects ELBs that were left behind after an EKS cluster was deleted.
+---
 
-1.  **Tag Analysis**: Looks for ELBs tagged with `kubernetes.io/cluster/<name> = owned`.
-2.  **Cluster Verification**: Checks if the referenced cluster `<name>` still exists in EKS.
-3.  **Verdict**: If the cluster is missing, the ELB is orphaned waste.
-
-### Zombie EKS Control Planes (v1.2.3)
-
-EKS clusters incur a base cost of ~$72/month even without worker nodes. CloudSlash identifies these "Zombie Control Planes" using a composite check:
-
-1.  **Status Check**: Cluster must be `ACTIVE` and created more than 7 days ago.
-2.  **Capacity Verification (The Triad)**:
-    - **Managed Node Groups**: Must have zero groups or groups with `desiredSize` 0.
-    - **Fargate Profiles**: Must have zero profiles defined.
-    - **Self-Managed Nodes**: We query all EC2 instances for the tag `kubernetes.io/cluster/<name>`. If 0 instances are found, the cluster is deemed empty.
-3.  **Safety Net**: Clusters tagged with `karpenter.sh/discovery` are automatically ignored to protect auto-scaling environments that scale to zero.
-
-## 7. Security Model
-
-CloudSlash is designed with a "Least Privilege" mindset.
-
-- **Read-Only**: The `scan` and `export` commands require only `ViewOnlyAccess` or `ReadOnlyAccess` permissions.
-- **Local Execution**: All graph processing, cost calculation, and credential usage occur within the process memory. No data is transmitted to third-party servers.
-- **Credential Chain**: It utilizes the standard AWS SDK credential provider chain (Env Vars -> Profile -> Instance Metadata), ensuring compatibility with existing MFA and SSO workflows.
+_Generated by CloudSlash Documentation Engine._
