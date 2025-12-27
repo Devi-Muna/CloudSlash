@@ -257,8 +257,21 @@ const htmlTemplate = `
                     <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/safe_cleanup.sh</code> to snapshot and delete identified waste.</p>
                 </div>
                  <div>
-                    <h3 style="margin-top:0; color: var(--text-primary);">Suppression</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Run <code>bash cloudslash-out/ignore_resources.sh</code> to tag resources as ignored (<code>cloudslash:ignore</code>).</p>
+                    <h3 style="margin-top:0; color: var(--text-primary);">Suppression (Justified Waste)</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        To exclude resources from future reports, add the tag <code>cloudslash:ignore</code> directly in the AWS Console.
+                    </p>
+                    <table style="margin-top: 0.5rem; font-size: 0.8rem; border: 1px solid var(--border);">
+                        <thead><tr style="background: rgba(255,255,255,0.05);"><th>Tag Value</th><th>Effect</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>true</code></td><td>Permanent Ignore (Hidden from TUI & Reports)</td></tr>
+                            <tr><td><code>30d</code></td><td>Ignore if created < 30 days ago</td></tr>
+                            <tr><td><code>cost<15</code></td><td>Ignore if monthly cost < $15</td></tr>
+                        </tbody>
+                    </table>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+                        <strong>For Bulk Action:</strong> Run <code>bash cloudslash-out/ignore_resources.sh</code> to automatically tag current findings as <code>true</code>.
+                    </p>
                 </div>
                  <div>
                     <h3 style="margin-top:0; color: var(--text-primary);">Terraform</h3>
