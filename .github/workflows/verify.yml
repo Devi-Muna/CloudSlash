@@ -5,10 +5,14 @@ on:
     branches: [main, v1.2-beta]
     paths-ignore:
       - "**.md"
+      - ".gitignore"
+      - "**.txt"
   pull_request:
     branches: [main, v1.2-beta]
     paths-ignore:
       - "**.md"
+      - ".gitignore"
+      - "**.txt"
   workflow_dispatch:
 
 jobs:
