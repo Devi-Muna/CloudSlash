@@ -11,7 +11,7 @@ CloudSlash identifies idle, orphaned, and underutilized resources in AWS environ
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
-![Version](https://img.shields.io/badge/version-v1.2.5-green)
+![Version](https://img.shields.io/badge/version-v1.2.6-green)
 
 > **New to CloudSlash?** Check out the complete [**User Walkthrough**](WALKTHROUGH.md) for a step-by-step guide.
 
@@ -143,9 +143,16 @@ Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 
 ## Release History
 
-### v1.2.5 (Latest)
+### v1.2.6 (Latest)
 
-- **Trap Door Analysis**: Detects **Abandoned Fargate Profiles**. Checks for broken namespace links (Layer 1), zero active pods (Layer 2), and "Ghost Town" controllers that have been scaled to 0 for >30 days (Layer 3).
+- **Idle Clusters**: "The Money Saver". Detects ECS Clusters that have registered container instances (EC2 capacity) but zero running tasks.
+- **Empty Services**: "Crash Loop Detector". Identifies services with `desiredCount > 0` but `runningCount == 0`, diagnosing failure reasons from forensic event analysis.
+- **Broken Artifacts**: Flags services failing to launch because the ECR image is missing.
+- **Deep Links & Hierarchy**: New TUI with contextual tree view and clickable resource deep links (OSC 8).
+- **Interactive Filtering**: Smart region selection when running `scan` without flags.
+
+### v1.2.5
+
 - **Risk Removal**: Identifies "Configuration Debt" that poses a risk of accidental serverless billing.
 
 ### v1.2.4

@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/DrSkyle/cloudslash/internal/app"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +16,17 @@ var scanCmd = &cobra.Command{
 Example:
   cloudslash scan --region us-west-2`,
 	Run: func(cmd *cobra.Command, args []string) {
-        config.Headless = true
+		// Interactive Filtering (v1.2.6)
+		if !cmd.Flags().Changed("region") {
+			// Check if TTY? Cobra Run usually implies we can check inputs.
+			// Just run the prompt.
+			regions, err := PromptForRegions()
+			if err == nil {
+				config.Region = strings.Join(regions, ",")
+			}
+		}
+		
+		config.Headless = true
 		_, _, _ = app.Run(config)
 	},
 }

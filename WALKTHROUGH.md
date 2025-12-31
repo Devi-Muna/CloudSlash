@@ -1,4 +1,4 @@
-# CloudSlash Technical Documentation (v1.2.5)
+# CloudSlash Technical Documentation (v1.2.6)
 
 This document serves as the primary technical reference for the CloudSlash forensic engine. It details the system architecture, operational workflows, detection logic, and remediation protocols. It is intended for Site Reliability Engineers (SREs), DevOps practitioners, and FinOps stakeholders.
 
@@ -25,8 +25,10 @@ CloudSlash operates as a local-first, zero-trust forensic scanner. It diverges f
 The primary operation mode. Scans the target AWS region, builds the graph, and outputs a summary to the terminal.
 
 ```bash
-cloudslash scan [flags]
+cloudslash scan
 ```
+
+If no flags are provided, CloudSlash enters **Interactive Mode**, prompting you to select regions via a smart TUI.
 
 **Flags:**
 
@@ -71,7 +73,33 @@ cloudslash update
 
 ## 3. Heuristic Detection Logic
 
-CloudSlash v1.2.5 includes advanced heuristics designed to detect subtle forms of infrastructure waste that escape simple tag-based filtering.
+CloudSlash v1.2.6 includes advanced heuristics designed to detect subtle forms of infrastructure waste that escape simple tag-based filtering.
+
+### Idle Clusters (ECS)
+
+**Introduced in v1.2.6**
+
+Detects ECS Clusters that are incurring EC2 costs but running no workload tasks.
+
+**Detection Logic:**
+
+1.  **Capacity Check**: Verifies the cluster has registered Container Instances (EC2 nodes).
+2.  **Workload Filter**: Checks `runningTasksCount` and `pendingTasksCount`. If both are 0, the compute capacity is effectively wasted.
+3.  **Uptime Verification**: Cross-references instance uptime to ensure they aren't just "warming up" (must be > 1 hour old).
+
+### Empty Services (Crash Loops)
+
+**Introduced in v1.2.6**
+
+Identifies ECS Services that are configured to run tasks but failing to do so, often indicating a broken deployment or missing artifact.
+
+**Forensic Diagnosis:**
+
+The engine analyzes the service's recent events to pinpoint the root cause:
+
+- **Infrastructure Issue**: "unable to place a task" (Insufficient Memory/CPU).
+- **Code Issue**: "task failed to start" (Application Crash).
+- **Broken Artifact**: Checks if the Docker image (ECR) referenced in the Task Definition still exists. If the image is deleted, the service is flagged as a "Broken Artifact".
 
 ### Trap Door Analysis (Fargate Profiles)
 

@@ -25,8 +25,16 @@ var rootCmd = &cobra.Command{
 Identify. Audit. Slash.`,
     Version: CurrentVersion,
 	Run: func(cmd *cobra.Command, args []string) {
-        // Default action: Run TUI
-        config.Headless = false
+        // Interactive Filtering (v1.2.6)
+        if !cmd.Flags().Changed("region") {
+            regions, err := PromptForRegions()
+            if err == nil {
+                config.Region = strings.Join(regions, ",")
+            }
+        }
+
+		// Default action: Run TUI
+		config.Headless = false
 		_, _, _ = app.Run(config)
 	},
 }
@@ -73,7 +81,7 @@ func init() {
 
 func checkUpdate() {
    latest, err := fetchLatestVersion()
-   if err == nil && strings.TrimSpace(latest) != CurrentVersion {
+   if err == nil && strings.TrimSpace(latest) > CurrentVersion {
        fmt.Printf("\n✨ Update Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", CurrentVersion, latest)
    }
 }
@@ -127,9 +135,9 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
     })
     fmt.Println("")
 
-    fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.5)"))
-    fmt.Println(flagStyle.Render("  • Trap Door Analysis:  Detects Abandoned Fargate Profiles"))
-    fmt.Println(flagStyle.Render("  • Ghost Town Check:    Deep k8s forensics for 30-day stale controllers"))
-    fmt.Println(flagStyle.Render("  • Configuration Debt:  Identifies risky, broken namespace links"))
+    fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.6)"))
+    fmt.Println(flagStyle.Render("  • ECS Idle Clusters:   Detects empty clusters wasting EC2 money"))
+    fmt.Println(flagStyle.Render("  • Crash Loop Detector: Identifies broken services & missing images"))
+    fmt.Println(flagStyle.Render("  • Interactive Mode:    Region selection & Deep Links in output"))
     fmt.Println("")
 }

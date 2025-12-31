@@ -100,6 +100,13 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 		heuristicEngine := heuristics.NewEngine()
 		heuristicEngine.Register(&heuristics.ZombieEBSHeuristic{})
 		heuristicEngine.Register(&heuristics.S3MultipartHeuristic{})
+        heuristicEngine.Register(&heuristics.IdleClusterHeuristic{})
+        heuristicEngine.Register(&heuristics.EmptyServiceHeuristic{}) // Clients are nil, checks logic only
+        heuristicEngine.Register(&heuristics.ZombieEKSHeuristic{})
+        heuristicEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
+        heuristicEngine.Register(&heuristics.ElasticIPHeuristic{}) // Property-based
+        heuristicEngine.Register(&heuristics.RDSHeuristic{}) // Handles "stopped" status without CW
+        // heuristicEngine.Register(&heuristics.TagComplianceHeuristic{RequiredTags: ...}) // Only if config passed
 		if err := heuristicEngine.Run(ctx, g); err != nil {
 			fmt.Printf("Heuristic run failed: %v\n", err)
 		}
@@ -147,25 +154,36 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
         var iamClient *aws.IAMClient
 		var ctClient *aws.CloudTrailClient
 		var logsClient *aws.CloudWatchLogsClient // New Logs Client
+        var ecsScanner *aws.ECSScanner
+        var ecrScanner *aws.ECRScanner
 
 		for _, profile := range profiles {
 			if cfg.AllProfiles {
 				fmt.Printf(">>> Scanning Profile: %s\n", profile)
 			}
  
-            // Using local helper (needs to be moved/exported or copied)
-			client, err := runScanForProfile(ctx, cfg.Region, profile, g, engine, &scanWg)
-			if err != nil {
-				fmt.Printf("Scan failed for profile %s: %v\n", profile, err)
-				continue
-			}
+            // Support Multi-Region Scan (v1.2.6)
+            regions := strings.Split(cfg.Region, ",")
+            for _, region := range regions {
+                region = strings.TrimSpace(region)
+                if region == "" { continue }
+                
+                // Using local helper (needs to be moved/exported or copied)
+                client, err := runScanForProfile(ctx, region, profile, g, engine, &scanWg)
+                if err != nil {
+                    fmt.Printf("Scan failed for profile %s region %s: %v\n", profile, region, err)
+                    continue
+                }
 
-			if client != nil {
-				cwClient = aws.NewCloudWatchClient(client.Config)
-				iamClient = aws.NewIAMClient(client.Config)
-				ctClient = aws.NewCloudTrailClient(client.Config)
-				logsClient = aws.NewCloudWatchLogsClient(client.Config, g)
-			}
+                if client != nil {
+                    cwClient = aws.NewCloudWatchClient(client.Config)
+                    iamClient = aws.NewIAMClient(client.Config)
+                    ctClient = aws.NewCloudTrailClient(client.Config)
+                    logsClient = aws.NewCloudWatchLogsClient(client.Config, g)
+                    ecsScanner = aws.NewECSScanner(client.Config, g)
+                    ecrScanner = aws.NewECRScanner(client.Config)
+                }
+            }
 		}
 
 		// Background Analysis & Reporting
@@ -251,7 +269,13 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			hEngine.Register(&heuristics.LogHoardersHeuristic{})
 			hEngine.Register(&heuristics.FossilAMIHeuristic{})
 			hEngine.Register(&heuristics.ZombieEKSHeuristic{})
+			hEngine.Register(&heuristics.ZombieEKSHeuristic{})
 			hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
+            
+            // v1.2.6 ECS Heuristics
+            hEngine.Register(&heuristics.IdleClusterHeuristic{})
+            // Injecting captured ECR/ECS scanners (from last successful profile)
+            hEngine.Register(&heuristics.EmptyServiceHeuristic{ECR: ecrScanner, ECS: ecsScanner})
             
             // v1.2.5 Fargate Analysis
             if k8sClient, err := k8s.NewClient(); err == nil {
@@ -370,6 +394,11 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
 	submitTask(func(ctx context.Context) error { return eksScanner.ScanClusters(ctx) })
+
+    // New ECS Scanner (v1.2.6)
+    ecsScanner := aws.NewECSScanner(awsClient.Config, g)
+    submitTask(func(ctx context.Context) error { return ecsScanner.ScanClusters(ctx) })
+
 
 	// K8s Scanner (Ghost Detector v1.2.4)
 	// Only run if we can create a client
