@@ -53,7 +53,7 @@ func (h *DataForensicsHeuristic) analyzeElasticache(node *graph.Node) {
 	if totalOps == 0 && netIn < netThreshold && cpu < 2.0 {
 		node.IsWaste = true
 		node.RiskScore = 9 // High confidence
-		node.Justification = "Ghost Cache: 0 Hits/Misses, Idle CPU, Negligible Network Traffic."
+		node.Properties["Reason"] = "Ghost Cache: 0 Hits/Misses, Idle CPU, Negligible Network Traffic."
 		// Cost calc would utilize Node Config. Assuming generic cost for now unless Pricing API integrated.
 		node.Cost = 50.0 // Placeholder
 	}
@@ -71,9 +71,9 @@ func (h *DataForensicsHeuristic) analyzeRedshift(node *graph.Node) {
 		node.RiskScore = 8
 		
 		if conns > 0 {
-			node.Justification = "Idle (Connected): 0 Queries in 24h, but active connections detected (BI Tool?)."
+			node.Properties["Reason"] = "Idle (Connected): 0 Queries in 24h, but active connections detected. Action: PAUSE."
 		} else {
-			node.Justification = "Redshift Pause Candidate: 0 Queries in 24h."
+			node.Properties["Reason"] = "Redshift Pause Candidate: 0 Queries in 24h. Action: PAUSE."
 		}
 		
 		// TODO: Check 'ClusterAvailabilityStatus' for legacy nodes
@@ -110,13 +110,13 @@ func (h *DataForensicsHeuristic) analyzeDynamoDB(node *graph.Node) {
 		node.RiskScore = 7
 		
 		if hasAS {
-			node.Justification = fmt.Sprintf("Auto-Scaling Misconfig: Utilization %.1f%%. Lower MinCapacity.", minUtil)
+			node.Properties["Reason"] = fmt.Sprintf("Auto-Scaling Misconfig: Utilization %.1f%%. Lower MinCapacity.", minUtil)
 		} else {
 			// Breakeven Calc (Simplified)
 			// Prov Cost: $0.00065 per RCU-hour -> ~$0.47/month per RCU
 			// OnDemand: $1.25 per million units
 			// Show savings?
-			node.Justification = fmt.Sprintf("Provisioned Bleed: Utilization %.1f%%. Switch to On-Demand.", minUtil)
+			node.Properties["Reason"] = fmt.Sprintf("Provisioned Bleed: Utilization %.1f%%. Switch to On-Demand.", minUtil)
 		}
 		
 		// Est Cost of waste = (Provisioned - Consumed) * CostPerUnit

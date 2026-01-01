@@ -37,7 +37,7 @@ func (h *NetworkForensicsHeuristic) analyzeNAT(n *graph.Node, g *graph.Graph) {
 	if conns == 0 && active == 0 {
 		n.IsWaste = true
 		n.RiskScore = 90
-		n.Properties["Reason"] = "Hollow NAT Gateway: Serves subnets with ZERO active instances."
+		n.Properties["Reason"] = "Hollow NAT Gateway: Serves subnets with ZERO active instances. Traffic: 0."
 		n.Cost = 32.0
 
 		h.topo(g, n)
@@ -95,12 +95,12 @@ func (h *NetworkForensicsHeuristic) analyzeEIP(n *graph.Node) {
 	if inDNS {
 		zone, _ := n.Properties["DNSZone"].(string)
 		n.RiskScore = 99
-		n.Properties["Reason"] = fmt.Sprintf("DANGEROUS ZOMBIE: EIP %s is unused BUT hardcoded in DNS zone %s. Do NOT release.", n.ID, zone)
+		n.Properties["Reason"] = fmt.Sprintf("DANGEROUS ZOMBIE: EIP %s is unused BUT hardcoded in DNS zone %s. Do NOT release. DNS Conflict.", n.ID, zone)
 		return
 	}
 
 	n.RiskScore = 20
-	n.Properties["Reason"] = "Safe Release: Unused EIP (Not in Route53)."
+	n.Properties["Reason"] = "Safe to Release: Unused EIP (Not in Route53)."
 	n.Properties["Warning"] = "Verify external DNS manually."
 }
 
