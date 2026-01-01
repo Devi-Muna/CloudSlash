@@ -40,3 +40,6 @@ npm-debug.log*
 cloudslash_local
 go/
 *.tar.gz
+
+# Commercial Backend (Private IP)
+license-server/

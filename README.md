@@ -8,33 +8,35 @@
 
 ![CloudSlash TUI Demo](docs/demo.gif)
 
-## Quick Start (Immediate Gratification)
+## Quick Start
 
-**macOS / Linux:**
+Get running in seconds. No dependencies required.
+
+**macOS / Linux**
 
 ```bash
 curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell)**
 
 ```powershell
 irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
 ```
 
-**Run Analysis:**
+**Run Analysis**
 
 ```bash
 cloudslash scan
 ```
 
-[Read the Official Walkthrough (Lab Manual)](WALKTHROUGH.md)
+[Read the Official Guide](WALKTHROUGH.md)
 
 ---
 
-## Key Capabilities (v1.3.0 Feature Stack)
+## Key Capabilities (v1.3.0)
 
-CloudSlash goes beyond simple "unused" checks by analyzing the **lifecycle** and **relationships** of your infrastructure.
+CloudSlash goes beyond simple "unused" checks. It analyzes the lifecycle, telemetry, and graph relationships of your infrastructure.
 
 | Domain                  | Capability               | Detection Logic                                                                                                                     |
 | :---------------------- | :----------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
@@ -62,7 +64,7 @@ Most tools are just billing dashboards. CloudSlash is an **engineering tool**.
 
 ---
 
-## License Model (Open Core Strategy)
+## License Model
 
 CloudSlash is dedicated to the philosophy of **Sustainable Open Source**.
 

@@ -45,15 +45,34 @@ jobs:
           files: dist/*
           generate_release_notes: false
           body: |
-            # CloudSlash v1.2.7
+            # CloudSlash v1.3.0: The Infrastructure Surgeon
 
-            ## New Features
-            - **Log Zombie Hunter**: Metrics-based forensics for unused CloudWatch Log Groups.
-            - **ECR Digital Janitor**: Detects untagged images (>90d old) in repositories without lifecycle policies.
-            - **Cockpit TUI**: "Live Cost Ticker" and Interactive Whitelist (`i` key to ignore).
-            - **Cost Control**: Added `--no-metrics` flag to disable API calls ($).
+            > **The Local-First Forensic Cloud Accountant.**
+            > CloudSlash goes beyond simple "unused" checks by analyzing the **lifecycle** and **relationships** of your infrastructure.
 
-            ## Improvements
-            - Graceful handling of ECR 403 (Access Denied) errors.
-            - Optimized API usage for log scanning.
+            ### ⚡ Quick Install
+
+            ```bash
+            # macOS / Linux
+            curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
+
+            # Windows (PowerShell)
+            irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
+            ```
+
+            ### 🔍 Key Capabilities in v1.3.0
+
+            - **The State Doctor**: Bridges AWS Reality to Terraform State. Generates `fix_terraform.sh` to surgically remove waste.
+            - **The Network Surgeon**: Identifies "Hollow" NAT Gateways (active but serving empty subnets) & Safe-Release EIPs (DNS-verified).
+            - **The Storage Janitor**: Finds hidden S3 Multipart Upload debris & legacy `gp2` volumes eligible for modernization.
+            - **The App Cleaner**: Prunes old Lambda versions (respecting aliases) & identifies Redshift Pause candidates.
+            - **The Log Hunter**: Audits abandoned CloudWatch Log Groups (>30 days silence).
+
+            ### ❤️ Social Impact Pledge
+
+            CloudSlash is 100% independent and bootstrapped. We pledge a portion of every Commercial License to support orphanages and animal rescue shelters in developing communities.
+
+            ---
+
+            [Full Changelog](https://github.com/DrSkyle/CloudSlash/compare/v1.2.9...v1.3.0)
           draft: false

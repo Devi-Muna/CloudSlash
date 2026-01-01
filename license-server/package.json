@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@freemius/sdk": "^0.1.0",
-    "wrangler": "^4.53.0",
-    "zod": "^4.2.1"
-  }
-}
