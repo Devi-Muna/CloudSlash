@@ -13,13 +13,13 @@
 **macOS / Linux:**
 
 ```bash
-curl -sL https://cloudslash.io/install.sh | bash
+curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://cloudslash.io/install.ps1 | iex
+irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
 ```
 
 **Run Analysis:**
@@ -27,6 +27,8 @@ irm https://cloudslash.io/install.ps1 | iex
 ```bash
 cloudslash scan
 ```
+
+[Read the Official Walkthrough (Lab Manual)](WALKTHROUGH.md)
 
 ---
 
