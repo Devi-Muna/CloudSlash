@@ -107,6 +107,11 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 	heuristicEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
 	heuristicEngine.Register(&heuristics.ElasticIPHeuristic{}) // Property-based
 	heuristicEngine.Register(&heuristics.RDSHeuristic{})       // Handles "stopped" status without CW
+	
+	// v1.3.0 Mock Heuristics
+	heuristicEngine.Register(&heuristics.NetworkForensicsHeuristic{})
+	heuristicEngine.Register(&heuristics.StorageOptimizationHeuristic{})
+	
 	// heuristicEngine.Register(&heuristics.TagComplianceHeuristic{RequiredTags: ...}) // Only if config passed
 	if err := heuristicEngine.Run(ctx, g); err != nil {
 		fmt.Printf("Heuristic run failed: %v\n", err)
@@ -237,15 +242,24 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			}
 		}
 
-		// Run Genius Heuristic Engine
-		hEngine := heuristics.NewEngine()
-		if pricingClient != nil {
-			hEngine.Register(&heuristics.ElasticIPHeuristic{Pricing: pricingClient})
-		} else {
-			hEngine.Register(&heuristics.ElasticIPHeuristic{})
-		}
-		hEngine.Register(&heuristics.S3MultipartHeuristic{})
 
+	// Run Genius Heuristic Engine
+		hEngine := heuristics.NewEngine()
+		// v1.3.0: Replacing Legacy Heuristics with Forensics Engine
+		// hEngine.Register(&heuristics.ElasticIPHeuristic{Pricing: pricingClient}) // Replaced by NetworkForensics
+		
+		// hEngine.Register(&heuristics.S3MultipartHeuristic{}) // Keeping for Legacy compat (but StorageOptimization handles Iceberg too? Check logic.)
+		// S3MultipartHeuristic (legacy) likely just flags them. StorageOptimization adds "FixRecommendation" and checks Lifecycle.
+		// Let's keep both or disable one. The legacy one is small. S3Scanner runs it. 
+		// Actually S3Scanner calls scanMultipartUploads. 
+		// Heuristic usually just marks them as waste.
+		// My new StorageOptimizationHeuristic (analyzeMultipart) marks them as waste and adds Fix.
+		// If I run both, they might duplicate or overwrite. 
+		// Safer to run NEW one. 
+		// I will comment out S3MultipartHeuristic.
+		
+		// Legacy NAT/RDS/ELB
+		/*
 		if cwClient != nil {
 			if pricingClient != nil {
 				hEngine.Register(&heuristics.NATGatewayHeuristic{CW: cwClient, Pricing: pricingClient})
@@ -254,6 +268,15 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			}
 			hEngine.Register(&heuristics.RDSHeuristic{CW: cwClient})
 			hEngine.Register(&heuristics.ELBHeuristic{CW: cwClient})
+			if pricingClient != nil {
+				hEngine.Register(&heuristics.UnderutilizedInstanceHeuristic{CW: cwClient, Pricing: pricingClient})
+			}
+		}
+		*/
+		// Re-enabling non-conflicting legacy ones:
+		if cwClient != nil {
+			hEngine.Register(&heuristics.RDSHeuristic{CW: cwClient}) // RDS not covered by new NetworkForensics
+			// UnderutilizedInstance is separate from Forensics.
 			if pricingClient != nil {
 				hEngine.Register(&heuristics.UnderutilizedInstanceHeuristic{CW: cwClient, Pricing: pricingClient})
 			}
@@ -273,23 +296,30 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			hEngine.Register(&heuristics.IAMHeuristic{IAM: iamClient})
 		}
 
-		// New Heuristics
+		// Register Heuristics
+		// v1.2.7 Heuristics
 		hEngine.Register(&heuristics.LogHoardersHeuristic{})
-		hEngine.Register(&heuristics.FossilAMIHeuristic{})
-		hEngine.Register(&heuristics.ZombieEKSHeuristic{})
-		hEngine.Register(&heuristics.ZombieEKSHeuristic{})
+		hEngine.Register(&heuristics.ECRJanitorHeuristic{})
+		
+		// v1.2.9 Forensics
+		hEngine.Register(&heuristics.DataForensicsHeuristic{})
+		hEngine.Register(&heuristics.LambdaHeuristic{})
+		
+		// v1.3.0 Network & Storage Forensics
+		hEngine.Register(&heuristics.NetworkForensicsHeuristic{})
+		hEngine.Register(&heuristics.StorageOptimizationHeuristic{}) // Handles S3 Iceberg & EBS Modernizer
+		
+		// K8s
 		hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
-
 		// v1.2.6 ECS Heuristics
 		hEngine.Register(&heuristics.IdleClusterHeuristic{})
-		// Injecting captured ECR/ECS scanners (from last successful profile)
+		// Injecting captured ECR/ECS scanners
 		hEngine.Register(&heuristics.EmptyServiceHeuristic{ECR: ecrScanner, ECS: ecsScanner})
 
 		// v1.2.5 Fargate Analysis
 		if k8sClient, err := k8s.NewClient(); err == nil {
 			hEngine.Register(&heuristics.AbandonedFargateHeuristic{K8sClient: k8sClient})
 		} else {
-			// Register with nil client (heuristic will skip)
 			hEngine.Register(&heuristics.AbandonedFargateHeuristic{K8sClient: nil})
 		}
 
@@ -310,14 +340,11 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			fmt.Printf("Time Machine Analysis failed: %v\n", err)
 		}
 
-		// Execute Forensics (Pro Feature Check implied by binary, but logic runs for graph data)
+		// Execute Forensics (Internal Detective)
 		if !isTrial {
 			detective := forensics.NewDetective(ctClient)
 			detective.InvestigateGraph(ctx, g)
 		} else {
-			// In trial/community, just check tags, no CloudTrail API to save requests/complexity?
-			// Or just don't run API.
-			// Actually, let's run simple tag check without CT client
 			detective := forensics.NewDetective(nil)
 			detective.InvestigateGraph(ctx, g)
 		}
@@ -375,12 +402,18 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	}
 	fmt.Printf(" [Profile: %s] Connected to AWS Account: %s\n", profile, identity)
 
-	// Scanners
+	// Legacy Scanners
 	ec2Scanner := aws.NewEC2Scanner(awsClient.Config, g)
 	s3Scanner := aws.NewS3Scanner(awsClient.Config, g)
 	rdsScanner := aws.NewRDSScanner(awsClient.Config, g)
-	elbScanner := aws.NewELBScanner(awsClient.Config, g)
+	// elbScanner := aws.NewELBScanner(awsClient.Config, g) // Replaced by ALBScanner
 	eksScanner := aws.NewEKSScanner(awsClient.Config, g)
+
+	// v1.3.0 Network Scanners
+	natScanner := aws.NewNATScanner(awsClient.Config, g)
+	eipScanner := aws.NewEIPScanner(awsClient.Config, g)
+	albScanner := aws.NewALBScanner(awsClient.Config, g)
+	vpcepScanner := aws.NewVpcEndpointScanner(awsClient.Config, g)
 
 	submitTask := func(task func(ctx context.Context) error) {
 		scanWg.Add(1)
@@ -392,11 +425,18 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanInstances(ctx) })
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanVolumes(ctx) })
-	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanNatGateways(ctx) })
-	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanAddresses(ctx) })
+	// submitTask(func(ctx context.Context) error { return ec2Scanner.ScanNatGateways(ctx) }) // Replaced by NATScanner
+	// submitTask(func(ctx context.Context) error { return ec2Scanner.ScanAddresses(ctx) }) // Replaced by EIPScanner
+	
+	submitTask(func(ctx context.Context) error { return natScanner.ScanNATGateways(ctx) })
+	submitTask(func(ctx context.Context) error { return eipScanner.ScanAddresses(ctx) })
+	submitTask(func(ctx context.Context) error { return albScanner.ScanALBs(ctx) })
+	submitTask(func(ctx context.Context) error { return vpcepScanner.ScanEndpoints(ctx) })
+	
 	submitTask(func(ctx context.Context) error { return s3Scanner.ScanBuckets(ctx) })
 	submitTask(func(ctx context.Context) error { return rdsScanner.ScanInstances(ctx) })
-	submitTask(func(ctx context.Context) error { return elbScanner.ScanLoadBalancers(ctx) })
+	// submitTask(func(ctx context.Context) error { return elbScanner.ScanLoadBalancers(ctx) }) // Replaced by ALBScanner
+	
 	// New Scans
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
 	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
@@ -405,6 +445,17 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	// New ECS Scanner (v1.2.6)
 	ecsScanner := aws.NewECSScanner(awsClient.Config, g)
 	submitTask(func(ctx context.Context) error { return ecsScanner.ScanClusters(ctx) })
+
+	// v1.2.9 Data & Code Forensics Scanners
+	elasticacheScanner := aws.NewElasticacheScanner(awsClient.Config, g)
+	redshiftScanner := aws.NewRedshiftScanner(awsClient.Config, g)
+	dynamoScanner := aws.NewDynamoDBScanner(awsClient.Config, g)
+	lambdaScanner := aws.NewLambdaScanner(awsClient.Config, g)
+
+	submitTask(func(ctx context.Context) error { return elasticacheScanner.ScanClusters(ctx) })
+	submitTask(func(ctx context.Context) error { return redshiftScanner.ScanClusters(ctx) })
+	submitTask(func(ctx context.Context) error { return dynamoScanner.ScanTables(ctx) })
+	submitTask(func(ctx context.Context) error { return lambdaScanner.ScanFunctions(ctx) })
 
 	// K8s Scanner (Ghost Detector v1.2.4)
 	// Only run if we can create a client

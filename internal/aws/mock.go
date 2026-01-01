@@ -42,16 +42,17 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"DeleteOnTermination": false,
 	})
 
-	// 4. Unused NAT Gateway (Marked as waste manually for demo since we skip CW)
-	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345", "AWS::EC2::NatGateway", map[string]interface{}{
+	// 4. Hollow NAT Gateway (v1.3.0)
+	// Triggers NetworkForensicsHeuristic
+	natArn := "arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"
+	s.Graph.AddNode(natArn, "aws_nat_gateway", map[string]interface{}{
 		"State": "available",
+		"SumConnections7d": 0.0,
+		"ActiveUserENIs": 0,
+		"EmptySubnets": []string{"subnet-mock-empty-1", "subnet-mock-empty-2"},
+		"Region": "us-east-1",
 	})
-	s.Graph.MarkWaste("arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345", 80)
-	if node, ok := s.Graph.Nodes["arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"]; ok {
-		node.Properties["Reason"] = "Unused NAT Gateway (Mocked)"
-		node.Cost = 32.85 // v1.2 Fixed Rate
-	}
-
+	
 	// 5. Mock Snapshot (Time Machine Test)
 	// Parent volume is vol-0mock1234567890 (which is waste)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild", "AWS::EC2::Snapshot", map[string]interface{}{
@@ -60,12 +61,52 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"VolumeSize": 100,
 	})
 
-	// 5b. Loose Elastic IP (Graph-based)
-	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mock123", "AWS::EC2::EIP", map[string]interface{}{
+	// 5b. Safe-Release Elastic IP (v1.3.0)
+	// Triggers NetworkForensicsHeuristic
+	eipArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mock123"
+	s.Graph.AddNode(eipArn, "aws_eip", map[string]interface{}{
 		"PublicIp": "203.0.113.10",
 		"Region":   "us-east-1",
-		// No InstanceId property = Loose
+		"AssociationId": "", // Unattached
+		"FoundInDNS": false, // Safe
 	})
+	
+	// 5c. Dangerous Zombie EIP (v1.3.0)
+	eipDangerArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger"
+	s.Graph.AddNode(eipDangerArn, "aws_eip", map[string]interface{}{
+		"PublicIp": "203.0.113.99",
+		"Region":   "us-east-1",
+		"AssociationId": "",
+		"FoundInDNS": true,
+		"DNSZone": "production.com",
+	})
+
+	// 5d. S3 Iceberg (v1.3.0)
+	s.Graph.AddNode("arn:aws:s3:::mock-bucket-iceberg", "AWS::S3::Bucket", map[string]interface{}{
+		"Name": "mock-bucket-iceberg",
+		"HasAbortLifecycle": false,
+	})
+	s.Graph.AddNode("arn:aws:s3:::multipart/mock-bucket-iceberg/upload-1", "AWS::S3::MultipartUpload", map[string]interface{}{
+		"Initiated": time.Now().Add(-15 * 24 * time.Hour), // 15 days old
+		"Bucket": "mock-bucket-iceberg",
+	})
+	
+	// 5e. EBS Modernizer (v1.3.0)
+	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockGp2", "AWS::EC2::Volume", map[string]interface{}{
+		"State": "in-use",
+		"Size": int32(500), // 500GB
+		"VolumeType": "gp2",
+		"IsModifying": false,
+		"Region": "us-east-1",
+	})
+
+	// 5f. Orphaned ELB (Graph-based)
+	// Needs to be tagged with a cluster that is also waste (or missing?)
+	// ... (Rest of existing mocks)
+	
+	// ... (Truncating for clarity, keeping required context)
+	
+
 
 	// 5c. Orphaned ELB (Graph-based)
 	// Needs to be tagged with a cluster that is also waste (or missing?)

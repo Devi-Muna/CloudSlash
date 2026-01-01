@@ -7,6 +7,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type S3Scanner struct {
@@ -20,6 +21,8 @@ func NewS3Scanner(cfg aws.Config, g *graph.Graph) *S3Scanner {
 		Graph:  g,
 	}
 }
+
+
 
 func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 	result, err := s.Client.ListBuckets(ctx, &s3.ListBucketsInput{})
@@ -36,15 +39,36 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 			"CreationDate": bucket.CreationDate,
 		}
 
+		// Check Lifecycle (Optimization)
+		hasAbortRule := s.hasAbortLifecycle(ctx, name)
+		props["HasAbortLifecycle"] = hasAbortRule
+		
 		s.Graph.AddNode(arn, "AWS::S3::Bucket", props)
 
-		// Check for Multipart Uploads
-		if err := s.scanMultipartUploads(ctx, name, arn); err != nil {
-			// Log error but continue scanning other buckets
-			fmt.Printf("Failed to scan multipart uploads for bucket %s: %v\n", name, err)
+		// Check for Multipart Uploads ONLY if strict cleaning isn't automated
+		if !hasAbortRule {
+			if err := s.scanMultipartUploads(ctx, name, arn); err != nil {
+				fmt.Printf("Failed to scan multipart uploads for bucket %s: %v\n", name, err)
+			}
 		}
 	}
 	return nil
+}
+
+func (s *S3Scanner) hasAbortLifecycle(ctx context.Context, bucket string) bool {
+	lc, err := s.Client.GetBucketLifecycleConfiguration(ctx, &s3.GetBucketLifecycleConfigurationInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		return false // No config or error -> Assume unsafe
+	}
+	
+	for _, rule := range lc.Rules {
+		if rule.Status == types.ExpirationStatusEnabled && rule.AbortIncompleteMultipartUpload != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *S3Scanner) scanMultipartUploads(ctx context.Context, bucketName, bucketARN string) error {

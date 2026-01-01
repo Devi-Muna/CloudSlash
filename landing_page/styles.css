@@ -1,11 +1,12 @@
 :root {
-  --bg-dark: #0a0a0a;
-  --text-main: #e0e0e0;
-  --primary: #00ff99; /* Neon Green */
-  --primary-dim: rgba(0, 255, 153, 0.1);
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-blur: 16px;
+  --bg-dark: #0B1120;
+  --text-main: #94A3B8;
+  --text-header: #F8FAFC;
+  --primary: #22C55E; /* Enterprise Green */
+  --primary-dim: rgba(34, 197, 94, 0.1);
+  --glass-bg: #1E293B;
+  --glass-border: #334155;
+  --glass-blur: 0px; /* Solid cards for enterprise feel */
   --transition: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -17,6 +18,7 @@
 
 body {
   background-color: var(--bg-dark);
+  background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0B1120 70%);
   color: var(--text-main);
   font-family: "Inter", sans-serif;
   overflow-x: hidden;
@@ -56,33 +58,37 @@ body {
 
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
-  border-radius: 16px;
+  border-top-color: #475569; /* Highlight top border */
+  border-bottom-color: #0F172A; /* Shadow bottom border */
+  border-radius: 12px;
   padding: 24px;
   transition: transform 0.4s var(--transition),
     border-color 0.4s var(--transition);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .glass-panel:hover {
-  border-color: rgba(0, 255, 153, 0.3);
-  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: 0 0 15px var(--primary-dim);
+  transform: translateY(-2px);
 }
 
 /* Typography */
 h1,
 h2,
 h3 {
-  font-family: "Inter", sans-serif;
+  font-family: 'Cabinet Grotesk', system-ui, sans-serif;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-header);
+  letter-spacing: -0.02em;
 }
 
 h1.glitch-text {
-  font-size: 3.5rem;
+  font-size: 4rem;
   line-height: 1.1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-weight: 800;
 }
 
 .highlight {
@@ -378,20 +384,30 @@ nav a:hover {
 }
 
 .price-card.featured {
-  border-color: var(--primary);
-  background: rgba(0, 255, 153, 0.05);
+  border-color: var(--glass-border);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.5) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.price-card.featured:hover {
+    border-color: var(--primary);
 }
 
 .badge {
   position: absolute;
-  top: -12px;
-  right: 24px;
-  background: var(--primary);
-  color: #000;
-  font-size: 0.75rem;
+  top: 16px;
+  right: 16px;
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  font-size: 0.7rem;
+  font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 12px;
+  padding: 4px 8px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .price {
@@ -502,6 +518,76 @@ nav a:hover {
   font-size: 0.9rem;
 }
 
+/* Tech Stack / Trust Battery */
+.tech-stack {
+    padding: 40px 0;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.tech-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: #475569;
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+}
+
+.tech-logos {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.tech-logo {
+    width: 40px;
+    height: 40px;
+    color: #94A3B8; /* Slate 400 - Brighter for visibility */
+    transition: color 0.3s;
+}
+
+.tech-item {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: default;
+}
+
+.tooltip {
+    position: absolute;
+    bottom: -30px;
+    background: #0F172A;
+    color: #F8FAFC;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.tech-item:hover .tech-logo {
+    color: #F8FAFC; /* White on hover */
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+}
+
+.tech-item:hover .tooltip {
+    opacity: 1;
+}
+
+/* Mobile Sticky CTA */
+.mobile-sticky-cta {
+    display: none; /* Hidden on desktop */
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .hero-content {
@@ -509,8 +595,18 @@ nav a:hover {
     text-align: center;
   }
 
+  /* Vertical Stack for Mobile */
+  .grid, .pricing-grid {
+    grid-template-columns: 1fr; /* Force single column */
+    gap: 32px;
+  }
+
   .hero-visual {
     margin-top: 48px;
+  }
+  
+  .terminal-window {
+      min-height: 300px; /* Smaller terminal on mobile */
   }
 
   .subtitle {
@@ -520,17 +616,48 @@ nav a:hover {
   h1.glitch-text {
     font-size: 2.5rem;
   }
+  
+  /* Sticky Bottom CTA for Mobile */
+  .mobile-sticky-cta {
+      display: flex;
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      z-index: 999;
+      justify-content: center;
+  }
+  
+  .mobile-sticky-cta .btn-primary {
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      padding: 16px;
+      font-size: 1.1rem;
+  }
+  
+  /* Hide the nav download button on mobile to avoid clutter */
+  nav .btn-primary-sm {
+      display: none;
+  }
+  
+  /* Adjust features padding for mobile stack */
+  .features, .pricing {
+      padding: 60px 0;
+  }
 }
 
 /* SVG Icon Styles */
 .icon svg {
-    stroke: #00FF99;
-    filter: drop-shadow(0 0 5px rgba(0, 255, 153, 0.5));
-    transition: filter 0.3s ease;
+    stroke: var(--primary);
+    filter: none;
+    transition: transform 0.3s ease;
 }
 
 .card:hover .icon svg {
-    filter: drop-shadow(0 0 12px rgba(0, 255, 153, 0.8));
+    filter: drop-shadow(0 0 10px var(--primary-dim));
+    transform: scale(1.1);
 }
 
 .copy-icon svg {
@@ -540,6 +667,5 @@ nav a:hover {
 }
 
 .code-block:hover .copy-icon svg {
-    stroke: #00FF99;
-    filter: drop-shadow(0 0 5px rgba(0, 255, 153, 0.5));
+    stroke: var(--primary);
 }

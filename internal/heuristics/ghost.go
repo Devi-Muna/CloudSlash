@@ -40,9 +40,11 @@ func (h *GhostNodeGroupHeuristic) Run(ctx context.Context, g *graph.Graph) error
 			// Cost Estimation: Assume generic m5.large (~$70/mo) * nodeCount as a baseline estimate
 			// Optimally we'd look up instance type from ASG, but we have "NodeCount".
 			estCostPerNode := 70.0
+			node.RiskScore = 1500 // High Risk (Costly)
 			node.Cost = estCostPerNode * float64(nodeCount)
-
-			node.Properties["Reason"] = fmt.Sprintf("👻 GHOST DETECTED: Node Group has %d active nodes but serves EXACTLY ZERO user applications.", nodeCount)
+			// node.Properties["Reason"] = fmt.Sprintf("👻 Ghost Node Group: %d nodes running with NO workloads.", scalingCount)
+			// Clean version:
+			node.Properties["Reason"] = fmt.Sprintf("Ghost Node Group: %d nodes running with NO workloads.", nodeCount)
 		}
 	}
 
