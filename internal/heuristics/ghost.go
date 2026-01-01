@@ -42,7 +42,7 @@ func (h *GhostNodeGroupHeuristic) Run(ctx context.Context, g *graph.Graph) error
 			estCostPerNode := 70.0
 			node.RiskScore = 1500 // High Risk (Costly)
 			node.Cost = estCostPerNode * float64(nodeCount)
-			// node.Properties["Reason"] = fmt.Sprintf("👻 Ghost Node Group: %d nodes running with NO workloads.", scalingCount)
+			// node.Properties["Reason"] = fmt.Sprintf("Ghost Node Group: %d nodes running with NO workloads.", scalingCount)
 			// Clean version:
 			node.Properties["Reason"] = fmt.Sprintf("Ghost Node Group: %d nodes running with NO workloads.", nodeCount)
 		}

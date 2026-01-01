@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// scanCmd represents the scan command
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Run a headless scan (no TUI)",
@@ -21,16 +20,13 @@ var scanCmd = &cobra.Command{
 Example:
   cloudslash scan --region us-west-2`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Interactive Filtering (v1.2.6)
 		if !cmd.Flags().Changed("region") {
-			// Check if TTY? Cobra Run usually implies we can check inputs.
 			regions, err := PromptForRegions()
 			if err == nil {
 				config.Region = strings.Join(regions, ",")
 			}
 		}
 
-		// Flag Overrides
 		if noMetrics, _ := cmd.Flags().GetBool("no-metrics"); noMetrics {
 			config.DisableCWMetrics = true
 		}
@@ -39,14 +35,13 @@ Example:
 		}
 
 		config.Headless = true
-		_, g, err := app.Run(config) // Modified to capture graph and error
+		_, g, err := app.Run(config)
 		if err != nil {
 			fmt.Printf("Error running scan: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Terraform Integration (v1.2.8 "The State Doctor")
-		// Safe Ingestion: Only runs if terraform is installed and explicitly available.
+		// The State Doctor (Terraform Integration)
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
 			fmt.Println("\n[INFO] Terraform detected. Initializing 'The State Doctor'...")
@@ -61,7 +56,6 @@ Example:
 				if err != nil {
 					fmt.Printf("[ERROR] Failed to parse Terraform state: %v\n", err)
 				} else {
-					// 1. Collect Zombies
 					var zombies []*graph.Node
 					g.Mu.RLock()
 					for _, n := range g.Nodes {
@@ -71,10 +65,8 @@ Example:
 					}
 					g.Mu.RUnlock()
 
-					// 2. Analyze
 					report := tf.Analyze(zombies, state)
 
-					// 3. Report & Artifact
 					printTerraformReport(report)
 					generateFixScript(report)
 				}
@@ -85,8 +77,6 @@ Example:
 
 func init() {
 	rootCmd.AddCommand(scanCmd)
-
-	// Scan Specific Flags
 	scanCmd.Flags().Bool("no-metrics", false, "Disable CloudWatch Metric calls (Saves money)")
 	scanCmd.Flags().Bool("fast", false, "Alias for --no-metrics (Fast scan)")
 }
@@ -102,7 +92,6 @@ func printTerraformReport(report *tf.AnalysisReport) {
 	fmt.Println("RECOMMENDED ACTION (The State Doctor):")
 	fmt.Println("-------------------------------------------------------------")
 
-	// Print Modules first (The "Genius" Part)
 	for _, mod := range report.ModulesToDelete {
 		fmt.Printf("# 1. Remove the '%s' module entirely\n", mod)
 		fmt.Println("#    (Logic: All resources in this module are dead)")

@@ -8,47 +8,42 @@ import (
 	"time"
 )
 
-// EdgeType defines the semantic relationship between resources.
 type EdgeType string
 
 const (
-	EdgeTypeAttachedTo EdgeType = "AttachedTo" // e.g., EBS -> EC2
-	EdgeTypeSecuredBy  EdgeType = "SecuredBy"  // e.g., EC2 -> SG
-	EdgeTypeContains   EdgeType = "Contains"   // e.g., VPC -> Subnet
-	EdgeTypeFlowsTo    EdgeType = "FlowsTo"    // e.g., ALB -> TargetGroup
+	EdgeTypeAttachedTo EdgeType = "AttachedTo"
+	EdgeTypeSecuredBy  EdgeType = "SecuredBy"
+	EdgeTypeContains   EdgeType = "Contains"
+	EdgeTypeFlowsTo    EdgeType = "FlowsTo"
 	EdgeTypeUnknown    EdgeType = "Unknown"
 )
 
-// Edge represents a directed connection with context.
 type Edge struct {
 	TargetID string
 	Type     EdgeType
-	Weight   int // 1-100, strength of dependency
+	Weight   int
 }
 
-// Node represents a resource in the infrastructure graph.
 type Node struct {
-	ID             string                 // Unique Identifier (ARN)
-	Type           string                 // Resource Type (e.g., "AWS::EC2::Instance")
-	Properties     map[string]interface{} // Resource attributes
-	IsWaste        bool                   // Flagged as waste?
-	Justified      bool                   // Is this accepted/known waste?
-	Justification  string                 // Reason for justification
-    Ignored        bool                   // Interactive Whitelist (Session/Persisted)
-	RiskScore      int                    // 0-100
-	Cost           float64                // Monthly cost estimate
-	SourceLocation string                 // e.g. "storage.tf:24"
+	ID             string
+	Type           string
+	Properties     map[string]interface{}
+	IsWaste        bool
+	Justified      bool
+	Justification  string
+	Ignored        bool
+	RiskScore      int
+	Cost           float64
+	SourceLocation string
 }
 
-// Graph represents the infrastructure topology as a Weighted DAG.
 type Graph struct {
 	Mu           sync.RWMutex
 	Nodes        map[string]*Node
-	Edges        map[string][]Edge // ID -> []Edge (Forward Dependencies)
-	ReverseEdges map[string][]Edge // ID -> []Edge (Reverse Dependencies)
+	Edges        map[string][]Edge
+	ReverseEdges map[string][]Edge
 }
 
-// NewGraph creates a new empty graph.
 func NewGraph() *Graph {
 	return &Graph{
 		Nodes:        make(map[string]*Node),
@@ -57,7 +52,6 @@ func NewGraph() *Graph {
 	}
 }
 
-// AddNode adds a resource to the graph. Structure is idempotent.
 func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 	if id == "" {
 		return
@@ -66,11 +60,9 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 	defer g.Mu.Unlock()
 
 	if node, exists := g.Nodes[id]; exists {
-		// Merge properties if node exists (Last Write Wins for conflicts)
 		for k, v := range props {
 			node.Properties[k] = v
 		}
-		// Update type if it was unknown
 		if node.Type == "Unknown" && resourceType != "Unknown" {
 			node.Type = resourceType
 		}
@@ -83,13 +75,10 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 	}
 }
 
-// AddEdge adds a directed edge from source to target with default type.
-// Maintained for backward compatibility.
 func (g *Graph) AddEdge(sourceID, targetID string) {
 	g.AddTypedEdge(sourceID, targetID, EdgeTypeUnknown, 1)
 }
 
-// AddTypedEdge adds a semantic relationship to the graph.
 func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weight int) {
 	if sourceID == "" || targetID == "" {
 		return
@@ -98,7 +87,6 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// Ensure nodes exist (create placeholders if not)
 	if _, ok := g.Nodes[sourceID]; !ok {
 		g.Nodes[sourceID] = &Node{ID: sourceID, Type: "Unknown", Properties: make(map[string]interface{})}
 	}
@@ -106,8 +94,7 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 		g.Nodes[targetID] = &Node{ID: targetID, Type: "Unknown", Properties: make(map[string]interface{})}
 	}
 
-	// Add Forward Edge
-	// Check for duplicates to prevent graph explosion
+	// Forward Edge
 	exists := false
 	for _, e := range g.Edges[sourceID] {
 		if e.TargetID == targetID && e.Type == edgeType {
@@ -119,7 +106,7 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 		g.Edges[sourceID] = append(g.Edges[sourceID], Edge{TargetID: targetID, Type: edgeType, Weight: weight})
 	}
 
-	// Add Reverse Edge
+	// Reverse Edge
 	revExists := false
 	for _, e := range g.ReverseEdges[targetID] {
 		if e.TargetID == sourceID && e.Type == edgeType {
@@ -132,8 +119,7 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 	}
 }
 
-// GetConnectedComponent returns all nodes reachable from startID (BFS).
-// Useful for finding all resources in a VPC or related to a specific security group.
+// GetConnectedComponent uses BFS to find all reachable nodes.
 func (g *Graph) GetConnectedComponent(startID string) []*Node {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
@@ -155,14 +141,12 @@ func (g *Graph) GetConnectedComponent(startID string) []*Node {
 			component = append(component, node)
 		}
 
-		// Traverse forward edges
 		for _, edge := range g.Edges[currentID] {
 			if !visited[edge.TargetID] {
 				queue = append(queue, edge.TargetID)
 			}
 		}
 
-		// Traverse backward edges (undirected connectivity check)
 		for _, edge := range g.ReverseEdges[currentID] {
 			if !visited[edge.TargetID] {
 				queue = append(queue, edge.TargetID)
@@ -173,23 +157,20 @@ func (g *Graph) GetConnectedComponent(startID string) []*Node {
 	return component
 }
 
-// MarkWaste flags a node and optionally its dependencies as waste.
 func (g *Graph) MarkWaste(id string, score int) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
 	if node, ok := g.Nodes[id]; ok {
-		// Safe List Logic (cloudslash:ignore)
+		// cloudslash:ignore logic
 		if tags, ok := node.Properties["Tags"].(map[string]string); ok {
 			if val, ok := tags["cloudslash:ignore"]; ok {
 				val = strings.ToLower(strings.TrimSpace(val))
 
-				// 1. Ignore Forever
 				if val == "true" {
 					return
 				}
 
-				// 2. Cost-Based Ignore (cost<10.50)
 				if strings.HasPrefix(val, "cost<") {
 					limitStr := strings.TrimPrefix(val, "cost<")
 					if limit, err := strconv.ParseFloat(limitStr, 64); err == nil {
@@ -199,7 +180,6 @@ func (g *Graph) MarkWaste(id string, score int) {
 					}
 				}
 
-				// 3. Justified Waste (justified:compliance)
 				if strings.HasPrefix(val, "justified:") {
 					node.IsWaste = true
 					node.Justified = true
@@ -208,59 +188,41 @@ func (g *Graph) MarkWaste(id string, score int) {
 					return
 				}
 
-				// 4. Ignore Until Date (YYYY-MM-DD)
 				if ignoreUntil, err := time.Parse("2006-01-02", val); err == nil {
 					if time.Now().Before(ignoreUntil) {
 						return
 					}
 				}
 
-				// 5. Grace Period / TTL (e.g., "ignore:3d" => Ignore if younger than 3 days)
-				// Useful for ephemeral dev resources that shouldn't be flagged immediately.
-				// Requires "LaunchTime" property to be set by scanner.
+				// Grace period (e.g., "30d")
 				if strings.HasSuffix(val, "d") || strings.HasSuffix(val, "h") {
-					// Parse "30d" -> 720h manually
-					var hours int
-					var conversionErr error
+					hours := 0
+					var err error
 
 					if strings.HasSuffix(val, "d") {
 						daysStr := strings.TrimSuffix(val, "d")
-						days, err := strconv.Atoi(daysStr)
-						if err == nil {
-							hours = days * 24
-						} else {
-							conversionErr = err
-						}
-					} else { // "h"
+						days, _ := strconv.Atoi(daysStr)
+						hours = days * 24
+					} else {
 						hoursStr := strings.TrimSuffix(val, "h")
-						h, err := strconv.Atoi(hoursStr)
-						if err == nil {
-							hours = h
-						} else {
-							conversionErr = err
-						}
+						hours, _ = strconv.Atoi(hoursStr)
 					}
 
-					if conversionErr == nil {
-						// Look for resource creation time
-						// Try common keys: LaunchTime (EC2), CreateTime (EBS/S3), StartTime (RDS)
+					if err == nil {
 						var launchTime time.Time
 						foundTime := false
 
-						timeKeys := []string{"LaunchTime", "CreateTime", "StartTime", "Created"}
-						for _, key := range timeKeys {
+						for _, key := range []string{"LaunchTime", "CreateTime", "StartTime", "Created"} {
 							if tVal, ok := node.Properties[key].(time.Time); ok {
 								launchTime = tVal
 								foundTime = true
 								break
 							}
-							// Handle string timestamps if needed? (Scanners usually use native types)
 						}
 
 						if foundTime {
-							age := time.Since(launchTime)
-							if age.Hours() < float64(hours) {
-								return // IGNORED: Within grace period
+							if time.Since(launchTime).Hours() < float64(hours) {
+								return
 							}
 						}
 					}
@@ -273,7 +235,6 @@ func (g *Graph) MarkWaste(id string, score int) {
 	}
 }
 
-// GetDownstream returns simple string slice of downstream IDs for compatibility.
 func (g *Graph) GetDownstream(id string) []string {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
@@ -287,7 +248,6 @@ func (g *Graph) GetDownstream(id string) []string {
 	return downstream
 }
 
-// GetUpstream returns simple string slice of upstream IDs for compatibility.
 func (g *Graph) GetUpstream(id string) []string {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
@@ -301,7 +261,6 @@ func (g *Graph) GetUpstream(id string) []string {
 	return upstream
 }
 
-// DumpStats returns graph statistics for the TUI.
 func (g *Graph) DumpStats() string {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()

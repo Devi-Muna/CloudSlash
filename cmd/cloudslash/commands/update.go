@@ -31,14 +31,14 @@ var updateCmd = &cobra.Command{
 		}
 
 		if strings.TrimSpace(latest) == CurrentVersion {
-			fmt.Printf("You are already running the latest version (%s). ✨\n", CurrentVersion)
+			fmt.Printf("You are already running the latest version (%s).\n", CurrentVersion)
 			return
 		}
 
 		// Basic semantic check to prevent "downgrade" notifications if local > remote
 		// (Assuming format vX.Y.Z)
 		if latest < CurrentVersion {
-			fmt.Printf("You are running a newer version (%s) than the latest release (%s). Dev build? 🚀\n", CurrentVersion, latest)
+			fmt.Printf("You are running a newer version (%s) than the latest release (%s).\n", CurrentVersion, latest)
 			return
 		}
 
@@ -50,7 +50,7 @@ var updateCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("🚀 Update successful! Please restart your terminal.")
+		fmt.Println("[SUCCESS] Update successful! Please restart your terminal.")
 	},
 }
 

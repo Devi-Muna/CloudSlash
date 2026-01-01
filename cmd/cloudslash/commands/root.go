@@ -25,7 +25,6 @@ var rootCmd = &cobra.Command{
 Identify. Audit. Slash.`,
 	Version: CurrentVersion,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Interactive Filtering (v1.2.6)
 		if !cmd.Flags().Changed("region") {
 			regions, err := PromptForRegions()
 			if err == nil {
@@ -33,7 +32,6 @@ Identify. Audit. Slash.`,
 			}
 		}
 
-		// Default action: Run TUI
 		config.Headless = false
 		_, _, _ = app.Run(config)
 	},
@@ -61,20 +59,16 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
 	rootCmd.PersistentFlags().MarkHidden("mock")
 
-	// Custom Help
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		renderFutureGlassHelp(cmd)
 	})
 
-	// Auto-Update Check
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Only verify on help or scan to avoid racing with TUI
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
 		}
 	}
 
-	// Register Sub-Commands
 	rootCmd.AddCommand(NukeCmd)
 	rootCmd.AddCommand(ExportCmd)
 }
@@ -82,7 +76,7 @@ func init() {
 func checkUpdate() {
 	latest, err := fetchLatestVersion()
 	if err == nil && strings.TrimSpace(latest) > CurrentVersion {
-		fmt.Printf("\n✨ Update Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", CurrentVersion, latest)
+		fmt.Printf("\n[UPDATE] Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", CurrentVersion, latest)
 	}
 }
 
@@ -101,7 +95,6 @@ func initConfig() {
 }
 
 func renderFutureGlassHelp(cmd *cobra.Command) {
-	// Bubble Tea / Lipgloss Styling for Help
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#00FF99")).
@@ -128,7 +121,7 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if f.Hidden {
 			return
-		} // Don't show mock
+		}
 		output := fmt.Sprintf("  --%-15s %s", f.Name, f.Usage)
 		if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
 			output += fmt.Sprintf(" (default %s)", f.DefValue)
