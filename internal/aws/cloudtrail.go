@@ -30,7 +30,7 @@ func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string)
 	// 2. Define Lookup Attribute
 	// We use ResourceName because ResourceID is not always indexed, but ResourceName often matches ID for EC2/EBS.
 	attrKey := types.LookupAttributeKeyResourceName
-	
+
 	input := &cloudtrail.LookupEventsInput{
 		LookupAttributes: []types.LookupAttribute{
 			{
@@ -38,14 +38,14 @@ func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string)
 				AttributeValue: aws.String(resourceID),
 			},
 		},
-		StartTime: &startTime,
-		EndTime:   &endTime,
-		MaxResults: aws.Int32(50), 
+		StartTime:  &startTime,
+		EndTime:    &endTime,
+		MaxResults: aws.Int32(50),
 	}
 
 	// 3. Query
 	paginator := cloudtrail.NewLookupEventsPaginator(c.Client, input)
-	
+
 	// We only need the first page usually.
 	if paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)

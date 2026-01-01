@@ -39,7 +39,7 @@ func NewClient(ctx context.Context, region, profile string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to load SDK config: %v", err)
 	}
-	
+
 	// Inject signature
 	cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 		return stack.Build.Add(middleware.BuildMiddlewareFunc("UserAgentTrap", func(ctx context.Context, input middleware.BuildInput, next middleware.BuildHandler) (

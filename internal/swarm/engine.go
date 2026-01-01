@@ -11,26 +11,26 @@ type Task func(ctx context.Context) error
 
 // Engine manages the worker pool and concurrency.
 type Engine struct {
-	aimd       *AIMD
-	tasks      chan Task
-	wg         sync.WaitGroup
-	quit       chan struct{}
-	active     int
-	mu         sync.Mutex
-	stats      Stats
+	aimd   *AIMD
+	tasks  chan Task
+	wg     sync.WaitGroup
+	quit   chan struct{}
+	active int
+	mu     sync.Mutex
+	stats  Stats
 }
 
 // Stats holds runtime statistics for the engine.
 type Stats struct {
-	ActiveWorkers int
-	Concurrency   int
+	ActiveWorkers  int
+	Concurrency    int
 	TasksCompleted int64
 }
 
 // NewEngine creates a new Swarm Engine.
 func NewEngine() *Engine {
 	return &Engine{
-		aimd:  NewAIMD(50, 5, 500), // Start 50, Min 5, Max 500
+		aimd:  NewAIMD(50, 5, 500),   // Start 50, Min 5, Max 500
 		tasks: make(chan Task, 1000), // Buffer for tasks
 		quit:  make(chan struct{}),
 	}
@@ -46,7 +46,7 @@ func (e *Engine) Submit(t Task) {
 	e.tasks <- t
 }
 
-// Wait blocks until all tasks are done (this is a simplified wait, 
+// Wait blocks until all tasks are done (this is a simplified wait,
 // in reality we need better tracking of submitted vs completed).
 // For now, we'll rely on the caller to manage wait groups for specific sets of tasks
 // or use a more complex job tracking system if needed.
@@ -62,8 +62,8 @@ func (e *Engine) GetStats() Stats {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return Stats{
-		ActiveWorkers: e.active,
-		Concurrency:   e.aimd.GetConcurrency(),
+		ActiveWorkers:  e.active,
+		Concurrency:    e.aimd.GetConcurrency(),
 		TasksCompleted: e.stats.TasksCompleted,
 	}
 }
@@ -141,7 +141,7 @@ func (e *Engine) worker(ctx context.Context) {
 			}
 
 			e.aimd.Feedback(latency, isThrottled)
-			
+
 			e.mu.Lock()
 			e.stats.TasksCompleted++
 			e.mu.Unlock()

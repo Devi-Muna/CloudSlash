@@ -90,14 +90,14 @@ func (m regionModel) GetSelectedRegions() []string {
 }
 
 func PromptForRegions() ([]string, error) {
-    p := tea.NewProgram(initialRegionModel())
-    m, err := p.Run()
-    if err != nil {
-        return nil, err
-    }
-    
-    if regionModel, ok := m.(regionModel); ok {
-        return regionModel.GetSelectedRegions(), nil
-    }
-    return []string{"us-east-1"}, nil
+	p := tea.NewProgram(initialRegionModel())
+	m, err := p.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	if regionModel, ok := m.(regionModel); ok {
+		return regionModel.GetSelectedRegions(), nil
+	}
+	return []string{"us-east-1"}, nil
 }

@@ -74,12 +74,12 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 
 func (s *ECSScanner) addClusterNode(cluster types.Cluster) {
 	s.Graph.AddNode(*cluster.ClusterArn, "AWS::ECS::Cluster", map[string]interface{}{
-			"Name":                              *cluster.ClusterName,
-			"Status":                            *cluster.Status,
-			"RegisteredContainerInstancesCount": int(cluster.RegisteredContainerInstancesCount),
-			"RunningTasksCount":                 int(cluster.RunningTasksCount),
-			"PendingTasksCount":                 int(cluster.PendingTasksCount),
-			"ActiveServicesCount":               int(cluster.ActiveServicesCount),
+		"Name":                              *cluster.ClusterName,
+		"Status":                            *cluster.Status,
+		"RegisteredContainerInstancesCount": int(cluster.RegisteredContainerInstancesCount),
+		"RunningTasksCount":                 int(cluster.RunningTasksCount),
+		"PendingTasksCount":                 int(cluster.PendingTasksCount),
+		"ActiveServicesCount":               int(cluster.ActiveServicesCount),
 	})
 }
 
@@ -139,15 +139,15 @@ func (s *ECSScanner) addServiceNode(service types.Service, clusterArn string) {
 	}
 
 	s.Graph.AddNode(*service.ServiceArn, "AWS::ECS::Service", map[string]interface{}{
-			"Name":           *service.ServiceName,
-			"ClusterArn":     clusterArn,
-			"Status":         *service.Status,
-			"DesiredCount":   int(service.DesiredCount),
-			"RunningCount":   int(service.RunningCount),
-			"PendingCount":   int(service.PendingCount),
-			"LaunchType":     string(service.LaunchType),
-			"TaskDefinition": taskDef,
-			"Events":         events,
+		"Name":           *service.ServiceName,
+		"ClusterArn":     clusterArn,
+		"Status":         *service.Status,
+		"DesiredCount":   int(service.DesiredCount),
+		"RunningCount":   int(service.RunningCount),
+		"PendingCount":   int(service.PendingCount),
+		"LaunchType":     string(service.LaunchType),
+		"TaskDefinition": taskDef,
+		"Events":         events,
 	})
 	s.Graph.AddTypedEdge(clusterArn, *service.ServiceArn, graph.EdgeTypeContains, 1)
 }
@@ -190,23 +190,23 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 			// Add Container Instance Node
 			// We map it to the underlying EC2 Instance ID if possible for the "Verification" uptime check
 			ec2InstanceID := *ci.Ec2InstanceId
-			
+
 			// We primarily care about the registeredAt time for the "Waste" check
 			// But we need to link it to the Cluster
-			
+
 			s.Graph.AddNode(*ci.ContainerInstanceArn, "AWS::ECS::ContainerInstance", map[string]interface{}{
-					"ClusterArn":    clusterArn,
-					"Ec2InstanceId": ec2InstanceID,
-					"RegisteredAt":  ci.RegisteredAt,
-					"Status":        *ci.Status,
+				"ClusterArn":    clusterArn,
+				"Ec2InstanceId": ec2InstanceID,
+				"RegisteredAt":  ci.RegisteredAt,
+				"Status":        *ci.Status,
 			})
 			s.Graph.AddTypedEdge(clusterArn, *ci.ContainerInstanceArn, graph.EdgeType("HAS_INSTANCE"), 1)
-			
+
 			// Link to EC2 Instance Node if exists (for cross-reference)
-			ec2Arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", ec2InstanceID) 
+			ec2Arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", ec2InstanceID)
 			// Note: region/account are hard to guess here without context, but in heuristics we often match by suffix or property
 			// Ideally we use a consistent ARN builder. For now, we store the EC2 ID in properties for the heuristic to look up.
-			_ = ec2Arn 
+			_ = ec2Arn
 		}
 	}
 	return nil

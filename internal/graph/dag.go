@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 	"sync"
+	"time"
 )
 
 // EdgeType defines the semantic relationship between resources.
@@ -28,15 +28,16 @@ type Edge struct {
 
 // Node represents a resource in the infrastructure graph.
 type Node struct {
-	ID            string                 // Unique Identifier (ARN)
-	Type          string                 // Resource Type (e.g., "AWS::EC2::Instance")
-	Properties    map[string]interface{} // Resource attributes
-	IsWaste       bool                   // Flagged as waste?
-	Justified     bool                   // Is this accepted/known waste?
-	Justification string                 // Reason for justification
-	RiskScore     int                    // 0-100
-	Cost          float64                // Monthly cost estimate
-	SourceLocation string                // e.g. "storage.tf:24"
+	ID             string                 // Unique Identifier (ARN)
+	Type           string                 // Resource Type (e.g., "AWS::EC2::Instance")
+	Properties     map[string]interface{} // Resource attributes
+	IsWaste        bool                   // Flagged as waste?
+	Justified      bool                   // Is this accepted/known waste?
+	Justification  string                 // Reason for justification
+    Ignored        bool                   // Interactive Whitelist (Session/Persisted)
+	RiskScore      int                    // 0-100
+	Cost           float64                // Monthly cost estimate
+	SourceLocation string                 // e.g. "storage.tf:24"
 }
 
 // Graph represents the infrastructure topology as a Weighted DAG.
@@ -182,12 +183,12 @@ func (g *Graph) MarkWaste(id string, score int) {
 		if tags, ok := node.Properties["Tags"].(map[string]string); ok {
 			if val, ok := tags["cloudslash:ignore"]; ok {
 				val = strings.ToLower(strings.TrimSpace(val))
-				
+
 				// 1. Ignore Forever
 				if val == "true" {
 					return
 				}
-				
+
 				// 2. Cost-Based Ignore (cost<10.50)
 				if strings.HasPrefix(val, "cost<") {
 					limitStr := strings.TrimPrefix(val, "cost<")
@@ -221,7 +222,7 @@ func (g *Graph) MarkWaste(id string, score int) {
 					// Parse "30d" -> 720h manually
 					var hours int
 					var conversionErr error
-					
+
 					if strings.HasSuffix(val, "d") {
 						daysStr := strings.TrimSuffix(val, "d")
 						days, err := strconv.Atoi(daysStr)
@@ -245,7 +246,7 @@ func (g *Graph) MarkWaste(id string, score int) {
 						// Try common keys: LaunchTime (EC2), CreateTime (EBS/S3), StartTime (RDS)
 						var launchTime time.Time
 						foundTime := false
-						
+
 						timeKeys := []string{"LaunchTime", "CreateTime", "StartTime", "Created"}
 						for _, key := range timeKeys {
 							if tVal, ok := node.Properties[key].(time.Time); ok {

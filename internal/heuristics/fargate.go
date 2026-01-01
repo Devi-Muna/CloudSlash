@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/k8s"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -24,7 +23,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 	if h.K8sClient == nil {
 		return nil
 	}
-	
+
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
@@ -34,12 +33,12 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 		}
 
 		profileName, _ := node.Properties["ProfileName"].(string)
-		
+
 		// 0. The CoreDNS / System Whitelist
 		if profileName == "fp-default" || strings.Contains(strings.ToLower(profileName), "coredns") {
 			continue
 		}
-		
+
 		// AWS SDK stores Selectors as []types.FargateProfileSelector
 		selectors, ok := node.Properties["Selectors"].([]types.FargateProfileSelector)
 		if !ok || len(selectors) == 0 {
@@ -62,7 +61,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 				isProfileActive = true
 				break
 			}
-			
+
 			// LAYER 1: The Broken Link Check (Namespace Existence)
 			// We check if namespace exists in the K8s cluster.
 			// Ideally we cache this list to avoid N calls.
@@ -73,29 +72,29 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 				failureReasons = append(failureReasons, fmt.Sprintf("Selector #%d: Namespace '%s' not found.", i+1, nsName))
 				continue
 			}
-			
+
 			// LAYER 2: The Pulse Check (Active Pods)
 			// List pods in namespace matching labels.
 			// Labels in a selector are AND.
 			labelSelector := formatLabelSelector(sel.Labels)
-			
+
 			pods, err := h.K8sClient.Clientset.CoreV1().Pods(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
-				Limit: 1, // We only need to know if > 0 exist
+				Limit:         1, // We only need to know if > 0 exist
 			})
-			
+
 			if err == nil && len(pods.Items) > 0 {
 				isProfileActive = true
 				break // Found life! The specific Trap Door works.
 			}
-			
+
 			// LAYER 3: Ghost Town Forensics (Controllers)
 			// If 0 Pods, is it abandoned configuration?
 			// Check Deployments
 			deployments, err := h.K8sClient.Clientset.AppsV1().Deployments(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
-			
+
 			hasActiveController := false
 			if err == nil {
 				for _, d := range deployments.Items {
@@ -110,7 +109,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 					}
 				}
 			}
-			
+
 			if hasActiveController {
 				isProfileActive = true
 				break // Waiting for pods to launch (e.g. pending/crashloop), but intent is there.
@@ -128,12 +127,12 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 					}
 				}
 			}
-			
+
 			if hasActiveController {
 				isProfileActive = true
 				break
 			}
-			
+
 			// If we get here, this selector matches:
 			// 1. Existing Namespace
 			// 2. But 0 Pods
@@ -146,7 +145,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			node.IsWaste = true
 			node.RiskScore = 60 // Medium Risk (Configuration Debt is mostly risk of confusion/accidental billing)
 			node.Cost = 0       // It's free to have empty profiles.
-			
+
 			reason := "Abandoned Fargate Profile:\n"
 			for _, r := range failureReasons {
 				reason += fmt.Sprintf(" - %s\n", r)
@@ -155,7 +154,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			node.Properties["Reason"] = reason
 		}
 	}
-	
+
 	return nil
 }
 

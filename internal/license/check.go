@@ -17,10 +17,10 @@ type VerifyRequest struct {
 }
 
 type VerifyResponse struct {
-	Valid  bool      `json:"valid"`
-	Plan   string    `json:"plan"`
+	Valid  bool       `json:"valid"`
+	Plan   string     `json:"plan"`
 	Expiry *time.Time `json:"expiry"` // Pointer to handle null/nil
-	Reason string    `json:"reason"`
+	Reason string     `json:"reason"`
 }
 
 // Check validates the license key by calling the Cloudflare Worker (Freemius Proxy).

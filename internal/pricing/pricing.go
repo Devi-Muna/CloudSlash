@@ -227,7 +227,7 @@ func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64
 		if err != nil {
 			// Fallback (Safe Mode): Return standard US-East price ($0.045/hr)
 			// This ensures the UI never hangs on network latency.
-			return 0.045 * 730, nil 
+			return 0.045 * 730, nil
 		}
 		c.mu.Lock()
 		c.cache[cacheKey] = pricePerHour
@@ -273,7 +273,6 @@ func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, err
 
 	return parsePriceFromJSON(out.PriceList[0])
 }
-
 
 // GetEIPPrice returns the monthly cost for an unassociated Elastic IP.
 // Pricing: $0.005/hr for unattached/remapped.

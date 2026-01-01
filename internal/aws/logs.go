@@ -3,22 +3,29 @@ package aws
 import (
 	"context"
 	"fmt"
+    "time"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+    cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 )
 
 type CloudWatchLogsClient struct {
-	Client *cloudwatchlogs.Client
-	Graph  *graph.Graph
+	Client         *cloudwatchlogs.Client
+	CWClient       *cloudwatch.Client
+	Graph          *graph.Graph
+	DisableMetrics bool
 }
 
-func NewCloudWatchLogsClient(cfg aws.Config, g *graph.Graph) *CloudWatchLogsClient {
+func NewCloudWatchLogsClient(cfg aws.Config, g *graph.Graph, disableMetrics bool) *CloudWatchLogsClient {
 	return &CloudWatchLogsClient{
-		Client: cloudwatchlogs.NewFromConfig(cfg),
-		Graph:  g,
+		Client:         cloudwatchlogs.NewFromConfig(cfg),
+		CWClient:       cloudwatch.NewFromConfig(cfg),
+		Graph:          g,
+		DisableMetrics: disableMetrics,
 	}
 }
 
@@ -35,15 +42,58 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 			arn := *group.Arn
 			// Strip trailing :* if present (sometimes ARN has :*)
 			// arn:aws:logs:region:account:log-group:name:*
-			
+			if len(arn) > 2 && arn[len(arn)-2:] == ":*" {
+				arn = arn[:len(arn)-2]
+			}
+
+			storedBytes := int64(0)
+			if group.StoredBytes != nil {
+				storedBytes = *group.StoredBytes
+			}
+
 			props := map[string]interface{}{
-				"StoredBytes": group.StoredBytes,
+				"StoredBytes": storedBytes,
 				"Retention":   "Never",
 			}
 
 			if group.RetentionInDays != nil {
 				props["Retention"] = *group.RetentionInDays
 			}
+
+			// METRIC CHECK: IncomingBytes (Opt-In Check)
+			incomingBytes := float64(-1) // Default: Unknown/Skipped
+
+			if !c.DisableMetrics && storedBytes > 0 {
+				// Only check metrics if stored > 0 to save costs
+				// We check Last 30 Days
+				now := time.Now()
+				start := now.Add(-30 * 24 * time.Hour)
+
+				metricOut, err := c.CWClient.GetMetricStatistics(ctx, &cloudwatch.GetMetricStatisticsInput{
+					Namespace:  aws.String("AWS/Logs"),
+					MetricName: aws.String("IncomingBytes"),
+					Dimensions: []cwtypes.Dimension{
+						{Name: aws.String("LogGroupName"), Value: group.LogGroupName},
+					},
+					StartTime:  &start,
+					EndTime:    &now,
+					Period:     aws.Int32(30 * 24 * 60 * 60), // One single datapoint for 30 days
+					Statistics: []cwtypes.Statistic{cwtypes.StatisticSum},
+				})
+
+				if err == nil && len(metricOut.Datapoints) > 0 {
+					if metricOut.Datapoints[0].Sum != nil {
+						incomingBytes = *metricOut.Datapoints[0].Sum
+					}
+				} else if err != nil {
+					// Log warning but continue?
+					// fmt.Printf("DEBUG: Metric check failed for %s: %v\n", *group.LogGroupName, err)
+				} else {
+					// No datapoints usually means 0
+					incomingBytes = 0
+				}
+			}
+			props["IncomingBytes"] = incomingBytes
 
 			c.Graph.AddNode(arn, "AWS::Logs::LogGroup", props)
 		}
@@ -53,7 +103,7 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 
 // DescribeLogGroups helper if needed for direct access
 func (c *CloudWatchLogsClient) DescribeLogGroups(ctx context.Context) ([]types.LogGroup, error) {
-    // ... logic duplicated above, but simplified for heuristic direct use if we didn't use graph scan
-    // But we prefer scanning into graph.
-    return nil, nil 
+	// ... logic duplicated above, but simplified for heuristic direct use if we didn't use graph scan
+	// But we prefer scanning into graph.
+	return nil, nil
 }

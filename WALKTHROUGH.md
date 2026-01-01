@@ -1,4 +1,4 @@
-# CloudSlash Technical Documentation (v1.2.6)
+# CloudSlash Technical Documentation (v1.2.7)
 
 This document serves as the primary technical reference for the CloudSlash forensic engine. It details the system architecture, operational workflows, detection logic, and remediation protocols. It is intended for Site Reliability Engineers (SREs), DevOps practitioners, and FinOps stakeholders.
 
@@ -34,6 +34,7 @@ If no flags are provided, CloudSlash enters **Interactive Mode**, prompting you 
 
 - `--region`: Specify the target AWS region (e.g., `us-east-1`). Defaults to the environment variable configuration.
 - `--headless`: Runs without the interactive Terminal User Interface (TUI), suitable for CI/CD logs.
+- `--no-metrics`: **(New in v1.2.7)** Disables CloudWatch API calls (Cost Saving Mode). Useful for frequent scans where precision metric forensics are not required.
 
 ### Export Operation
 
@@ -73,7 +74,31 @@ cloudslash update
 
 ## 3. Heuristic Detection Logic
 
-CloudSlash v1.2.6 includes advanced heuristics designed to detect subtle forms of infrastructure waste that escape simple tag-based filtering.
+CloudSlash v1.2.7 includes advanced heuristics designed to detect subtle forms of infrastructure waste that escape simple tag-based filtering.
+
+### Log Zombie Hunter (CloudWatch Logs)
+
+**Introduced in v1.2.7**
+
+Identifies CloudWatch Log Groups that are either abandoned (receiving no data) or hoarding storage indefinitely.
+
+**Detection Logic:**
+
+1.  **Abandoned**: Logs with `StoredBytes > 0` but `IncomingBytes == 0` over the last 30 days. Uses CloudWatch Metrics API.
+2.  **Hoarder**: Logs with `Retention` set to **Never Expire** and `StoredBytes > 1GB`.
+3.  **Safety**: Automatically whitelists log groups starting with `/aws/lambda/` to prevent accidental deletion of serverless execution logs.
+
+### ECR Digital Janitor
+
+**Introduced in v1.2.7**
+
+Forensic analysis of Elastic Container Registry (ECR) to identify storage waste in repositories that lack automated lifecycle cleaning.
+
+**Detection Logic:**
+
+1.  **Policy Warning**: Flags any repository that has **zero** Lifecycle Policy attached.
+2.  **Untagged Waste**: Within those repositories, identifies images that are **Untagged** and have not been pulled for >90 days (using `lastRecordedPullTime` forensics).
+3.  **Access Resilience**: Gracefully handles `403 AccessDenied` on `ecr:GetLifecyclePolicy` (common in restricted environments) by logging a warning instead of crashing.
 
 ### Idle Clusters (ECS)
 

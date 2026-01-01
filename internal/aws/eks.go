@@ -72,7 +72,7 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 	}
 
 	arn := *cluster.Arn
-	
+
 	// 1. Check Managed Node Groups
 	hasManagedNodes, err := s.checkManagedNodes(ctx, name)
 	if err != nil {
@@ -118,7 +118,7 @@ func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) 
 	// If any nodegroup exists with DesiredSize > 0, return true.
 	// Actually, listing nodegroups is paginated too.
 	paginator := eks.NewListNodegroupsPaginator(s.Client, &eks.ListNodegroupsInput{ClusterName: &clusterName})
-	
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -133,7 +133,7 @@ func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) 
 			if err != nil {
 				return false, err
 			}
-			
+
 			if ng.Nodegroup != nil && ng.Nodegroup.ScalingConfig != nil {
 				if ng.Nodegroup.ScalingConfig.DesiredSize != nil && *ng.Nodegroup.ScalingConfig.DesiredSize > 0 {
 					return true, nil
@@ -146,15 +146,15 @@ func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) 
 
 func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clusterARN string) (bool, error) {
 	paginator := eks.NewListFargateProfilesPaginator(s.Client, &eks.ListFargateProfilesInput{ClusterName: &clusterName})
-	
+
 	hasProfiles := false
-	
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
 			return false, err
 		}
-		
+
 		if len(page.FargateProfileNames) > 0 {
 			hasProfiles = true
 		}
@@ -169,22 +169,24 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 				fmt.Printf("   [Warning] Failed to describe Fargate Profile %s: %v\n", profileName, err)
 				continue
 			}
-			
+
 			fp := resp.FargateProfile
-			if fp == nil { continue }
-			
+			if fp == nil {
+				continue
+			}
+
 			// Ingest into Graph
 			props := map[string]interface{}{
 				"ProfileName": *fp.FargateProfileName,
 				"ClusterName": clusterName,
-				"ClusterARN": clusterARN,
-				"CreatedAt": fp.CreatedAt,
-				"Selectors": fp.Selectors, // Stores internal K8s Types (Namespace, Labels)
+				"ClusterARN":  clusterARN,
+				"CreatedAt":   fp.CreatedAt,
+				"Selectors":   fp.Selectors, // Stores internal K8s Types (Namespace, Labels)
 				// PodExecutionRoleArn, Subnets, etc. can be added if needed
 			}
-			
+
 			s.Graph.AddNode(*fp.FargateProfileArn, "AWS::EKS::FargateProfile", props)
-			
+
 			// Link to Cluster
 			s.Graph.AddEdge(*fp.FargateProfileArn, clusterARN)
 		}
@@ -195,18 +197,18 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName string) (bool, error) {
 	// Tag filter: kubernetes.io/cluster/<name> = owned | shared
 	key := fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)
-	
+
 	input := &ec2.DescribeInstancesInput{
 		Filters: []ec2types.Filter{
 			{Name: aws.String(key), Values: []string{"owned", "shared"}},
 			{Name: aws.String("instance-state-name"), Values: []string{"running", "pending"}},
 		},
 	}
-	
+
 	// Just check if any exist. No need to paginate all if we find one.
 	// But we must paginate to find AT LEAST one.
 	paginator := ec2.NewDescribeInstancesPaginator(s.EC2Client, input)
-	
+
 	// We only need the first page. If it has ANY instances, we are good.
 	// Actually, we should check HasMorePages loop but break early.
 	if paginator.HasMorePages() {
@@ -220,6 +222,6 @@ func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName stri
 			}
 		}
 	}
-	
+
 	return false, nil
 }

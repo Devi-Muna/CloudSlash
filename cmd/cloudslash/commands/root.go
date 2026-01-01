@@ -3,13 +3,13 @@ package commands
 import (
 	"fmt"
 	"os"
-    "strings"
+	"strings"
 
-    "github.com/DrSkyle/cloudslash/internal/app"
+	"github.com/DrSkyle/cloudslash/internal/app"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-    "github.com/charmbracelet/lipgloss"
-    "github.com/spf13/pflag"
 )
 
 var (
@@ -23,15 +23,15 @@ var rootCmd = &cobra.Command{
 	Long: `CloudSlash - Zero Trust Infrastructure Analysis
     
 Identify. Audit. Slash.`,
-    Version: CurrentVersion,
+	Version: CurrentVersion,
 	Run: func(cmd *cobra.Command, args []string) {
-        // Interactive Filtering (v1.2.6)
-        if !cmd.Flags().Changed("region") {
-            regions, err := PromptForRegions()
-            if err == nil {
-                config.Region = strings.Join(regions, ",")
-            }
-        }
+		// Interactive Filtering (v1.2.6)
+		if !cmd.Flags().Changed("region") {
+			regions, err := PromptForRegions()
+			if err == nil {
+				config.Region = strings.Join(regions, ",")
+			}
+		}
 
 		// Default action: Run TUI
 		config.Headless = false
@@ -54,36 +54,36 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.Region, "region", "us-east-1", "AWS Region")
 	rootCmd.PersistentFlags().StringVar(&config.TFStatePath, "tfstate", "terraform.tfstate", "Path to web.tfstate")
 	rootCmd.PersistentFlags().BoolVar(&config.AllProfiles, "all-profiles", false, "Scan all AWS profiles")
-    rootCmd.PersistentFlags().StringVar(&config.RequiredTags, "required-tags", "", "Required tags (comma-separated)")
-    rootCmd.PersistentFlags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL")
+	rootCmd.PersistentFlags().StringVar(&config.RequiredTags, "required-tags", "", "Required tags (comma-separated)")
+	rootCmd.PersistentFlags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL")
 
-    // Hidden Flags
-    rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
-    rootCmd.PersistentFlags().MarkHidden("mock")
+	// Hidden Flags
+	rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
+	rootCmd.PersistentFlags().MarkHidden("mock")
 
-    // Custom Help
-    rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-        renderFutureGlassHelp(cmd)
-    })
-    
-    // Auto-Update Check
-    rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-        // Only verify on help or scan to avoid racing with TUI
-        if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
-             checkUpdate()
-        }
-    }
+	// Custom Help
+	rootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		renderFutureGlassHelp(cmd)
+	})
 
-    // Register Sub-Commands
-    rootCmd.AddCommand(NukeCmd)
-    rootCmd.AddCommand(ExportCmd)
+	// Auto-Update Check
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// Only verify on help or scan to avoid racing with TUI
+		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
+			checkUpdate()
+		}
+	}
+
+	// Register Sub-Commands
+	rootCmd.AddCommand(NukeCmd)
+	rootCmd.AddCommand(ExportCmd)
 }
 
 func checkUpdate() {
-   latest, err := fetchLatestVersion()
-   if err == nil && strings.TrimSpace(latest) > CurrentVersion {
-       fmt.Printf("\n✨ Update Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", CurrentVersion, latest)
-   }
+	latest, err := fetchLatestVersion()
+	if err == nil && strings.TrimSpace(latest) > CurrentVersion {
+		fmt.Printf("\n✨ Update Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", CurrentVersion, latest)
+	}
 }
 
 func initConfig() {
@@ -93,51 +93,53 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		if err == nil {
 			viper.AddConfigPath(home)
-            viper.SetConfigName(".cloudslash")
+			viper.SetConfigName(".cloudslash")
 		}
 	}
 	viper.AutomaticEnv()
-    viper.ReadInConfig()
+	viper.ReadInConfig()
 }
 
 func renderFutureGlassHelp(cmd *cobra.Command) {
-    // Bubble Tea / Lipgloss Styling for Help
-    titleStyle := lipgloss.NewStyle().
-        Bold(true).
-        Foreground(lipgloss.Color("#00FF99")).
-        MarginBottom(1)
-    
-    flagStyle := lipgloss.NewStyle().
-        Foreground(lipgloss.Color("#AAAAAA"))
+	// Bubble Tea / Lipgloss Styling for Help
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00FF99")).
+		MarginBottom(1)
 
-    fmt.Println(titleStyle.Render(fmt.Sprintf("CLOUDSLASH %s [Future-Glass]", CurrentVersion)))
-    fmt.Println("The Forensic Cloud Accountant for AWS.")
-    
-    fmt.Println(titleStyle.Render("USAGE"))
-    fmt.Printf("  %s\n\n", cmd.UseLine())
+	flagStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#AAAAAA"))
 
-    fmt.Println(titleStyle.Render("COMMANDS"))
-    for _, c := range cmd.Commands() {
-        if c.IsAvailableCommand() {
-             fmt.Printf("  %-12s %s\n", c.Name(), c.Short)
-        }
-    }
-    fmt.Println("")
-    
-    fmt.Println(titleStyle.Render("FLAGS"))
-    cmd.Flags().VisitAll(func(f *pflag.Flag) {
-        if f.Hidden { return } // Don't show mock
-        output := fmt.Sprintf("  --%-15s %s", f.Name, f.Usage)
-        if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
-            output += fmt.Sprintf(" (default %s)", f.DefValue)
-        }
-        fmt.Println(flagStyle.Render(output))
-    })
-    fmt.Println("")
+	fmt.Println(titleStyle.Render(fmt.Sprintf("CLOUDSLASH %s [Future-Glass]", CurrentVersion)))
+	fmt.Println("The Forensic Cloud Accountant for AWS.")
 
-    fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.6)"))
-    fmt.Println(flagStyle.Render("  • ECS Idle Clusters:   Detects empty clusters wasting EC2 money"))
-    fmt.Println(flagStyle.Render("  • Crash Loop Detector: Identifies broken services & missing images"))
-    fmt.Println(flagStyle.Render("  • Interactive Mode:    Region selection & Deep Links in output"))
-    fmt.Println("")
+	fmt.Println(titleStyle.Render("USAGE"))
+	fmt.Printf("  %s\n\n", cmd.UseLine())
+
+	fmt.Println(titleStyle.Render("COMMANDS"))
+	for _, c := range cmd.Commands() {
+		if c.IsAvailableCommand() {
+			fmt.Printf("  %-12s %s\n", c.Name(), c.Short)
+		}
+	}
+	fmt.Println("")
+
+	fmt.Println(titleStyle.Render("FLAGS"))
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Hidden {
+			return
+		} // Don't show mock
+		output := fmt.Sprintf("  --%-15s %s", f.Name, f.Usage)
+		if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
+			output += fmt.Sprintf(" (default %s)", f.DefValue)
+		}
+		fmt.Println(flagStyle.Render(output))
+	})
+	fmt.Println("")
+
+	fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.6)"))
+	fmt.Println(flagStyle.Render("  • ECS Idle Clusters:   Detects empty clusters wasting EC2 money"))
+	fmt.Println(flagStyle.Render("  • Crash Loop Detector: Identifies broken services & missing images"))
+	fmt.Println(flagStyle.Render("  • Interactive Mode:    Region selection & Deep Links in output"))
+	fmt.Println("")
 }

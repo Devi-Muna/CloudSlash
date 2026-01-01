@@ -19,13 +19,20 @@ Example:
 		// Interactive Filtering (v1.2.6)
 		if !cmd.Flags().Changed("region") {
 			// Check if TTY? Cobra Run usually implies we can check inputs.
-			// Just run the prompt.
 			regions, err := PromptForRegions()
 			if err == nil {
 				config.Region = strings.Join(regions, ",")
 			}
 		}
-		
+
+		// Flag Overrides
+		if noMetrics, _ := cmd.Flags().GetBool("no-metrics"); noMetrics {
+			config.DisableCWMetrics = true
+		}
+		if fast, _ := cmd.Flags().GetBool("fast"); fast {
+			config.DisableCWMetrics = true
+		}
+
 		config.Headless = true
 		_, _, _ = app.Run(config)
 	},
@@ -33,4 +40,8 @@ Example:
 
 func init() {
 	rootCmd.AddCommand(scanCmd)
+
+	// Scan Specific Flags
+	scanCmd.Flags().Bool("no-metrics", false, "Disable CloudWatch Metric calls (Saves money)")
+	scanCmd.Flags().Bool("fast", false, "Alias for --no-metrics (Fast scan)")
 }

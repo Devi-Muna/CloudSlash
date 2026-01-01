@@ -18,12 +18,12 @@ func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
 	// Create Zombie EKS Cluster
 	clusterArn := "arn:aws:eks:us-east-1:123456789012:cluster/ZombieCluster"
 	g.AddNode(clusterArn, "AWS::EKS::Cluster", map[string]interface{}{
-		"Status":                "ACTIVE",
-		"CreatedAt":             time.Now().Add(-8 * 24 * time.Hour), // 8 days old
-		"KarpenterEnabled":      false,
-		"HasManagedNodes":       false,
-		"HasFargate":            false,
-		"HasSelfManagedNodes":   false,
+		"Status":              "ACTIVE",
+		"CreatedAt":           time.Now().Add(-8 * 24 * time.Hour), // 8 days old
+		"KarpenterEnabled":    false,
+		"HasManagedNodes":     false,
+		"HasFargate":          false,
+		"HasSelfManagedNodes": false,
 	})
 
 	// Create Orphaned ALB (Matching Tag)
@@ -64,7 +64,7 @@ func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
 	}
 
 	reason, _ := clusterNode.Properties["Reason"].(string)
-	
+
 	// Check for Orphaned ELB Logic
 	if !strings.Contains(reason, "Orphaned ELBs") {
 		t.Errorf("Expected reason to contain 'Orphaned ELBs', got: %s", reason)

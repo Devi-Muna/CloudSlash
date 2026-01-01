@@ -11,7 +11,7 @@ CloudSlash identifies idle, orphaned, and underutilized resources in AWS environ
 
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Mac%20%7C%20Linux%20%7C%20Windows-lightgrey)
-![Version](https://img.shields.io/badge/version-v1.2.6-green)
+![Version](https://img.shields.io/badge/version-v1.2.7-green)
 
 > **New to CloudSlash?** Check out the complete [**User Walkthrough**](WALKTHROUGH.md) for a step-by-step guide.
 
@@ -143,7 +143,14 @@ Remove-Item "$env:LOCALAPPDATA\CloudSlash" -Recurse -Force
 
 ## Release History
 
-### v1.2.6 (Latest)
+### v1.2.7 (Latest)
+
+- **Log Zombie Hunter**: Detects abandoned Log Groups (0 IncomingBytes/30 days) and Hoarders (Infinite Retention).
+- **ECR Digital Janitor**: Identifying untagged/unused images in repositories lacking Lifecycle Policies.
+- **Cockpit TUI**: Live "Cost Ticker" and interactive Whitelist with immediate persistence (`i` key).
+- **Cost Saving Mode**: New `--no-metrics` flag to opt-out of forensic API calls.
+
+### v1.2.6
 
 - **Idle Clusters**: "The Money Saver". Detects ECS Clusters that have registered container instances (EC2 capacity) but zero running tasks.
 - **Empty Services**: "Crash Loop Detector". Identifies services with `desiredCount > 0` but `runningCount == 0`, diagnosing failure reasons from forensic event analysis.

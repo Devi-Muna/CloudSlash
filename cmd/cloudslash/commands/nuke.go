@@ -22,7 +22,7 @@ var NukeCmd = &cobra.Command{
 		fmt.Println("⚠️  WARNING: You are entering DESTRUCTIVE MODE.")
 		fmt.Println("   This will DELETE resources from your AWS account.")
 		fmt.Print("   Are you sure? [y/N]: ")
-		
+
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
 			text := strings.ToLower(strings.TrimSpace(scanner.Text()))
@@ -48,7 +48,7 @@ var NukeCmd = &cobra.Command{
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
-		
+
 		// Setup minimal heuristics
 		hEngine := heuristics.NewEngine()
 		hEngine.Register(&heuristics.ZombieEBSHeuristic{Pricing: nil}) // Pricing optional for nuke
@@ -76,14 +76,14 @@ var NukeCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\nFound %d waste items.\n", len(waste))
-		
+
 		deleter := aws.NewDeleter(client.Config) // Need to implement this or just use client directly
 
 		for _, item := range waste {
 			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
 			fmt.Print(" 💀 Delete this resource? [y/N]: ")
-			
+
 			if scanner.Scan() {
 				ans := strings.ToLower(strings.TrimSpace(scanner.Text()))
 				if ans == "y" {
@@ -100,7 +100,7 @@ var NukeCmd = &cobra.Command{
 				}
 			}
 		}
-		
+
 		fmt.Println("\nNuke complete.")
 	},
 }

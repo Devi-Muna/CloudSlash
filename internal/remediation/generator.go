@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/DrSkyle/cloudslash/internal/graph"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
 // Generator handles creates remediation scripts.
@@ -128,7 +128,7 @@ func (g *Generator) GenerateIgnoreScript(path string) error {
 	count := 0
 	for _, item := range items {
 		resourceID := extractResourceID(item.ID)
-		
+
 		arg := item.ID
 		if !strings.HasPrefix(item.ID, "arn:") {
 			fmt.Fprintf(f, "# Skipping non-ARN resource: %s\n", item.ID)

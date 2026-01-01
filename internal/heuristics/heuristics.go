@@ -63,7 +63,7 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		if maxConns < 5 && sumBytes < 1e9 {
 			g.MarkWaste(node.ID, 80)
 			node.Properties["Reason"] = fmt.Sprintf("Unused NAT Gateway: MaxConns=%.0f, BytesOut=%.0f", maxConns, sumBytes)
-			
+
 			if h.Pricing != nil {
 				// NAT is usually region-based, but we can assume us-east-1 for simple estimate or parse region from ARN
 				cost, err := h.Pricing.GetNATGatewayPrice(ctx, "us-east-1")
@@ -167,7 +167,7 @@ func (h *ZombieEBSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 }
 
 // ElasticIPHeuristic checks for EIPs attached to stopped instances or unattached.
-type ElasticIPHeuristic struct{
+type ElasticIPHeuristic struct {
 	Pricing *pricing.Client
 }
 

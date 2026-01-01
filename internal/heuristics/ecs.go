@@ -36,7 +36,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 
 	for _, cluster := range clusters {
 		// 1. The Filter (Indentifying the Zombie)
-		
+
 		// Check 1: Capacity Exists
 		regInstances, _ := cluster.Properties["RegisteredContainerInstancesCount"].(int)
 		if regInstances == 0 {
@@ -47,7 +47,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		// Check 2: Workload is Zero
 		runningTasks, _ := cluster.Properties["RunningTasksCount"].(int)
 		pendingTasks, _ := cluster.Properties["PendingTasksCount"].(int)
-		
+
 		if runningTasks > 0 || pendingTasks > 0 {
 			continue
 		}
@@ -63,44 +63,44 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		// 3. The Verification (The "Pro" Check)
 		// Rule: If runningTasks == 0 AND Instance Uptime > 1 hour, IT IS WASTE.
 		isWaste := true
-		
+
 		instances := instancesByCluster[cluster.ID]
 		hasOldInstances := false
-		
+
 		// Logic: If ANY instance is fresh (< 1h), the cluster might be scaling up.
 		// If ALL instances are old (> 1h), it is waste.
-		
+
 		if len(instances) == 0 {
-		    // Inconsistency: regInstances > 0 but no nodes found. Safest is to skip.
-		    isWaste = false
+			// Inconsistency: regInstances > 0 but no nodes found. Safest is to skip.
+			isWaste = false
 		} else {
-    		for _, inst := range instances {
-    			registeredAt, ok := inst.Properties["RegisteredAt"].(time.Time)
-    			if ok {
-    				if time.Since(registeredAt) > 1*time.Hour {
-    					hasOldInstances = true
-    				} else {
-    					// Found a fresh instance. Abort waste flag.
-    					isWaste = false
-    					break
-    				}
-    			}
-    		}
-    		
-    		if !hasOldInstances && isWaste {
-    		    // All instances were checked, none were old (and none were fresh? impossible if len > 0).
-    		    // Wait. logic above:
-    		    // if fresh found -> isWaste = false.
-    		    // if old found -> hasOldInstances = true.
-    		    // We need AT LEAST ONE old instance to confirm stasis? 
-    		    // Actually, if we didn't find any fresh instances, and we found *some* instances, they must be old.
-    		    // So `isWaste` remains true (from init).
-    		}
+			for _, inst := range instances {
+				registeredAt, ok := inst.Properties["RegisteredAt"].(time.Time)
+				if ok {
+					if time.Since(registeredAt) > 1*time.Hour {
+						hasOldInstances = true
+					} else {
+						// Found a fresh instance. Abort waste flag.
+						isWaste = false
+						break
+					}
+				}
+			}
+
+			if !hasOldInstances && isWaste {
+				// All instances were checked, none were old (and none were fresh? impossible if len > 0).
+				// Wait. logic above:
+				// if fresh found -> isWaste = false.
+				// if old found -> hasOldInstances = true.
+				// We need AT LEAST ONE old instance to confirm stasis?
+				// Actually, if we didn't find any fresh instances, and we found *some* instances, they must be old.
+				// So `isWaste` remains true (from init).
+			}
 		}
 
 		if isWaste {
 			g.MarkWaste(cluster.ID, 85)
-			
+
 			reason := fmt.Sprintf("Idle Cluster: %d Container Instances active (>1h uptime), but 0 Tasks running.", regInstances)
 			cluster.Properties["Reason"] = reason
 		}
@@ -130,15 +130,15 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	for _, service := range services {
 		desired, _ := service.Properties["DesiredCount"].(int)
 		running, _ := service.Properties["RunningCount"].(int)
-		
+
 		// The Filter
 		if desired > 0 && running == 0 {
 			// It's broken.
-			
+
 			// The Forensic Diagnosis
 			events, _ := service.Properties["Events"].([]string)
 			diagnosis := "Reason: Service is failing to start tasks."
-			
+
 			// Regex/String Match
 			for _, event := range events {
 				if strings.Contains(event, "unable to place a task") {
@@ -186,6 +186,6 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			service.Properties["Reason"] = fmt.Sprintf("STUCK Service. Desired: %d, Running: 0. %s", desired, diagnosis)
 		}
 	}
-	
+
 	return nil
 }

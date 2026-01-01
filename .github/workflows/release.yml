@@ -45,15 +45,15 @@ jobs:
           files: dist/*
           generate_release_notes: false
           body: |
-            # CloudSlash v1.2.6
+            # CloudSlash v1.2.7
 
             ## New Features
-            - **ECS Idle Clusters**: Detects empty clusters wasting EC2 money.
-            - **Crash Loop Detector**: Identifies broken services & missing images.
-            - **Interactive Mode**: Region selection & Deep Links in output.
+            - **Log Zombie Hunter**: Metrics-based forensics for unused CloudWatch Log Groups.
+            - **ECR Digital Janitor**: Detects untagged images (>90d old) in repositories without lifecycle policies.
+            - **Cockpit TUI**: "Live Cost Ticker" and Interactive Whitelist (`i` key to ignore).
+            - **Cost Control**: Added `--no-metrics` flag to disable API calls ($).
 
             ## Improvements
-            - Mock Mode covering 100% of heuristics.
-            - Fixed Auto-Updater logic.
-            - Enhanced Terminal UI with Tree View.
+            - Graceful handling of ECR 403 (Access Denied) errors.
+            - Optimized API usage for log scanning.
           draft: false

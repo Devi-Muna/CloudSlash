@@ -2,7 +2,7 @@ package heuristics
 
 import (
 	"context"
-	"fmt" // Added for Sprintf
+	"fmt"     // Added for Sprintf
 	"strings" // Added for Split/Join
 	"time"
 
@@ -64,14 +64,14 @@ func (h *ZombieEKSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		if !hasManaged && !hasFargate && !hasSelf {
 			// ZOMBIE IDENTIFIED
 			node.IsWaste = true
-			node.RiskScore = 90 // High confidence, pure waste
+			node.RiskScore = 90    // High confidence, pure waste
 			node.Cost = 0.10 * 730 // ~$73.00/month
-			
+
 			reason := "Zombie Control Plane: Active EKS cluster with zero compute nodes for > 7 days."
 
 			// 5. Orphaned ELB Check
 			clusterName := ""
-            // Extract cluster name from ARN: arn:aws:eks:region:account:cluster/ClusterName
+			// Extract cluster name from ARN: arn:aws:eks:region:account:cluster/ClusterName
 			parts := strings.Split(node.ID, "/")
 			if len(parts) > 0 {
 				clusterName = parts[len(parts)-1]
@@ -89,14 +89,14 @@ func (h *ZombieEKSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 
 				if len(orphanedELBs) > 0 {
 					reason += fmt.Sprintf("\nDeleting this cluster will leave %d Orphaned ELBs behind. Here is the CLI command to delete them too:\n", len(orphanedELBs))
-					
-                    // Construct CLI command
+
+					// Construct CLI command
 					// aws elbv2 delete-load-balancer --load-balancer-arn <ARN>
-                    cmdLines := []string{}
-                    for _, arn := range orphanedELBs {
-                        cmdLines = append(cmdLines, fmt.Sprintf("aws elbv2 delete-load-balancer --load-balancer-arn %s", arn))
-                    }
-                    reason += strings.Join(cmdLines, "\n")
+					cmdLines := []string{}
+					for _, arn := range orphanedELBs {
+						cmdLines = append(cmdLines, fmt.Sprintf("aws elbv2 delete-load-balancer --load-balancer-arn %s", arn))
+					}
+					reason += strings.Join(cmdLines, "\n")
 				}
 			}
 

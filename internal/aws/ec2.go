@@ -124,7 +124,7 @@ func (s *EC2Scanner) ScanNatGateways(ctx context.Context) error {
 		for _, ngw := range page.NatGateways {
 			id := *ngw.NatGatewayId
 			arn := fmt.Sprintf("arn:aws:ec2:region:account:natgateway/%s", id)
-			
+
 			props := map[string]interface{}{
 				"State": string(ngw.State),
 				"Tags":  parseTags(ngw.Tags),
@@ -145,7 +145,7 @@ func (s *EC2Scanner) ScanAddresses(ctx context.Context) error {
 	for _, addr := range result.Addresses {
 		id := *addr.AllocationId
 		arn := fmt.Sprintf("arn:aws:ec2:region:account:eip/%s", id)
-		
+
 		props := map[string]interface{}{
 			"PublicIp": *addr.PublicIp,
 			"Tags":     parseTags(addr.Tags),
@@ -179,7 +179,7 @@ func (s *EC2Scanner) ScanSnapshots(ctx context.Context, ownerID string) error {
 		for _, snap := range page.Snapshots {
 			id := *snap.SnapshotId
 			arn := fmt.Sprintf("arn:aws:ec2:region:account:snapshot/%s", id)
-			
+
 			props := map[string]interface{}{
 				"State":       string(snap.State),
 				"VolumeSize":  *snap.VolumeSize,

@@ -32,7 +32,7 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		desc, _ := node.Properties["Description"].(string)
-		
+
 		// "Created by CreateImage(...) for ami-12345678"
 		// If description says it was created for an AMI, but that AMI is not in our graph...
 		// It means the AMI is deregistered (or we failed to scan it, but assuming full scan).
@@ -56,7 +56,7 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				node.IsWaste = true
 				node.RiskScore = 60
 				node.Properties["Reason"] = "Fossil Snapshot: Created by an AMI which no longer exists."
-				
+
 				// Estimate Cost ($0.05/GB standard-ish)
 				if size, ok := node.Properties["VolumeSize"].(int32); ok {
 					node.Cost = float64(size) * 0.05

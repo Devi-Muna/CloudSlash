@@ -62,7 +62,7 @@ func GenerateCSV(g *graph.Graph, path string) error {
 // GenerateJSON writes certain waste items to a JSON file.
 func GenerateJSON(g *graph.Graph, path string) error {
 	items := extractItems(g)
-	
+
 	data, err := json.MarshalIndent(items, "", "  ")
 	if err != nil {
 		return err

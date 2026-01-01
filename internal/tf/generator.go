@@ -165,7 +165,7 @@ func (g *Generator) GenerateFixScript(path string) error {
 		// Try to find exact Terraform Address from State
 		// First try ID, then try extracting resource ID
 		resourceName := ""
-		
+
 		if addr, ok := stateMap[id]; ok {
 			resourceName = addr
 		} else {
