@@ -36,10 +36,7 @@ setup_env.sh
 *.log
 npm-debug.log*
 
-
 # Local Dev Junk (Do Not Commit)
 cloudslash_local
 go/
 *.tar.gz
-
-
