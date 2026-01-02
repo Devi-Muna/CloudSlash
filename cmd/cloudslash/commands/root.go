@@ -64,6 +64,11 @@ func init() {
 	})
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// Support Environment Variable for License Key (CI/CD Safety)
+		if config.LicenseKey == "" {
+			config.LicenseKey = os.Getenv("CLOUDSLASH_LICENSE")
+		}
+
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
 		}

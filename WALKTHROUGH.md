@@ -10,6 +10,23 @@ Ensure the following are configured before execution:
 - **IAM Permissions:** The `ViewOnlyAccess` managed policy is sufficient for analysis.
 - **Terraform CLI:** (Optional) Required locally (v0.12+) only if generating state remediation scripts.
 
+## 1.1 License Activation (Pro)
+
+To unlock Pro features (Headless Mode, Fix Scripts, Reports), provide your license key via flag or environment variable:
+
+**Option A: Flag (One-off)**
+
+```bash
+cloudslash scan --license "YOUR_KEY_HERE"
+```
+
+**Option B: Environment Variable (Recommended for CI/CD)**
+
+```bash
+export CLOUDSLASH_LICENSE="YOUR_KEY_HERE"
+cloudslash scan --headless
+```
+
 ## 2. Scan Modes
 
 Select the execution mode based on your environment.
