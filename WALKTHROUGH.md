@@ -133,6 +133,33 @@ Detailed logic for specific high-value checks.
 
 ---
 
+# 7. Command & Control Reference
+
+A complete cheatsheet of all available CLI commands and TUI controls.
+
+## CLI Commands
+
+| Command                        | Description                                                                                                                                         |
+| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cloudslash`                   | **Interactive Mode**. Launches the TUI dashboard. Default entry point.                                                                              |
+| `cloudslash scan`              | **Headless Mode**. Runs analysis and outputs text logs. Ideal for CI/CD or scripting.                                                               |
+| `cloudslash scan --no-metrics` | **Metadata-Only**. Skips CloudWatch APIs for a faster, free scan (less accurate).                                                                   |
+| `cloudslash nuke`              | **[DANGER] Destructive Mode**. Interactively reviews and _permanently deletes_ resources via AWS API. Bypasses Terraform. Use with extreme caution. |
+| `cloudslash export`            | **Export Data**. Runs a scan and forces generation of CSV/JSON/HTML reports (Pro).                                                                  |
+| `cloudslash update`            | **Self-Update**. Checks GitHub for the latest release and auto-updates the binary.                                                                  |
+
+## TUI Controls (Interactive Dashboard)
+
+|        Key        | Action                | Context                                                           |
+| :---------------: | :-------------------- | :---------------------------------------------------------------- |
+|     `↑` / `k`     | **Move Up**           | Navigation                                                        |
+|     `↓` / `j`     | **Move Down**         | Navigation                                                        |
+| `Enter` / `Space` | **View Details**      | Expands the selected resource to show Cost, Region, and Tags.     |
+|        `i`        | **Ignore (Suppress)** | Adds the resource ID to `.ignore.yaml`. Hidden from future scans. |
+|  `q` / `Ctrl+C`   | **Quit**              | Exits the application.                                            |
+
+---
+
 # Appendix: Heuristics Catalog
 
 A reference guide to the detection engines available in v1.3.0.
