@@ -17,6 +17,10 @@ type MockEC2Client struct {
 	// Add other mock functions if needed
 }
 
+func (m *MockEC2Client) DescribeVolumesModifications(ctx context.Context, params *ec2.DescribeVolumesModificationsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesModificationsOutput, error) {
+	return &ec2.DescribeVolumesModificationsOutput{}, nil
+}
+
 func (m *MockEC2Client) DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error) {
 	if m.DescribeVolumesFunc != nil {
 		return m.DescribeVolumesFunc(ctx, params, optFns...)

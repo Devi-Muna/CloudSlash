@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DrSkyle/cloudslash/internal/aws"
 	"github.com/DrSkyle/cloudslash/internal/forensics"
@@ -50,6 +51,10 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 		}
 	}
 
+	if cfg.Headless && isTrial && !cfg.MockMode {
+		return false, nil, fmt.Errorf("headless Mode (CI/CD Automation) is a CloudSlash Pro feature.\nPlease use the interactive mode ('cloudslash') or upgrade to Enterprise.")
+	}
+
 	ctx := context.Background()
 	var g *graph.Graph
 	var engine *swarm.Engine
@@ -61,7 +66,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 	var doneChan <-chan struct{}
 
 	if cfg.MockMode {
-		runMockMode(ctx, g, engine, cfg.Headless)
+		runMockMode(ctx, g, engine, cfg.Headless, isTrial)
 	} else {
 		doneChan = runRealMode(ctx, cfg, g, engine, isTrial)
 	}
@@ -82,7 +87,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 	return !isTrial, g, nil
 }
 
-func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, headless bool) {
+func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, headless bool, isTrial bool) {
 	mockScanner := aws.NewMockScanner(g)
 	mockScanner.Scan(ctx)
 
@@ -110,11 +115,25 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 	hEngine2.Run(ctx, g)
 
 	os.Mkdir("cloudslash-out", 0755)
-	if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
-		fmt.Printf("Failed to generate mock dashboard: %v\n", err)
-	}
+
+	// FREE FEATURES (The Evidence Locker)
 	report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
 	report.GenerateJSON(g, "cloudslash-out/waste_report.json")
+
+	// PRO FEATURES
+	if !isTrial {
+		if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
+			fmt.Printf("Failed to generate dashboard: %v\n", err)
+		}
+		
+		// The Scalpel
+		gen := tf.NewGenerator(g, nil)
+		gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
+		os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
+
+		// The Executive Brief
+		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
+	}
 }
 
 func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, isTrial bool) <-chan struct{} {
@@ -277,12 +296,21 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			detective.InvestigateGraph(ctx, g)
 		}
 
+		// OUTPUT GENERATION (Updated Logic)
+		os.Mkdir("cloudslash-out", 0755)
+
+		// 1. Evidence Locker (FREE)
+		report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
+		report.GenerateJSON(g, "cloudslash-out/waste_report.json")
+
+		// 2. Pro Features
 		if !isTrial {
-			os.Mkdir("cloudslash-out", 0755)
 			gen := tf.NewGenerator(g, state)
 			gen.GenerateWasteTF("cloudslash-out/waste.tf")
 			gen.GenerateImportScript("cloudslash-out/import.sh")
 			gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
+			
+			// The Scalpel
 			gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
 			os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
 
@@ -296,9 +324,10 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
 				fmt.Printf("Failed to generate dashboard: %v\n", err)
 			}
+			
+			// The Executive Brief
+			report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
-			report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
-			report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
 			if cfg.SlackWebhook != "" {
 				if err := notifier.SendSlackReport(cfg.SlackWebhook, g); err != nil {

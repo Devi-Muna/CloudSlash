@@ -34,30 +34,28 @@ cloudslash scan
 
 ---
 
-## Key Capabilities (v1.3.0)
+## Key Capabilities (v1.3.0 SSSS+)
 
-CloudSlash goes beyond simple "unused" checks. It analyzes the lifecycle, telemetry, and graph relationships of your infrastructure.
+CloudSlash is an **engineering tool** built for precision forensics.
 
 | Domain                  | Capability               | Detection Logic                                                                                                                     |
 | :---------------------- | :----------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
-| **The State Doctor**    | **Terraform Bridge**     | Maps waste to local Terraform state. Generates `fix_terraform.sh` to surgically remove resources without breaking state files.      |
+| **The State Doctor**    | **The Scalpel** 🔒       | Maps waste to local Terraform state. Generates a SAFE `fix_terraform.sh` with automatic backups to surgically remove zombies.       |
+| **The Evidence Locker** | **Forensic Reporting**   | Generates `waste_report.csv` with full forensic evidence (Risk Score, Owner ARN, Cost, Action) for every single resource.           |
 | **The Network Surgeon** | **Forensics Engine**     | Identifies "Hollow" NAT Gateways (0 active backend hosts) and Safe-Release Elastic IPs (Cross-referenced with Route53 DNS records). |
-| **The Storage Janitor** | **S3 & EBS Hygiene**     | Finds S3 Multipart Upload debris, "Ghost" EBS Snapshots, and legacy `gp2` volumes (recommending `gp3` upgrades).                    |
-| **The App Cleaner**     | **Compute Optimization** | Prunes Lambda versions (safely respecting Aliases) and calculates DynamoDB Provisioned vs. On-Demand breakeven points.              |
-| **The Log Hunter**      | **Telemetry Audit**      | Metric-based detection of abandoned CloudWatch Log Groups (>30 days silence).                                                       |
+| **The Executive Brief** | **Executive Summary** 🔒 | Generates a "Pen Test" style audit report (`executive_summary.md`) for management.                                                  |
 
 ---
 
 ## Why CloudSlash?
 
-Most tools are just billing dashboards. CloudSlash is an **engineering tool**.
+Most tools are just billing dashboards. CloudSlash is a **Forensic Weapon**.
 
 | Feature                     |       CloudSlash        |  Trusted Advisor   | Vantage / CloudHealth |
 | :-------------------------- | :---------------------: | :----------------: | :-------------------: |
-| **Execution Model**         | **Local CLI (Private)** | SaaS (AWS Console) |   SaaS (3rd Party)    |
-| **Terraform Remediation**   |   **✓ Yes (Native)**    |        ✖ No        |         ✖ No          |
+| **The Scalpel (Terraform)** |  **✓ Yes (Surgical)**   |        ✖ No        |         ✖ No          |
 | **DNS "Safety Lock"**       |   **✓ Yes (Route53)**   |        ✖ No        |         ✖ No          |
-| **"Hollow" Resource Logic** |  **✓ Yes (Topology)**   |        ✖ No        |         ✖ No          |
+| **Execution Model**         | **Local CLI (Private)** | SaaS (AWS Console) |   SaaS (3rd Party)    |
 | **Cost**                    |  **Open Core (Free)**   | Enterprise Support |      $$$$/month       |
 
 > **Note:** CloudSlash is the only tool that runs locally and fixes Terraform state directly.
@@ -66,13 +64,15 @@ Most tools are just billing dashboards. CloudSlash is an **engineering tool**.
 
 ## License Model
 
-CloudSlash is dedicated to the philosophy of **Sustainable Open Source**.
-
-- **Community Edition (AGPLv3):** Free for personal use, auditing, and contribution. Full forensic engine included.
-- **Commercial License:** Unlocks `fix_terraform.sh` automation, PDF/CSV Reporting, and Priority Support.
-- **Enterprise:** Indemnification, SLA, and White-labeling rights.
-
-### Social Impact Pledge
+| Feature                              | Community Edition (Free) | Pro / Enterprise |
+| :----------------------------------- | :----------------------: | :--------------: |
+| **Full Forensic Scan**               |            ✅            |        ✅        |
+| **The Evidence Locker (CSV)**        |            ✅            |        ✅        |
+| **Interactive TUI**                  |            ✅            |        ✅        |
+| **The Scalpel (`fix_terraform.sh`)** |            ❌            |        ✅        |
+| **The Executive Brief (`.md`)**      |            ❌            |        ✅        |
+| **Headless Mode (`--headless`)**     |            ❌            |        ✅        |
+| **Support**                          |        Community         |     Priority     |
 
 > **SOCIAL IMPACT PLEDGE**
 > CloudSlash is 100% independent and bootstrapped. We pledge a portion of every Commercial License to support orphanages and animal rescue shelters in developing communities.
@@ -92,6 +92,6 @@ go build -o /usr/local/bin/cloudslash ./cmd/cloudslash
 **Uninstallation:**
 
 ```bash
-rm /usr/local/bin/cloudslash
+sudo rm /usr/local/bin/cloudslash
 rm -rf ~/.cloudslash
 ```

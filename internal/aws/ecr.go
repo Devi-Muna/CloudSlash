@@ -101,7 +101,6 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 	}
 
 	return false, nil
-	return false, nil
 }
 
 // ScanRepositories scans ECR repositories for Lifecycle Policies and Untagged Images.
