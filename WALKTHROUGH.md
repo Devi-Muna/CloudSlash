@@ -1,22 +1,22 @@
-# CloudSlash Operator's Guide (v1.3.0)
+# CloudSlash Guide (v1.3.0)
 
-This is the manual for CloudSlash. It covers how to run the scan, read the output, and fix the problems safely.
+This manual outlines the operational workflows for CloudSlash: executing scans, interpreting the dependency graph, and performing safe remediation of Terraform state.
 
 ## 1. Prerequisites
 
-You need three things to get started:
+Ensure the following are configured before execution:
 
-1.  **AWS Credentials:** Standard `~/.aws/credentials` or `AWS_PROFILE` set in your terminal.
-2.  **Permissions:** A user/role with `ViewOnlyAccess`. We don't need Write access just to look.
-3.  **Terraform CLI:** (Optional) If you want to fix state drift, you need terraform (v0.12+) installed locally.
+- **AWS Credentials:** A valid session via `~/.aws/credentials` or `AWS_PROFILE`.
+- **IAM Permissions:** The `ViewOnlyAccess` managed policy is sufficient for analysis.
+- **Terraform CLI:** (Optional) Required locally (v0.12+) only if generating state remediation scripts.
 
-## 2. Scan Strategy
+## 2. Scan Modes
 
-Pick the mode that fits your current workflow.
+Select the execution mode based on your environment.
 
 ### Standard Scan (Interactive)
 
-This is the default. It launches the Terminal UI (TUI) so you can explore the graph manually.
+The default mode launches a Terminal UI (TUI) for interactive exploration of resource dependencies.
 
 ```bash
 cloudslash scan
@@ -24,143 +24,150 @@ cloudslash scan
 
 ### Headless Mode (CI/CD)
 
-Use this for pipelines (GitHub Actions, Jenkins). It prints no UI, just logs. Returns exit 0 if clean, exit 1 if waste is found.
+Designed for automated pipelines (GitHub Actions, Jenkins). It outputs raw logs and exit codes (Exit 0: Clean, Exit 1: Waste Detected).
 
 ```bash
 cloudslash scan --headless
 ```
 
-### Cost-Save Mode (Fast)
+### Metadata-Only Scan (Fast)
 
-Skips the expensive CloudWatch API calls (metrics). It only checks metadata (tags, status). Much faster, but less "forensic."
+Bypasses CloudWatch metrics API calls to reduce execution time. Checks are limited to metadata (tags, status, configuration) rather than utilization.
 
 ```bash
 cloudslash scan --no-metrics
 ```
 
-## 3. The Forensic Graph (TUI)
+## 3. The Resource Dependency Graph (TUI)
 
-The TUI isn't just a list; it's a **Dependency Tree**. We map the "Waste" to its "Parent" so you can see the blast radius before you delete anything.
+CloudSlash visualizes resources as a **Dependency Tree**. This allows you to evaluate the "blast radius" of a resource before removal by seeing its parent/child relationships.
 
-### The Dashboard
+**Dashboard Overview**
 
-```text
- [ POTENTIAL SAVINGS: $4,250.00 ]
+```plaintext
+ [ ESTIMATED MONTHLY WASTE: $4,250.00 ]
 
  [FAIL] NAT Gateway: nat-0abc123
-  ├─ Cost: $32.40/mo (Fixed)
+  ├─ Cost: $32.40/mo (Fixed Rate)
   ├─ Traffic: 0 Bytes (Last 7 Days)
-  ├─ Connected Subnet: subnet-xyz (3 Instances / All STOPPED)
-  └─ Recommendation: DELETE (Hollow Gateway)
+  ├─ Connected Subnet: subnet-xyz (3 Instances / State: STOPPED)
+  └─ Recommendation: DELETE (Idle Gateway)
 ```
 
-- **The Ticker:** That green number at the top is your monthly burn rate. It updates live.
-- **The Tree:** Notice how `subnet-xyz` is nested under the NAT Gateway? That tells you why we flagged it.
+- **Cost Estimate:** Real-time calculation of potential monthly savings.
+- **Dependency Context:** In the example above, the NAT Gateway is flagged because the instances in its connected subnet are stopped, rendering the gateway redundant.
 
-### Controls
+**Controls**
 
-- **Arrows:** Move up/down.
-- **Enter:** Drill down for details (IDs, ARNs, Tags).
-- **i:** Ignore. Adds the resource to your local allowlist (`.cloudslash/ignore.yaml`).
-- **q:** Quit.
+- **Navigation:** Arrow Keys (Up/Down)
+- **Drill Down:** Enter (View IDs, ARNs, Tags)
+- **Suppress:** `i` (Adds resource to local `.cloudslash/ignore.yaml`)
+- **Exit:** `q`
 
-## 4. The Terraform Bridge
+## 4. Terraform State Reconciliation
 
-This is the v1.3.0 killer feature. We map the "Zombie" AWS resources back to your local Terraform state.
+CloudSlash maps identified AWS resources back to your local Terraform state to facilitate cleanup.
 
-**Safety First:** We do **not** touch your `.tfstate` file directly. That’s dangerous. Instead, we run `terraform show -json` to get a clean, safe readout of what Terraform thinks exists.
+> **Safety Mechanism:** CloudSlash never modifies `.tfstate` files directly. It utilizes `terraform show -json` to safely inspect the current state.
 
-### The Fix Workflow
+**Remediation Workflow**
 
-1.  **Go to your project root:** `cd /path/to/my-infra`
-2.  **Run the scan:** `cloudslash scan`
-3.  **Check the output:** Look in the `cloudslash-out/` folder.
+1. **Navigate to Project Root:**
 
-If we find drift, we generate a script called `fix_terraform.sh`.
+   ```bash
+   cd /path/to/my-infra
+   ```
 
-```bash
-# 1. Review the script (Always review auto-generated code)
-cat cloudslash-out/fix_terraform.sh
+2. **Execute Scan:**
 
-# 2. Run the surgery
-# This runs 'terraform state rm' commands for you
-./cloudslash-out/fix_terraform.sh
+   ```bash
+   cloudslash scan
+   ```
 
-# 3. Verify
-terraform plan
-```
+3. **Review Output:** If drift is detected, a script is generated in the `cloudslash-out/` directory.
 
-## 5. Specific Forensics
+   ```bash
+   # 1. Audit the generated script
+   cat cloudslash-out/fix_terraform.sh
 
-Here is the logic regarding why we flag certain things.
+   # 2. Execute Remediation
+   # This executes 'terraform state rm' for identified resources
+   ./cloudslash-out/fix_terraform.sh
 
-### The Network Surgeon
+   # 3. Verify Consistency
+   terraform plan
+   ```
 
-**1. The "Hollow" NAT Gateway**
+## 5. Detection Logic & Heuristics
 
-A NAT Gateway costs ~$32/month just to exist.
+Detailed logic for specific high-value checks.
 
-- **Our Logic:** If traffic < 1GB OR the subnets behind it are empty/stopped, it's a zombie. You are paying for a door that nobody is walking through.
+### Network Optimization
 
-**2. The "Safe-Release" EIP**
+**1. Idle NAT Gateways**
 
-- **The Risk:** If you release an Elastic IP (EIP) back to AWS, but your DNS (Route53) still points `api.company.com` to it, a hacker can claim that IP and hijack your traffic.
-- **Our Check:** We cross-reference Route53. If the IP is in a Record Set, we mark it **[DANGER]**. Do not release until you fix DNS.
+- **Cost Impact:** ~$32/month base cost + data processing fees.
+- **Logic:** Flagged if traffic < 1GB (30d) OR if all backend instances in connected subnets are in a terminated/stopped state.
 
-### The Storage Janitor
+**2. Elastic IP DNS Safety Check**
 
-**1. S3 Multipart Debris**
+- **Risk:** "Subdomain Takeover." If an EIP is released to AWS but remains in your Route53 DNS records, a third party could claim the IP and serve traffic on your domain.
+- **Logic:** Cross-references EIPs against Route53 A-records. If a match is found, the EIP is marked **[DANGER]**. DNS records must be updated before release.
 
-- **The Trap:** When a huge upload fails, S3 keeps the chunks "just in case" you want to resume. These chunks cost money but are invisible in the file browser.
-- **The Fix:** We query the low-level API to find these ghosts.
+### Storage Hygiene
 
-**2. EBS Modernization (gp2 -> gp3)**
+**1. Incomplete S3 Multipart Uploads**
 
-- **The Math:** `gp2` is legacy. `gp3` is strictly better.
-- **The Upsell:** Switching saves 20% on storage costs AND unlinks IOPS from size. We calculate the exact savings and performance boost for you.
+- **Issue:** Failed large file uploads leave hidden data chunks in S3 that incur storage costs but do not appear in standard file listings.
+- **Detection:** Queries the `ListMultipartUploads` API for incomplete segments older than 7 days.
+
+**2. EBS Volume Optimization (gp2 vs gp3)**
+
+- **Benefit:** gp3 volumes offer a 20% lower cost per GB and decouple IOPS from storage size compared to gp2.
+- **Logic:** Identifies gp2 volumes and calculates the specific cost savings and IOPS performance gain of migrating to gp3.
 
 ## 6. Troubleshooting
 
-- **"Permission Denied" errors?** You are likely missing `ce:GetCostAndUsage`. Ensure your IAM user has the `ViewOnlyAccess` managed policy.
-- **"Terraform State Not Found"?** You need to be in the folder that has the `.tfstate` (or the `.terraform` folder). If you use remote state (S3 backend), make sure you have run `terraform init` recently so your local cache is fresh.
+- **"Permission Denied" errors:** Ensure your IAM user possesses the `ce:GetCostAndUsage` permission in addition to `ViewOnlyAccess`.
+- **"Terraform State Not Found":** Ensure you are executing the CLI from the directory containing `.tfstate` (or the `.terraform` directory). For remote backends (S3), run `terraform init` to refresh the local cache.
 
 ---
 
-## Appendix: Heuristics Catalog (The Encyclopedia)
+# Appendix: Heuristics Catalog
 
-Reference guide to all 7 Forensic Engines in CloudSlash v1.3.0.
+A reference guide to the detection engines available in v1.3.0.
 
 ### 1. Compute & Serverless
 
-| Detection                | Condition                                                                         | Status   |
-| :----------------------- | :-------------------------------------------------------------------------------- | :------- |
-| **Lambda Code Rot**      | Invocations (90d) == 0 **AND** Last Modified > 90d                                | `[FAIL]` |
-| **Lambda Version Bloat** | >5 Versions exist that are NOT `$LATEST` or Aliased.                              | `[WARN]` |
-| **ECS Idle Cluster**     | Cluster has EC2 Instances (>1h uptime) but **0 Tasks** running.                   | `[FAIL]` |
-| **ECS Crash Loop**       | Service Desired Count > 0 but Running Count == 0. (Checks for OOM/Image Missing). | `[FAIL]` |
+| Detection                  | Condition                                                                      | Severity |
+| :------------------------- | :----------------------------------------------------------------------------- | :------- |
+| **Lambda Code Stagnation** | 0 Invocations (90d) AND Last Modified > 90d                                    | [FAIL]   |
+| **Lambda Version Bloat**   | >5 Versions exist (excluding $LATEST or Aliased versions)                      | [WARN]   |
+| **ECS Idle Cluster**       | Cluster contains active EC2 Instances (>1h uptime) but 0 Tasks running         | [FAIL]   |
+| **ECS Crash Loop**         | Service Desired Count > 0 but Running Count == 0 (Checks for OOM/Image errors) | [FAIL]   |
 
 ### 2. Data & Storage
 
-| Detection                     | Condition                                                                  | Status   |
-| :---------------------------- | :------------------------------------------------------------------------- | :------- |
-| **Redshift Pause**            | 0 Queries in last 24h.                                                     | `[WARN]` |
-| **Ghost Cache (ElastiCache)** | 0 Hits/Misses (7d) **AND** CPU < 2% **AND** Network < 5MB/week.            | `[FAIL]` |
-| **DynamoDB Bleed**            | Provisioned Mode with utilization < 15%. Recommends On-Demand switch.      | `[WARN]` |
-| **EBS Legacy**                | Volume Type is `gp2`. Recommends `gp3` (20% Cheaper + 3000 IOPS baseline). | `[WARN]` |
-| **S3 Multipart**              | Incomplete Upload parts > 7 days old.                                      | `[WARN]` |
+| Detection                      | Condition                                                      | Severity |
+| :----------------------------- | :------------------------------------------------------------- | :------- |
+| **Redshift Inactivity**        | 0 Queries executed in last 24h                                 | [WARN]   |
+| **ElastiCache Idle**           | 0 Hits/Misses (7d) AND CPU < 2% AND Network < 5MB/week         | [FAIL]   |
+| **DynamoDB Over-provisioning** | Provisioned Mode with utilization < 15% (Recommends On-Demand) | [WARN]   |
+| **EBS Legacy Type**            | Volume Type is `gp2` (Recommends `gp3` upgrade)                | [WARN]   |
+| **S3 Multipart Abandonment**   | Incomplete Upload parts > 7 days old                           | [WARN]   |
 
 ### 3. Network & Infrastructure
 
-| Detection                | Condition                                                              | Status   |
-| :----------------------- | :--------------------------------------------------------------------- | :------- |
-| **Hollow NAT**           | Traffic < 1GB (30d) **OR** Connected Subnets have 0 Running Instances. | `[FAIL]` |
-| **Zombie EIP**           | Unattached EIP. Checks Route53 for DNS hazards before flagging Safe.   | `[FAIL]` |
-| **Orphan Load Balancer** | ELB exists but target instances/targets don't exist.                   | `[FAIL]` |
+| Detection                  | Condition                                                         | Severity |
+| :------------------------- | :---------------------------------------------------------------- | :------- |
+| **Idle NAT Gateway**       | Traffic < 1GB (30d) OR Connected Subnets have 0 Running Instances | [FAIL]   |
+| **Dangling EIP**           | Unattached EIP. (Includes Route53 cross-reference check)          | [FAIL]   |
+| **Orphaned Load Balancer** | ELB exists but has no registered targets/instances                | [FAIL]   |
 
-### 4. Containers & Ops
+### 4. Containers & Operations
 
-| Detection               | Condition                                                                  | Status   |
-| :---------------------- | :------------------------------------------------------------------------- | :------- |
-| **ECR Digital Janitor** | Repo has **No Lifecycle Policy** AND Images are Untagged + Unpulled > 90d. | `[WARN]` |
-| **Log Hoarder**         | Retention = "Never" AND Size > 1GB.                                        | `[WARN]` |
-| **Abandoned Log**       | Stored Bytes > 0 BUT Incoming Bytes == 0 (30d).                            | `[FAIL]` |
+| Detection                 | Condition                                                             | Severity |
+| :------------------------ | :-------------------------------------------------------------------- | :------- |
+| **ECR Lifecycle Missing** | Repo has No Lifecycle Policy AND Images are Untagged + Unpulled > 90d | [WARN]   |
+| **Log Retention Missing** | Retention = "Never" AND Group Size > 1GB                              | [WARN]   |
+| **Abandoned Log Group**   | Stored Bytes > 0 BUT Incoming Bytes == 0 (30d)                        | [FAIL]   |
