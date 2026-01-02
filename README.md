@@ -26,6 +26,8 @@ irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 |
 cloudslash scan
 ```
 
+> **Detailed Guide:** Check out the [Operator's Guide](WALKTHROUGH.md) for advanced usage, heuristics, and troubleshooting.
+
 ## Key Capabilities (v1.3.0+)
 
 **Terraform State Remediation**
