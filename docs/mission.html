@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
+    <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Human Mission | CloudSlash</title>
@@ -9,53 +9,9 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        /* Peeking Cat Animation */
-        .peeking-cat {
-            position: fixed;
-            bottom: -50px; /* Start hidden */
-            right: 40px;
-            width: 120px;
-            height: auto;
-            z-index: 100;
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            animation: peek 10s infinite;
-            cursor: pointer;
-        }
-
-        .peeking-cat:hover {
-            transform: translateY(-40px) scale(1.1); /* Pop up on hover */
-        }
-
-        @keyframes peek {
-            0%, 90% { transform: translateY(0); }
-            92% { transform: translateY(-30px); } /* Peek up */
-            94% { transform: translateY(-30px) rotate(5deg); } /* Tilt head */
-            96% { transform: translateY(-30px) rotate(-5deg); }
-            98% { transform: translateY(-30px); }
-            100% { transform: translateY(0); }
-        }
-
-        /* Eye movement (simple CSS blink for now) */
-        .cat-eye {
-            animation: blink 4s infinite;
-            transform-origin: center;
-        }
-        @keyframes blink {
-            0%, 48%, 52%, 100% { transform: scaleY(1); }
-            50% { transform: scaleY(0.1); }
-        }
-
-        /* Indie Card Polish */
-        .indie-card {
-            background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .pro-card {
-            background: linear-gradient(145deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.02) 100%);
-            border: 1px solid #22C55E;
-            box-shadow: 0 0 40px rgba(34, 197, 94, 0.1);
-        }
+        .balloon { pointer-events: none; }
     </style>
 </head>
 
@@ -87,21 +43,34 @@
     </header>
 
     <main>
-        <section class="hero" style="min-height: 50vh; align-items: center; padding-top: 100px;">
+        <section class="hero" style="min-height: 60vh; align-items: center; padding-top: 100px;">
             <div class="container hero-content" style="text-align: center; justify-content: center; flex-direction: column;">
-                <h1 style="font-size: 3.5rem; letter-spacing: -0.05em; margin-bottom: 20px;">
+                
+                <!-- Genki Cat Container -->
+                <div style="position: relative; margin-bottom: 30px;">
+                    <div id="cat-bubble" style="background: white; color: black; padding: 10px 20px; border-radius: 20px; position: absolute; top: 0; right: -40px; font-weight: bold; opacity: 0; transition: opacity 0.3s; font-size: 0.9rem; pointer-events: none;">Meow?</div>
+                    <img id="genki-cat-img" src="assets/genki/cat-state-1.gif" alt="Genki Cat" style="width: 120px; height: auto;">
+                </div>
+
+                <h1 style="font-size: 3rem; letter-spacing: -0.05em; margin-bottom: 20px;">
                     Software for Humans.
                 </h1>
-                <p class="subtitle" style="max-width: 600px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #94A3B8; font-weight: 400; font-size: 1.1rem;">
-                    We build professional-grade tools. We charge fair prices. We donate surplus revenue to independent animal sanctuaries. No VC. No Bullshit.
+                <p class="subtitle" style="max-width: 600px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #94A3B8; font-weight: 400; font-size: 1.1rem; margin-bottom: 30px;">
+                    Will you support independent open-source development?
                 </p>
+
+                <div class="genki-controls" style="display: flex; gap: 20px; justify-content: center;">
+                    <button id="btn-cat-yes" class="btn-primary" style="background: #00FF99; color: black; border: none; padding: 12px 30px; font-weight: bold; font-family: 'Inter'; cursor: pointer;">Yes, Donate!</button>
+                    <button id="btn-cat-no" style="background: transparent; border: 1px solid #475569; color: #94A3B8; padding: 12px 30px; font-weight: bold; font-family: 'Inter'; cursor: pointer; border-radius: 8px;">No, not today.</button>
+                </div>
+
             </div>
         </section>
 
         <!-- No Nonsense Pricing -->
         <section id="support" style="padding: 40px 0 100px 0;">
             <div class="container">
-                <div class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto;">
+                <div id="pricing-cards" class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto;">
                     
                     <!-- Indie / Human Card -->
                     <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; overflow: hidden;">
