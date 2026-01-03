@@ -47,6 +47,9 @@ func (g *Generator) GenerateWasteTF(path string) error {
 		// For "Reverse Terraform", we ideally want to reconstruct the config.
 		// For now, we'll write minimal config or comments.
 		fmt.Fprintf(f, "  # Imported by CloudSlash (Risk Score: %d)\n", node.RiskScore)
+		if isGP2, _ := node.Properties["IsGP2"].(bool); isGP2 {
+			fmt.Fprintf(f, "  type = \"gp3\"\n")
+		}
 		if reason, ok := node.Properties["Reason"].(string); ok {
 			fmt.Fprintf(f, "  # Reason: %s\n", reason)
 		}
@@ -196,6 +199,11 @@ echo -e "${CYAN}[3/3] Removing Zombies...${NC}"
 
 	for id, node := range g.Graph.Nodes {
 		if !node.IsWaste {
+			continue
+		}
+
+		// Skip logical upgrades (handled by waste.tf -> terraform plan)
+		if isGP2, _ := node.Properties["IsGP2"].(bool); isGP2 {
 			continue
 		}
 

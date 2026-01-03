@@ -1,5 +1,7 @@
 # CloudSlash
 
+![Version](https://img.shields.io/badge/version-v1.3.1-blue)
+
 **AWS Resource Reclamation & Terraform State Reconciliation**
 
 CloudSlash correlates CloudWatch metrics with resource topology to identify idle infrastructure that standard "Status" checks miss. It bridges the gap between the actual AWS environment and your local Terraform state.
@@ -68,7 +70,9 @@ CloudSlash is designed for engineering workflows, not finance teams.
 | **Headless Mode (CI/CD integration)**           |            ❌            |        ✅        |
 | **Priority Support**                            |            ❌            |        ✅        |
 
-> **Note:** CloudSlash is bootstrapped. A portion of commercial license revenue is donated to orphanages and animal rescue shelters in developing communities.
+> **Mission:** CloudSlash is bootstrapped. A portion of commercial license revenue is donated to orphanages and animal rescue shelters in developing communities.
+>
+> [**Support Our Mission & Upgrade**](https://checkout.freemius.com/app/22411/plan/37513/) | [**Follow Impact Updates**](https://x.com/dr__skyle)
 
 ## Build from Source
 
@@ -86,3 +90,5 @@ go build -o /usr/local/bin/cloudslash ./cmd/cloudslash
 sudo rm /usr/local/bin/cloudslash
 rm -rf ~/.cloudslash
 ```
+
+Made with love ❤️ by DrSkyle

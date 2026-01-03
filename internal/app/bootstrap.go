@@ -26,6 +26,7 @@ import (
 
 type Config struct {
 	LicenseKey       string
+	MachineID        string // New Field
 	Region           string
 	TFStatePath      string
 	MockMode         bool
@@ -44,7 +45,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 		}
 		isTrial = true
 	} else {
-		if err := license.Check(cfg.LicenseKey); err != nil {
+		if err := license.Check(cfg.LicenseKey, cfg.MachineID); err != nil {
 			fmt.Printf("License check failed: %v\n", err)
 			fmt.Println("Falling back to Community Edition.")
 			isTrial = true
@@ -105,6 +106,7 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 	// v1.3.0
 	heuristicEngine.Register(&heuristics.NetworkForensicsHeuristic{})
 	heuristicEngine.Register(&heuristics.StorageOptimizationHeuristic{})
+    heuristicEngine.Register(&heuristics.EBSModernizerHeuristic{})
 	
 	if err := heuristicEngine.Run(ctx, g); err != nil {
 		fmt.Printf("Heuristic run failed: %v\n", err)
@@ -263,6 +265,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		hEngine.Register(&heuristics.LambdaHeuristic{})
 		hEngine.Register(&heuristics.NetworkForensicsHeuristic{})
 		hEngine.Register(&heuristics.StorageOptimizationHeuristic{})
+        hEngine.Register(&heuristics.EBSModernizerHeuristic{})
 		hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
 		hEngine.Register(&heuristics.IdleClusterHeuristic{})
 		hEngine.Register(&heuristics.EmptyServiceHeuristic{ECR: ecrScanner, ECS: ecsScanner})

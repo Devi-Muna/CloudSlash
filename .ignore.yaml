@@ -5,3 +5,5 @@ ignored:
 - arn:aws:s3:::multipart/mock-bucket-iceberg/upload-1
 - arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345
 - arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild
+- arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890
+- arn:aws:rds:us-east-1:123456789012:db:legacy-postgres

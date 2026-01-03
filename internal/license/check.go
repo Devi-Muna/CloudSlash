@@ -14,6 +14,7 @@ const LicenseServerURL = "https://cloudslash-license-server.nexus-apis.workers.d
 
 type VerifyRequest struct {
 	LicenseKey string `json:"licenseKey"`
+	MachineID  string `json:"machineId"` // New field
 }
 
 type VerifyResponse struct {
@@ -24,9 +25,12 @@ type VerifyResponse struct {
 }
 
 // Check validates the license key by calling the Cloudflare Worker (Freemius Proxy).
-func Check(key string) error {
+func Check(key string, machineID string) error {
 	// 1. Prepare Request
-	reqBody, err := json.Marshal(VerifyRequest{LicenseKey: key})
+	reqBody, err := json.Marshal(VerifyRequest{
+		LicenseKey: key,
+		MachineID:  machineID,
+	})
 	if err != nil {
 		return fmt.Errorf("internal error: %v", err)
 	}

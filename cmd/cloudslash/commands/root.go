@@ -3,9 +3,14 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"math/rand"
+	"time"
+
 	"github.com/DrSkyle/cloudslash/internal/app"
+	"github.com/DrSkyle/cloudslash/internal/license"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -64,10 +69,63 @@ func init() {
 	})
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Support Environment Variable for License Key (CI/CD Safety)
+		// 1. Env Var Override
 		if config.LicenseKey == "" {
 			config.LicenseKey = os.Getenv("CLOUDSLASH_LICENSE")
 		}
+
+        // 2. Machine ID Generation (Persistent Identity)
+        machineID := viper.GetString("machine_id")
+        // fmt.Printf("DEBUG: Current Machine ID in Viper: '%s'\n", machineID)
+        
+        if machineID == "" {
+            // Generate simple random hex ID (16 chars)
+            b := make([]byte, 8)
+            rand.Seed(time.Now().UnixNano())
+            rand.Read(b)
+            machineID = fmt.Sprintf("%x", b)
+            
+            // fmt.Printf("DEBUG: Generated New ID: %s. Saving...\n", machineID)
+
+            viper.Set("machine_id", machineID)
+            if err := viper.WriteConfig(); err != nil {
+                // fmt.Printf("DEBUG: WriteConfig failed: %v. Trying SafeWrite...\n", err)
+                safeWriteConfig()
+            } else {
+                // fmt.Println("DEBUG: WriteConfig Success.")
+            }
+        }
+        config.MachineID = machineID
+
+		// 3. Logic: If user provided a key (Flag or Env), try to SAVE it.
+		//    If not, try to LOAD it.
+		savedLicense := viper.GetString("license")
+
+		if config.LicenseKey != "" {
+			// User is providing a key based on input.
+			// Only save if it's different or we just want to ensure it's saved.
+			// Check validity first to avoid saving garbage.
+			if err := license.Check(config.LicenseKey, machineID); err == nil {
+                // It is valid. Persist it.
+				viper.Set("license", config.LicenseKey)
+                // Use safe write
+                if err := viper.WriteConfig(); err != nil {
+                     // If file doesn't exist, Create it
+                     safeWriteConfig()
+                }
+                // Feedback only if it was a manual flag input (contextual guess)
+                if cmd.Flags().Changed("license") {
+                    fmt.Println("✅ License Verified & Saved to ~/.cloudslash.yaml")
+                }
+			} else {
+                 // Warn but don't stop? Or stop? 
+                 // If the user explicitly provided a flag, we should probably warn if it's invalid.
+                 // But let's leave the strict check to the actual feature usage points to avoid breaking help/completion.
+            }
+		} else {
+            // No input provided, load from disk
+            config.LicenseKey = savedLicense
+        }
 
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
@@ -91,8 +149,8 @@ func initConfig() {
 	} else {
 		home, err := os.UserHomeDir()
 		if err == nil {
-			viper.AddConfigPath(home)
-			viper.SetConfigName(".cloudslash")
+			viper.SetConfigFile(filepath.Join(home, ".cloudslash.yaml"))
+			viper.SetConfigType("yaml")
 		}
 	}
 	viper.AutomaticEnv()
@@ -140,4 +198,32 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 	fmt.Println(flagStyle.Render("  • Crash Loop Detector: Identifies broken services & missing images"))
 	fmt.Println(flagStyle.Render("  • Interactive Mode:    Region selection & Deep Links in output"))
 	fmt.Println("")
+}
+
+func safeWriteConfig() {
+    // 1. Try SafeWrite (creates if creates if missing, fails if exists)
+	if err := viper.SafeWriteConfig(); err != nil {
+        // 2. If already exists, try Overwrite
+		if err2 := viper.WriteConfig(); err2 != nil {
+            // 3. Fallback: Force create file at explicit path
+            path := viper.ConfigFileUsed()
+            if path != "" {
+                 f, createErr := os.Create(path)
+                 if createErr == nil {
+                     f.Close()
+                     viper.WriteConfig()
+                 } else {
+                     fmt.Printf("Error creating config file: %v\n", createErr)
+                 }
+            } else {
+                // If path is empty, try manual home construction
+                 home, _ := os.UserHomeDir()
+                 path = filepath.Join(home, ".cloudslash.yaml")
+                 f, _ := os.Create(path)
+                 f.Close()
+                 viper.SetConfigFile(path)
+                 viper.WriteConfig()
+            }
+        }
+	}
 }
