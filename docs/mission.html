@@ -4,14 +4,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-site-verification" content="cE4g3_aZ9YvRm0_LQtr56jRWuyGS1PzEJw1jICXLTYg" />
-    <title>Mission Log | CloudSlash</title>
+    <title>Human Mission | CloudSlash</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Peeking Cat Animation */
+        .peeking-cat {
+            position: fixed;
+            bottom: -50px; /* Start hidden */
+            right: 40px;
+            width: 120px;
+            height: auto;
+            z-index: 100;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: peek 10s infinite;
+            cursor: pointer;
+        }
+
+        .peeking-cat:hover {
+            transform: translateY(-40px) scale(1.1); /* Pop up on hover */
+        }
+
+        @keyframes peek {
+            0%, 90% { transform: translateY(0); }
+            92% { transform: translateY(-30px); } /* Peek up */
+            94% { transform: translateY(-30px) rotate(5deg); } /* Tilt head */
+            96% { transform: translateY(-30px) rotate(-5deg); }
+            98% { transform: translateY(-30px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Eye movement (simple CSS blink for now) */
+        .cat-eye {
+            animation: blink 4s infinite;
+            transform-origin: center;
+        }
+        @keyframes blink {
+            0%, 48%, 52%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.1); }
+        }
+
+        /* Indie Card Polish */
+        .indie-card {
+            background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .pro-card {
+            background: linear-gradient(145deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.02) 100%);
+            border: 1px solid #22C55E;
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.1);
+        }
+    </style>
 </head>
 
 <body>
@@ -42,83 +87,73 @@
     </header>
 
     <main>
-        <section class="hero" style="min-height: 40vh; align-items: center; padding-top: 120px;">
+        <section class="hero" style="min-height: 50vh; align-items: center; padding-top: 100px;">
             <div class="container hero-content" style="text-align: center; justify-content: center; flex-direction: column;">
-                <h1 style="font-size: 3.5rem; letter-spacing: -0.05em; margin-bottom: 20px;">More Than Code.</h1>
-                <p class="subtitle" style="max-width: 600px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #94A3B8; font-weight: 400;">
-                    CloudSlash is a "Robin Hood" project. It exists to redistribute efficiency from cloud giants to real-world needs.
+                <h1 style="font-size: 3.5rem; letter-spacing: -0.05em; margin-bottom: 20px;">
+                    Software for Humans.<br>
+                    <span style="color: #00FF99;">(And Cats).</span>
+                </h1>
+                <p class="subtitle" style="max-width: 600px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #94A3B8; font-weight: 400; font-size: 1.1rem;">
+                    We build professional-grade tools. We charge fair prices. We donate surplus revenue to independent animal sanctuaries. No VC. No Bullshit.
                 </p>
             </div>
         </section>
 
-        <!-- The Warm "Support" Section -->
-        <section id="support" style="padding: 60px 0;">
+        <!-- No Nonsense Pricing -->
+        <section id="support" style="padding: 40px 0 100px 0;">
             <div class="container">
-                <h2 class="section-title" style="margin-bottom: 40px; font-size: 1.5rem;">Support Independent Development</h2>
-                <div class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;">
+                <div class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto;">
                     
-                    <!-- Tier 1 -->
-                    <div class="price-card glass-panel" style="border-top: 4px solid #94A3B8; text-align: center; padding: 30px;">
-                        <h3 style="font-size: 1.2rem; color: #E2E8F0; margin-bottom: 5px;">Indie Backer</h3>
-                        <div class="price" style="font-size: 2rem; margin: 15px 0; font-family: 'JetBrains Mono';">$5<span style="font-size: 1rem; color: #64748B;">/mo</span></div>
-                        <p style="font-size: 0.9rem; color: #94A3B8; margin-bottom: 20px;">Support maintenance, hosting, and operations.</p>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #475569; color: #94A3B8;">Select</a>
-                    </div>
-                    
-                    <!-- Tier 2 -->
-                    <div class="price-card glass-panel" style="border-top: 4px solid #38BDF8; text-align: center; padding: 30px;">
-                        <h3 style="font-size: 1.2rem; color: #38BDF8; margin-bottom: 5px;">Feature Sponsor</h3>
-                        <div class="price" style="font-size: 2rem; margin: 15px 0; font-family: 'JetBrains Mono';">$15<span style="font-size: 1rem; color: #64748B;">/mo</span></div>
-                        <p style="font-size: 0.9rem; color: #94A3B8; margin-bottom: 20px;">Accelerate R&D for Container & Kubernetes heuristics.</p>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #38BDF8; color: #38BDF8;">Select</a>
-                    </div>
-
-                    <!-- Tier 3 -->
-                    <div class="price-card glass-panel" style="border-top: 4px solid #818CF8; text-align: center; padding: 30px;">
-                        <h3 style="font-size: 1.2rem; color: #818CF8; margin-bottom: 5px;">Core Patron</h3>
-                        <div class="price" style="font-size: 2rem; margin: 15px 0; font-family: 'JetBrains Mono';">$30<span style="font-size: 1rem; color: #64748B;">/mo</span></div>
-                        <p style="font-size: 0.9rem; color: #94A3B8; margin-bottom: 20px;">Ensure CloudSlash remains 100% independent and VC-free.</p>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #818CF8; color: #818CF8;">Select</a>
+                    <!-- Indie / Human Card -->
+                    <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; overflow: hidden;">
+                        <div style="position: absolute; top: -20px; right: -20px; font-size: 8rem; opacity: 0.05; transform: rotate(15deg);">🐈</div>
+                        <h3 style="font-size: 1.5rem; color: #E2E8F0; margin-bottom: 10px;">Indie / Human</h3>
+                        <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$49<span style="font-size: 1rem; color: #64748B;">/once</span></div>
+                        <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
+                            If you are a solo dev, student, or just a human using this. <br>
+                            <em>"Buy me a nice dinner."</em>
+                        </p>
+                        <ul class="features-list" style="margin-bottom: 30px;">
+                            <li>✅ Lifetime License</li>
+                            <li>✅ Personal Use</li>
+                            <li>✅ Instant Karma</li>
+                        </ul>
+                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #475569; color: #94A3B8;">Support the Dev</a>
                     </div>
 
-                     <!-- Tier 4 -->
-                    <div class="price-card glass-panel" style="border-top: 4px solid #22C55E; text-align: center; padding: 30px; background: rgba(34, 197, 94, 0.05);">
-                        <div class="badge" style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #22C55E; color: #000; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: bold;">RECOMMENDED</div>
-                        <h3 style="font-size: 1.2rem; color: #22C55E; margin-bottom: 5px;">Commercial Pro</h3>
-                        <div class="price" style="font-size: 2rem; margin: 15px 0; font-family: 'JetBrains Mono';">$299<span style="font-size: 1rem; color: #64748B;">/yr</span></div>
-                        <p style="font-size: 0.9rem; color: #94A3B8; margin-bottom: 20px;">Full Enterprise License. ROI usually < 1 week.</p>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-primary-full">Get License</a>
+                     <!-- Company / Pro Card -->
+                    <div class="price-card glass-panel pro-card" style="padding: 40px; position: relative;">
+                        <!-- Badge -->
+                        <div style="position: absolute; top: 0; right: 0; background: #22C55E; color: #000; font-weight: 800; font-size: 0.75rem; padding: 5px 15px; border-bottom-left-radius: 10px;">BUSINESS</div>
+                        
+                        <h3 style="font-size: 1.5rem; color: #22C55E; margin-bottom: 10px;">Company</h3>
+                        <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$299<span style="font-size: 1rem; color: #64748B;">/yr</span></div>
+                        <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
+                            For teams and consultants. Saves you 100x this amount in a single infrastructure audit.
+                        </p>
+                        <ul class="features-list" style="margin-bottom: 30px;">
+                            <li>✅ <strong>Commercial License</strong></li>
+                            <li>✅ Terraform Fix Scripts</li>
+                            <li>✅ Priority Support</li>
+                        </ul>
+                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-primary-full">Get Commercial License</a>
                     </div>
 
-                </div>
-                <div style="text-align: center; margin-top: 40px; opacity: 0.5; font-size: 0.8rem; color: #64748B;">
-                    * All proceeds fund development. Surplus revenue is donated to animal sanctuaries and orphanages as part of our sustainability pledge.
                 </div>
             </div>
         </section>
 
-        <!-- Impact Log Section -->
+        <!-- Impact Log (Keeping it professional but minimal) -->
         <section id="impact" class="impact-section" style="padding: 50px 0 100px 0; border-top: 1px solid #1E293B;">
             <div class="container">
-                <h2 class="section-title">The Mission Log</h2>
-                <div class="impact-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 40px;">
+                <h2 class="section-title" style="font-size: 1.2rem; opacity: 0.7; margin-bottom: 40px;">THE IMPACT LOG</h2>
+                <div class="impact-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
                     
-                    <!-- Entry 1: The Pledge (Honest Start) -->
                     <div class="impact-card glass-panel" style="padding: 32px; border-left: 4px solid #00FF99;">
-                        <span class="date" style="color: #64748B; font-family: 'JetBrains Mono'; font-size: 0.8rem;">JAN 2026 // GENESIS</span>
-                        <h3 style="margin: 12px 0; font-size: 1.25rem;">Protocol Activated</h3>
+                        <span class="date" style="color: #64748B; font-family: 'JetBrains Mono'; font-size: 0.8rem;">JAN 2026</span>
+                        <h3 style="margin: 12px 0; font-size: 1.25rem; color: #F8FAFC;">Mission Start</h3>
                         <p style="color: #94A3B8; line-height: 1.6;">
-                            CloudSlash v1.3.1 released. We officially pledge a portion of all revenue to support independent animal sanctuaries and student grants. 
-                            <br><br>
-                            <strong>Status:</strong> Waiting for first donor. 🐈
-                        </p>
-                    </div>
-
-                     <div class="impact-card glass-panel" style="padding: 32px; border-left: 4px solid #334155; opacity: 0.5;">
-                        <span class="date" style="color: #64748B; font-family: 'JetBrains Mono'; font-size: 0.8rem;">COMING SOON</span>
-                        <h3 style="margin: 12px 0; font-size: 1.25rem;">Impact Report #001</h3>
-                        <p style="color: #94A3B8; line-height: 1.6;">
-                            Your name could be here. Join the mission to see exactly where your license fee goes.
+                            v1.3.1 Launched. 10% of revenue committed to cat sanctuaries.
                         </p>
                     </div>
 
@@ -127,13 +162,39 @@
         </section>
     </main>
 
+    <!-- THE PEEKING CAT SVG -->
+    <div class="peeking-cat" title="I judge your cloud spend.">
+        <svg viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Ears -->
+            <path d="M10 50 L30 10 L50 50" fill="#1E293B" stroke="#334155" stroke-width="2"/>
+            <path d="M70 50 L90 10 L110 50" fill="#1E293B" stroke="#334155" stroke-width="2"/>
+            
+            <!-- Head -->
+            <circle cx="60" cy="80" r="50" fill="#0F172A" stroke="#334155" stroke-width="2"/>
+            
+            <!-- Eyes -->
+            <ellipse class="cat-eye" cx="45" cy="70" rx="8" ry="12" fill="#00FF99"/>
+            <ellipse class="cat-eye" cx="75" cy="70" rx="8" ry="12" fill="#00FF99"/>
+            <circle class="cat-pupil" cx="45" cy="70" r="3" fill="#000"/>
+            <circle class="cat-pupil" cx="75" cy="70" r="3" fill="#000"/>
+            
+            <!-- Nose -->
+            <path d="M55 85 L65 85 L60 92 Z" fill="#F472B6"/>
+            
+            <!-- Whiskers -->
+            <path d="M20 80 L5 75" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+            <path d="M20 85 L5 85" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+            <path d="M100 80 L115 75" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+            <path d="M100 85 L115 85" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    </div>
+
     <footer>
         <div class="container">
             <p>&copy; 2026 CloudSlash.</p>
             <div class="footer-links" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">
                 <a href="index.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Home</a>
                 <a href="privacy.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Privacy Policy</a>
-                <a href="terms.html" style="color: inherit; text-decoration: none;">Terms of Service</a>
             </div>
         </div>
     </footer>
