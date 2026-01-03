@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="cE4g3_aZ9YvRm0_LQtr56jRWuyGS1PzEJw1jICXLTYg" />
+    <title>Mission Log | CloudSlash</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="glass-overlay"></div>
+    <div class="noise-overlay"></div>
+
+    <header>
+        <div class="container nav-container">
+            <div class="logo">
+                <a href="index.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16 4C10 4 5 8 5 14C5 18 8 21 12 23" stroke="#00FF99" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M26 14C26 8 21 4 16 4" stroke="#00FF99" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M20 23C24 21 27 18 27 14" stroke="#00FF99" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M22 6L10 26" stroke="#00FF99" stroke-width="3" stroke-linecap="round" class="slash-anim"/>
+                    </svg>
+                    <span class="logo-text">CLOUDSLASH</span>
+                </a>
+            </div>
+            <nav>
+                <a href="index.html#features">Features</a>
+                <a href="index.html#pricing">Pricing</a>
+                <a href="mission.html" class="active">Mission</a>
+                <a href="https://github.com/DrSkyle/CloudSlash" target="_blank" class="github-link">GitHub</a>
+                <a href="index.html#download" class="btn-primary-sm">Get CLI</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero" style="min-height: 40vh; align-items: center;">
+            <div class="container hero-content" style="text-align: center; justify-content: center; flex-direction: column;">
+                <h1 class="glitch-text" data-text="Impact Log.">Impact Log.</h1>
+                <p class="subtitle" style="max-width: 600px; margin: 0 auto;">
+                    <strong>The Robin Hood Protocol.</strong><br>
+                    CloudSlash is independently bootstrapped by a student. A portion of every license funds infrastructure for orphanages and animal sanctuaries.
+                </p>
+            </div>
+        </section>
+
+        <!-- Impact Log Section -->
+        <section id="impact" class="impact-section" style="padding: 50px 0 100px 0;">
+            <div class="container">
+                <div class="impact-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                    
+                    <!-- Entry 1: The Pledge (Honest Start) -->
+                    <div class="impact-card glass-panel" style="padding: 32px; border-left: 4px solid #00FF99;">
+                        <span class="date" style="color: #64748B; font-family: 'JetBrains Mono'; font-size: 0.8rem;">JAN 2026 // GENESIS</span>
+                        <h3 style="margin: 12px 0; font-size: 1.25rem;">Protocol Activated</h3>
+                        <p style="color: #94A3B8; line-height: 1.6;">
+                            CloudSlash v1.3.1 released. We officially pledge a portion of all revenue to support independent animal sanctuaries and student grants. 
+                            <br><br>
+                            <strong>Status:</strong> Waiting for first donor. 🐈
+                        </p>
+                    </div>
+
+                    <!-- Placeholder for future Entry -->
+                     <div class="impact-card glass-panel" style="padding: 32px; border-left: 4px solid #334155; opacity: 0.5;">
+                        <span class="date" style="color: #64748B; font-family: 'JetBrains Mono'; font-size: 0.8rem;">COMING SOON</span>
+                        <h3 style="margin: 12px 0; font-size: 1.25rem;">Impact Report #001</h3>
+                        <p style="color: #94A3B8; line-height: 1.6;">
+                            Your name could be here. Join the mission to see exactly where your license fee goes.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CloudSlash.</p>
+            <div class="footer-links" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">
+                <a href="index.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Home</a>
+                <a href="privacy.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Privacy Policy</a>
+                <a href="terms.html" style="color: inherit; text-decoration: none;">Terms of Service</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
