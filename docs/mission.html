@@ -106,7 +106,6 @@
                     
                     <!-- Indie / Human Card -->
                     <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; overflow: hidden;">
-                        <div style="position: absolute; top: -20px; right: -20px; font-size: 8rem; opacity: 0.05; transform: rotate(15deg);">🐈</div>
                         <h3 style="font-size: 1.5rem; color: #E2E8F0; margin-bottom: 10px;">Indie / Human</h3>
                         <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$49<span style="font-size: 1rem; color: #64748B;">/once</span></div>
                         <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
@@ -115,8 +114,8 @@
                         </p>
                         <ul class="features-list" style="margin-bottom: 30px;">
                             <li>✅ Lifetime License</li>
-                            <li>✅ Personal Use</li>
-                            <li>✅ Instant Karma</li>
+                            <li>⚠️ <strong>Personal Use Only</strong></li>
+                            <li>❌ No CI/CD / Headless</li>
                         </ul>
                         <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #475569; color: #94A3B8;">Support the Dev</a>
                     </div>
@@ -129,12 +128,12 @@
                         <h3 style="font-size: 1.5rem; color: #22C55E; margin-bottom: 10px;">Company</h3>
                         <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$299<span style="font-size: 1rem; color: #64748B;">/yr</span></div>
                         <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
-                            For teams and consultants. Saves you 100x this amount in a single infrastructure audit.
+                            For teams and consultants. Includes commercial invoice and license compliance for audit.
                         </p>
                         <ul class="features-list" style="margin-bottom: 30px;">
                             <li>✅ <strong>Commercial License</strong></li>
+                            <li>✅ <strong>CI/CD & Headless Mode</strong></li>
                             <li>✅ Terraform Fix Scripts</li>
-                            <li>✅ Priority Support</li>
                         </ul>
                         <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-primary-full">Get Commercial License</a>
                     </div>
@@ -162,32 +161,7 @@
         </section>
     </main>
 
-    <!-- THE PEEKING CAT SVG -->
-    <div class="peeking-cat" title="I judge your cloud spend.">
-        <svg viewBox="0 0 120 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <!-- Ears -->
-            <path d="M10 50 L30 10 L50 50" fill="#1E293B" stroke="#334155" stroke-width="2"/>
-            <path d="M70 50 L90 10 L110 50" fill="#1E293B" stroke="#334155" stroke-width="2"/>
-            
-            <!-- Head -->
-            <circle cx="60" cy="80" r="50" fill="#0F172A" stroke="#334155" stroke-width="2"/>
-            
-            <!-- Eyes -->
-            <ellipse class="cat-eye" cx="45" cy="70" rx="8" ry="12" fill="#00FF99"/>
-            <ellipse class="cat-eye" cx="75" cy="70" rx="8" ry="12" fill="#00FF99"/>
-            <circle class="cat-pupil" cx="45" cy="70" r="3" fill="#000"/>
-            <circle class="cat-pupil" cx="75" cy="70" r="3" fill="#000"/>
-            
-            <!-- Nose -->
-            <path d="M55 85 L65 85 L60 92 Z" fill="#F472B6"/>
-            
-            <!-- Whiskers -->
-            <path d="M20 80 L5 75" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
-            <path d="M20 85 L5 85" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
-            <path d="M100 80 L115 75" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
-            <path d="M100 85 L115 85" stroke="#64748B" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-    </div>
+    </main>
 
     <footer>
         <div class="container">
@@ -198,5 +172,7 @@
             </div>
         </div>
     </footer>
+    
+    <script src="cats.js"></script>
 </body>
 </html>
