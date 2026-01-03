@@ -9,9 +9,11 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        .balloon { pointer-events: none; }
+        /* Fish Cursor for Oneko to Chase */
+        body {
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'  width='40' height='48' viewport='0 0 100 100' style='fill:black;font-size:24px;'><text y='50%'>🐟</text></svg>") 16 0, auto;
+        }
     </style>
 </head>
 
@@ -47,21 +49,16 @@
             <div class="container hero-content" style="text-align: center; justify-content: center; flex-direction: column;">
                 
                 <!-- Genki Cat Container -->
-                <div style="position: relative; margin-bottom: 30px;">
-                    <div id="cat-bubble" style="background: white; color: black; padding: 10px 20px; border-radius: 20px; position: absolute; top: 0; right: -40px; font-weight: bold; opacity: 0; transition: opacity 0.3s; font-size: 0.9rem; pointer-events: none;">Meow?</div>
-                    <img id="genki-cat-img" src="assets/genki/cat-state-1.gif" alt="Genki Cat" style="width: 120px; height: auto;">
-                </div>
-
                 <h1 style="font-size: 3rem; letter-spacing: -0.05em; margin-bottom: 20px;">
                     Software for Humans.
                 </h1>
                 <p class="subtitle" style="max-width: 600px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #94A3B8; font-weight: 400; font-size: 1.1rem; margin-bottom: 30px;">
-                    Will you support independent open-source development?
+                    If you stop moving your mouse, the cat will go to sleep on the button below. <br>
+                    (It knows where the warm spot is).
                 </p>
 
                 <div class="genki-controls" style="display: flex; gap: 20px; justify-content: center;">
-                    <button id="btn-cat-yes" class="btn-primary" style="background: #00FF99; color: black; border: none; padding: 12px 30px; font-weight: bold; font-family: 'Inter'; cursor: pointer;">Yes, Donate!</button>
-                    <button id="btn-cat-no" style="background: transparent; border: 1px solid #475569; color: #94A3B8; padding: 12px 30px; font-weight: bold; font-family: 'Inter'; cursor: pointer; border-radius: 8px;">No, not today.</button>
+                    <a id="btn-donate" href="#support" class="btn-primary" style="background: #00FF99; color: black; border: none; padding: 12px 30px; font-weight: bold; font-family: 'Inter'; cursor: pointer; text-decoration: none;">Donate & Feed Cat</a>
                 </div>
 
             </div>
@@ -70,10 +67,10 @@
         <!-- No Nonsense Pricing -->
         <section id="support" style="padding: 40px 0 100px 0;">
             <div class="container">
-                <div id="pricing-cards" class="pricing-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto;">
+                <div id="pricing-cards" class="pricing-grid" style="display: flex; justify-content: center; max-width: 600px; margin: 0 auto;">
                     
                     <!-- Indie / Human Card -->
-                    <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; overflow: hidden;">
+                    <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; overflow: hidden; width: 100%;">
                         <h3 style="font-size: 1.5rem; color: #E2E8F0; margin-bottom: 10px;">Indie / Human</h3>
                         <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$49<span style="font-size: 1rem; color: #64748B;">/once</span></div>
                         <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
@@ -87,25 +84,6 @@
                         </ul>
                         <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #475569; color: #94A3B8;">Support the Dev</a>
                     </div>
-
-                     <!-- Company / Pro Card -->
-                    <div class="price-card glass-panel pro-card" style="padding: 40px; position: relative;">
-                        <!-- Badge -->
-                        <div style="position: absolute; top: 0; right: 0; background: #22C55E; color: #000; font-weight: 800; font-size: 0.75rem; padding: 5px 15px; border-bottom-left-radius: 10px;">BUSINESS</div>
-                        
-                        <h3 style="font-size: 1.5rem; color: #22C55E; margin-bottom: 10px;">Company</h3>
-                        <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$299<span style="font-size: 1rem; color: #64748B;">/yr</span></div>
-                        <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
-                            For teams and consultants. Includes commercial invoice and license compliance for audit.
-                        </p>
-                        <ul class="features-list" style="margin-bottom: 30px;">
-                            <li>✅ <strong>Commercial License</strong></li>
-                            <li>✅ <strong>CI/CD & Headless Mode</strong></li>
-                            <li>✅ Terraform Fix Scripts</li>
-                        </ul>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-primary-full">Get Commercial License</a>
-                    </div>
-
                 </div>
             </div>
         </section>
@@ -141,5 +119,6 @@
         </div>
     </footer>
     
+    <script src="oneko.js"></script>
 </body>
 </html>
