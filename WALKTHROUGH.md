@@ -85,7 +85,7 @@ CloudSlash visualizes resources as a **Dependency Tree**. This allows you to eva
 
 CloudSlash maps identified AWS resources back to your local Terraform state to facilitate cleanup.
 
-> **Safety Mechanism:** CloudSlash never modifies `.tfstate` files directly. It utilizes `terraform show -json` to safely inspect the current state.
+> **Safety Mechanism:** CloudSlash **automatically creates a backup** of your `.tfstate` before any operation. It never modifies `.tfstate` files directly without this safety net, and utilizes `terraform show -json` to safely inspect usage.
 
 **Remediation Workflow**
 

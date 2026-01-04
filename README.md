@@ -33,7 +33,9 @@ cloudslash scan
 ## Key Capabilities (v1.3.0+)
 
 **Terraform State Remediation**
-Maps identified waste back to your local Terraform state. Generates a generated `fix_terraform.sh` script to remove resources from state, including automatic backup generation before modification.
+Maps identified waste back to your local Terraform state. Generates a generated `fix_terraform.sh` script to remove resources from state.
+
+> **Safety First:** The script automatically creates a timestamped backup (`tfstate_backup_TIMESTAMP.json`) of your state file before touching anything.
 
 **Deep Resource Inspection**
 Goes beyond simple uptime checks:
