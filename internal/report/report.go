@@ -638,7 +638,35 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 		return data.WasteItems[i].Cost > data.WasteItems[j].Cost
 	})
 
-	t, err := template.New("report").Parse(htmlTemplate)
+	// Helper for numeric conversion
+	toFloat := func(v interface{}) float64 {
+		switch i := v.(type) {
+		case int:
+			return float64(i)
+		case int64:
+			return float64(i)
+		case float64:
+			return i
+		default:
+			return 0
+		}
+	}
+
+	// Register Math Functions
+	funcMap := template.FuncMap{
+		"sub": func(a, b interface{}) float64 { return toFloat(a) - toFloat(b) },
+		"mul": func(a, b interface{}) float64 { return toFloat(a) * toFloat(b) },
+		"div": func(a, b interface{}) float64 {
+			num := toFloat(a)
+			den := toFloat(b)
+			if den == 0 {
+				return 0
+			}
+			return num / den
+		},
+	}
+
+	t, err := template.New("report").Funcs(funcMap).Parse(htmlTemplate)
 	if err != nil {
 		return err
 	}
