@@ -72,7 +72,7 @@ CloudSlash is designed for engineering workflows, not finance teams.
 
 > **Mission:** CloudSlash is bootstrapped. A portion of commercial license revenue is donated to orphanages and animal rescue shelters in developing communities.
 >
-> [**Support Our Mission & Upgrade**](https://checkout.freemius.com/app/22411/plan/37513/) | [**Follow Impact Updates**](https://x.com/dr__skyle)
+> [**Support Our Mission & Upgrade**](https://checkout.freemius.com/app/22411/plan/37525/) | [**Follow Impact Updates**](https://x.com/dr__skyle)
 
 ## Build from Source
 
