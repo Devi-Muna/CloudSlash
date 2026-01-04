@@ -1,18 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 
-    <head>
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Human Mission | CloudSlash</title>
+    <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
+    
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Fish Cursor for Oneko to Chase */
-        body {
-            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'  width='40' height='48' viewport='0 0 100 100' style='fill:black;font-size:24px;'><text y='50%'>🐟</text></svg>") 16 0, auto;
+        .cat-container {
+            position: absolute;
+            top: -95px;
+            right: -25px;
+            width: 160px;
+            height: 160px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .indie-card {
+            margin-top: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .indie-card:hover {
+            transform: translateY(-5px);
+            border-color: #00FF99;
+        }
+
+        .impact-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid #334155;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            transition: background 0.3s;
+        }
+        
+        .impact-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: #00FF99;
         }
     </style>
 </head>
@@ -45,80 +77,85 @@
     </header>
 
     <main>
-        <section class="hero" style="min-height: 60vh; align-items: center; padding-top: 100px;">
+        <section class="hero" style="min-height: 45vh; align-items: center; padding-top: 80px;">
             <div class="container hero-content" style="text-align: center; justify-content: center; flex-direction: column;">
                 
-                <!-- Genki Cat Container -->
                 <h1 style="font-size: 3rem; letter-spacing: -0.05em; margin-bottom: 20px;">
-                    Software for Humans.
+                    Code Locally.<br> <span style="color: #00FF99;">Impact Globally.</span>
                 </h1>
                 <p class="subtitle" style="max-width: 600px; margin: 0 auto; font-family: 'Inter', sans-serif; color: #94A3B8; font-weight: 400; font-size: 1.1rem; margin-bottom: 30px;">
-                    If you stop moving your mouse, the cat will go to sleep on the button below. <br>
-                    (It knows where the warm spot is).
+                    CloudSlash is bootstrapped, open-source software. <br>
+                    Proceeds directly support underfunded orphanages and animal sanctuaries.
                 </p>
 
-                <div class="genki-controls" style="display: flex; gap: 20px; justify-content: center;">
-                    <a id="btn-donate" href="#support" class="btn-primary" style="background: #00FF99; color: black; border: none; padding: 12px 30px; font-weight: bold; font-family: 'Inter'; cursor: pointer; text-decoration: none;">Donate & Feed Cat</a>
-                </div>
-
             </div>
         </section>
 
-        <!-- No Nonsense Pricing -->
-        <section id="support" style="padding: 40px 0 100px 0;">
+        <section id="support" style="padding: 20px 0 80px 0;">
             <div class="container">
-                <div id="pricing-cards" class="pricing-grid" style="display: flex; justify-content: center; max-width: 600px; margin: 0 auto;">
+                <div id="pricing-cards" class="pricing-grid" style="display: flex; justify-content: center; max-width: 500px; margin: 0 auto;">
                     
-                    <!-- Indie / Human Card -->
-                    <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; overflow: hidden; width: 100%;">
-                        <h3 style="font-size: 1.5rem; color: #E2E8F0; margin-bottom: 10px;">Indie / Human</h3>
+                    <div class="price-card glass-panel indie-card" style="padding: 40px; position: relative; width: 100%;">
+                        
+                        <div class="cat-container">
+                            <dotlottie-player 
+                                src="assets/cat.json" 
+                                background="transparent" 
+                                speed="1" 
+                                style="width: 160px; height: 160px;" 
+                                loop 
+                                autoplay>
+                            </dotlottie-player>
+                        </div>
+
+                        <h3 style="font-size: 1.5rem; color: #E2E8F0; margin-bottom: 10px;">Indie Developer License</h3>
                         <div class="price" style="font-size: 2.5rem; margin: 20px 0; font-family: 'JetBrains Mono';">$49<span style="font-size: 1rem; color: #64748B;">/once</span></div>
+                        
                         <p style="font-size: 1rem; color: #94A3B8; margin-bottom: 30px; line-height: 1.6;">
-                            If you are a solo dev, student, or just a human using this. <br>
-                            <em>"Buy me a nice dinner."</em>
+                            Own the tool forever. Stop renting SaaS.<br>
+                            <span style="font-size: 0.9em; opacity: 0.8;">(Strictly for Personal / Solo use)</span>
                         </p>
-                        <ul class="features-list" style="margin-bottom: 30px;">
-                            <li>✅ Lifetime License</li>
-                            <li>⚠️ <strong>Personal Use Only</strong></li>
-                            <li>❌ No CI/CD / Headless</li>
+                        
+                        <ul class="features-list" style="margin-bottom: 30px; text-align: left; padding-left: 20px; color: #CBD5E1;">
+                            <li style="margin-bottom: 10px;">✅ <strong>Lifetime Updates</strong> (No subscription)</li>
+                            <li style="margin-bottom: 10px;">✅ Full Forensic Scan Capabilities</li>
+                            <li style="margin-bottom: 10px;">❤️ <strong>Funds Direct Aid</strong></li>
                         </ul>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="border-color: #475569; color: #94A3B8;">Support the Dev</a>
+                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-secondary-full" style="display:block; text-align:center; padding: 15px; background: #00FF99; color: #000; font-weight: bold; text-decoration: none; border-radius: 4px;">Get Lifetime Access</a>
+                        <p style="margin-top: 15px; font-size: 0.8rem; color: #64748B; text-align: center;">Secure payment via Freemius</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Impact Log (Keeping it professional but minimal) -->
-        <section id="impact" class="impact-section" style="padding: 50px 0 100px 0; border-top: 1px solid #1E293B;">
-            <div class="container">
-                <h2 class="section-title" style="font-size: 1.2rem; opacity: 0.7; margin-bottom: 40px;">THE IMPACT LOG</h2>
-                <div class="impact-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
-                    
-                    <div class="impact-card glass-panel" style="padding: 32px; border-left: 4px solid #00FF99;">
-                        <span class="date" style="color: #64748B; font-family: 'JetBrains Mono'; font-size: 0.8rem;">JAN 2026</span>
-                        <h3 style="margin: 12px 0; font-size: 1.25rem; color: #F8FAFC;">Mission Start</h3>
-                        <p style="color: #94A3B8; line-height: 1.6;">
-                            v1.3.1 Launched. 10% of revenue committed to cat sanctuaries.
+        <section id="impact" class="impact-section" style="padding: 20px 0 100px 0; border-top: 1px solid #1E293B;">
+            <div class="container" style="max-width: 600px;">
+                <h2 class="section-title" style="font-size: 1.2rem; opacity: 0.7; margin-bottom: 40px; text-align: center;">TRANSPARENCY LOG</h2>
+                
+                <a href="https://x.com/dr__skyle" target="_blank" style="text-decoration: none;">
+                    <div class="impact-card">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" style="margin-bottom: 15px;">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231h.001zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                        
+                        <h3 style="color: #F8FAFC; margin-bottom: 10px;">View Impact Updates on X</h3>
+                        <p style="color: #94A3B8; font-size: 0.95rem; line-height: 1.6;">
+                            We believe in proof, not just promises. <br>
+                            Follow <strong>@dr__skyle</strong> to see receipts and updates of our donations to grassroots shelters.
                         </p>
+                        <span style="display: inline-block; margin-top: 15px; color: #00FF99; font-weight: bold; font-size: 0.9rem;">Open Live Feed &rarr;</span>
                     </div>
+                </a>
 
-                </div>
             </div>
         </section>
-    </main>
-
     </main>
 
     <footer>
-        <div class="container">
-            <p>&copy; 2026 CloudSlash.</p>
-            <div class="footer-links" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">
-                <a href="index.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Home</a>
-                <a href="privacy.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Privacy Policy</a>
-            </div>
+        <div class="container" style="text-align: center; padding-bottom: 40px;">
+            <p style="color: #64748B;">&copy; 2026 CloudSlash. Built by DrSkyle.</p>
         </div>
     </footer>
     
-    <script src="oneko.js"></script>
 </body>
 </html>
