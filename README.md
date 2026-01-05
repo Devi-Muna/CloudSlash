@@ -2,11 +2,11 @@
 
 ![Version](https://img.shields.io/badge/version-v1.3.1-blue)
 
-**AWS Resource Reclamation & Terraform State Reconciliation**
+**AWS Resource Reclamation & Zero-Trust Forensics**
 
-CloudSlash correlates CloudWatch metrics with resource topology to identify idle infrastructure that standard "Status" checks miss. It bridges the gap between the actual AWS environment and your local Terraform state.
+CloudSlash bridges the gap between FinOps (Cost) and SecOps (Risk). It correlates CloudWatch metrics with network topology to identify "Zombie" infrastructure that standard tools miss—reducing both your AWS bill and your attack surface.
 
-Unlike SaaS billing dashboards, CloudSlash runs locally and generates actionable scripts to clean up state files.
+Unlike SaaS dashboards that export your data, CloudSlash runs 100% locally for maximum security privacy.
 
 ## Quick Start
 
@@ -37,11 +37,11 @@ Maps identified waste back to your local Terraform state. Generates a generated 
 
 > **Safety First:** The script automatically creates a timestamped backup (`tfstate_backup_TIMESTAMP.json`) of your state file before touching anything.
 
-**Deep Resource Inspection**
-Goes beyond simple uptime checks:
+**Deep Forensics & Risk Detection**
+Goes beyond simple uptime checks to find security liabilities:
 
-- **Hollow NAT Gateways**: Identifies gateways with zero active backend hosts.
-- **Safe-Release EIPs**: Cross-references Elastic IPs with Route53 DNS records to ensure IPs aren't serving traffic before release.
+- **Hollow NAT Gateways**: Identifies gateways with zero active backend hosts (Cost + Network Noise).
+- **Dangling Elastic IPs**: Cross-references EIPs with Route53 DNS records to prevent **Subdomain Takeover** attacks.
 
 **Audit Reporting**
 Generates `waste_report.csv` containing resource ARNs, cost estimates, risk scores, and owner tags for ingestion into other tools or spreadsheets.
