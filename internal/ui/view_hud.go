@@ -24,6 +24,9 @@ func (m Model) viewHUD() string {
 
 	// 2. Waste Ticker
 	savings := fmt.Sprintf("$%.2f/mo", m.totalSavings)
+	if m.totalSavings > 0 {
+		savings += fmt.Sprintf(" ($%.0f/yr)", m.totalSavings*12)
+	}
 	
 	// 3. Risk Score (Mock logic for now, or derived from graph)
 	riskLevel := "LOW"

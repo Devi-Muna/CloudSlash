@@ -99,7 +99,12 @@ func (m Model) viewList() string {
 		if len(dispType) > 15 { dispType = dispType[:15] }
 
 		// Cost
+		// Cost & Guilt Trip
 		dispCost := fmt.Sprintf("$%.2f", node.Cost)
+		if node.Cost > 0 {
+			yearly := node.Cost * 12
+			dispCost += lipgloss.NewStyle().Foreground(lipgloss.Color("#F05D5E")).Render(fmt.Sprintf(" ($%.0f/yr)", yearly))
+		}
 
 		// Reason (cut off rest)
 		reason := fmt.Sprintf("%v", node.Properties["Reason"])

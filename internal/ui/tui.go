@@ -6,7 +6,10 @@ import (
 	"os/exec"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/DrSkyle/cloudslash/internal/audit"
 
 	"gopkg.in/yaml.v2"
 
@@ -48,14 +51,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.wasteItems) > 0 {
 					m.state = ViewStateDetail
 				}
-			case "i":
-				// Quick Ignore from List
-				if len(m.wasteItems) > 0 {
-					// wasteItems might be stale if not updated often, but it's updated in ViewList
-					if m.cursor < len(m.wasteItems) {
-						id := m.wasteItems[m.cursor].ID
-						m.ignoreNode(id)
-					}
+			case "m":
+				// Soft Delete (Mark for Death)
+				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
+					id := m.wasteItems[m.cursor].ID
+					// In a real app, this would call AWS: TagResource("cloudslash:status", "to-delete")
+					// For now, we simulate/log it and visually indicate it (e.g., ignore/hide it or mark it)
+					// Let's re-use ignore logic but with a "soft-delete" flag if we had one.
+					// For v1.3.2 TUI demo, we'll log it to audit and treat it as 'handled' (ignored)
+					audit.LogAction("SOFT_DELETE", id, "MARKED", 0, "Marked for later collision")
+					m.ignoreNode(id) 
+				}
+			case "y":
+				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
+					copyToClipboard(m.wasteItems[m.cursor].ID)
+				}
+			case "Y":
+				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
+					copyToClipboard(m.wasteItems[m.cursor].ID) // ID is often ARN in Graph
+				}
+			case "c":
+				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
+					// Copy JSON properties
+					node := m.wasteItems[m.cursor]
+					jsonStr := fmt.Sprintf("ID: %s\nType: %s\nCost: $%.2f\nProps: %v", node.ID, node.Type, node.Cost, node.Properties)
+					copyToClipboard(jsonStr)
 				}
 			case "P", "p":
 				if m.SortMode == "Price" {
@@ -194,10 +214,10 @@ func (m *Model) updateStats() {
 func quickHelp(state ViewState) string {
 	base := subtle.Render(" [q] Quit/Back ")
 	if state == ViewStateList {
-		return base + subtle.Render(" [↑/↓] Nav  [Enter] Details  [i] Ignore  [P]rice Sort  [E]asy Filter  [R]egion")
+		return base + subtle.Render(" [↑/↓] Nav  [Enter] Details  [i] Ign  [m] Mark  [y] Copy  [P]rice  [E]asy")
 	}
 	if state == ViewStateDetail {
-		return base + subtle.Render(" [o] Open Browser  [i] Ignore")
+		return base + subtle.Render(" [o] Open Browser  [i] Ign  [m] Mark  [y] Copy")
 	}
 	return base
 }
@@ -236,6 +256,30 @@ func getConsoleURL(node *graph.Node) string {
 		return fmt.Sprintf("https://s3.console.aws.amazon.com/s3/buckets/%s?region=%s", node.ID, region)
 	}
 	return "https://console.aws.amazon.com"
+}
+
+func copyToClipboard(text string) {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("pbcopy")
+	case "linux":
+		// check for wl-copy (wayland) or xclip (x11)
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			cmd = exec.Command("wl-copy")
+		} else {
+			cmd = exec.Command("xclip", "-selection", "clipboard")
+		}
+	case "windows":
+		cmd = exec.Command("clip")
+	default:
+		return
+	}
+
+	cmd.Stdin = strings.NewReader(text)
+	cmd.Start() 
+	// Don't wait, just fire and forget for UI responsiveness
 }
 
 func openBrowser(url string) {
