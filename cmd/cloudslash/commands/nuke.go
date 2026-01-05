@@ -19,9 +19,9 @@ var NukeCmd = &cobra.Command{
 	Short: "Interactive cleanup (The 'Safety Brake')",
 	Long:  `Iteratively reviews identified waste and performs real deletion with confirmation.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("⚠️  WARNING: You are entering DESTRUCTIVE MODE.")
-		fmt.Println("   This will DELETE resources from your AWS account.")
-		fmt.Print("   Are you sure? [y/N]: ")
+		fmt.Println("[WARNING] DESTRUCTIVE MODE INITIATED")
+		fmt.Println("This operation will permanently DELETE resources from your AWS account.")
+		fmt.Print("Confirm execution? [y/N]: ")
 
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
@@ -38,7 +38,7 @@ var NukeCmd = &cobra.Command{
 		engine.Start(ctx)
 
 		// 1. Run a fresh scan (Headless)
-		fmt.Println("\n🔍 Scanning infrastructure for targets...")
+		fmt.Println("\n[SCAN] Analyzing infrastructure topology...")
 		// Note: We need to access internal scan logic.
 		// Reusing app.Config and mimicking bootstrap logic quickly.
 		// Ideally refactor bootstrap to return the graph.
@@ -71,7 +71,7 @@ var NukeCmd = &cobra.Command{
 		g.Mu.RUnlock()
 
 		if len(waste) == 0 {
-			fmt.Println("No waste found to nuke. You are clean.")
+			fmt.Println("No waste detected. Infrastructure is optimized.")
 			return
 		}
 
@@ -82,7 +82,7 @@ var NukeCmd = &cobra.Command{
 		for _, item := range waste {
 			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
-			fmt.Print(" 💀 Delete this resource? [y/N]: ")
+			fmt.Print(" [ACTION] DELETE this resource? [y/N]: ")
 
 			if scanner.Scan() {
 				ans := strings.ToLower(strings.TrimSpace(scanner.Text()))

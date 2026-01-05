@@ -193,11 +193,7 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 	})
 	fmt.Println("")
 
-	fmt.Println(titleStyle.Render("NEW FEATURES (v1.2.6)"))
-	fmt.Println(flagStyle.Render("  • ECS Idle Clusters:   Detects empty clusters wasting EC2 money"))
-	fmt.Println(flagStyle.Render("  • Crash Loop Detector: Identifies broken services & missing images"))
-	fmt.Println(flagStyle.Render("  • Interactive Mode:    Region selection & Deep Links in output"))
-	fmt.Println("")
+
 }
 
 func safeWriteConfig() {

@@ -1,4 +1,4 @@
-# CloudSlash Guide (v1.3.0)
+# CloudSlash Guide (v1.3.2)
 
 This manual outlines the operational workflows for CloudSlash: executing scans, interpreting the dependency graph, and performing safe remediation of Terraform state.
 
@@ -179,7 +179,7 @@ A complete cheatsheet of all available CLI commands and TUI controls.
 
 # Appendix: Heuristics Catalog
 
-A reference guide to the detection engines available in v1.3.0.
+A reference guide to the detection engines available in v1.3.2.
 
 ### 1. Compute & Serverless
 

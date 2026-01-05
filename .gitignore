@@ -43,3 +43,4 @@ go/
 
 # Commercial Backend (Private IP)
 license-server/
+INTERNAL_keygen.go

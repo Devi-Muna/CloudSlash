@@ -8,8 +8,7 @@ import (
 	"time"
 )
 
-// LicenseServerURL is the endpoint of your Cloudflare Worker.
-// TODO: Update this to your deployed worker URL.
+
 const LicenseServerURL = "https://cloudslash-license-server.nexus-apis.workers.dev/verify"
 
 type VerifyRequest struct {

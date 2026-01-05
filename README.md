@@ -1,6 +1,6 @@
 # CloudSlash
 
-![Version](https://img.shields.io/badge/version-v1.3.1-blue)
+![Version](https://img.shields.io/badge/version-v1.3.2-blue)
 
 **AWS Resource Reclamation & Zero-Trust Forensics**
 
@@ -30,7 +30,7 @@ cloudslash scan
 
 > **Detailed Guide:** Check out the [Operator's Guide](WALKTHROUGH.md) for advanced usage, heuristics, and troubleshooting.
 
-## Key Capabilities (v1.3.0+)
+## Key Capabilities (v1.3.2+)
 
 **Terraform State Remediation**
 Maps identified waste back to your local Terraform state. Generates a generated `fix_terraform.sh` script to remove resources from state.
@@ -93,4 +93,4 @@ sudo rm /usr/local/bin/cloudslash
 rm -rf ~/.cloudslash
 ```
 
-Made with love ❤️ by DrSkyle
+Made with ❤️ by DrSkyle
