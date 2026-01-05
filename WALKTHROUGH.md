@@ -167,13 +167,20 @@ A complete cheatsheet of all available CLI commands and TUI controls.
 
 ## TUI Controls (Interactive Dashboard)
 
-|        Key        | Action                | Context                                                           |
-| :---------------: | :-------------------- | :---------------------------------------------------------------- |
-|     `↑` / `k`     | **Move Up**           | Navigation                                                        |
-|     `↓` / `j`     | **Move Down**         | Navigation                                                        |
-| `Enter` / `Space` | **View Details**      | Expands the selected resource to show Cost, Region, and Tags.     |
-|        `i`        | **Ignore (Suppress)** | Adds the resource ID to `.ignore.yaml`. Hidden from future scans. |
-|  `q` / `Ctrl+C`   | **Quit**              | Exits the application.                                            |
+|        Key        | Action                | Context                                                    |
+| :---------------: | :-------------------- | :--------------------------------------------------------- |
+|     `↑` / `k`     | **Move Up**           | Navigation                                                 |
+|     `↓` / `j`     | **Move Down**         | Navigation                                                 |
+| `Enter` / `Space` | **View Details**      | Expands to show "Sparklines", "Blame", Cost, and Tags.     |
+|        `i`        | **Ignore (Suppress)** | Adds resource to `.ignore.yaml`. Hidden from future scans. |
+|        `m`        | **Soft Delete**       | "Marks" resource for later deletion (Audit Logged).        |
+|        `y`        | **Copy ID**           | Copies Resource ID (e.g., `i-0x123`) to clipboard.         |
+|     `Shift+Y`     | **Copy ARN**          | Copies full ARN to clipboard.                              |
+|        `c`        | **Copy JSON**         | Copies full resource details JSON to clipboard.            |
+|        `P`        | **Sort by Price**     | Toggles sorting by highest monthly cost.                   |
+|        `E`        | **Filter Easy**       | Filters for "Easy Wins" (Low Risk / Unattached).           |
+|        `R`        | **Filter Region**     | Cycles through discovered regions.                         |
+|  `q` / `Ctrl+C`   | **Quit**              | Exits the application.                                     |
 
 ---
 
