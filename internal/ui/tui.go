@@ -83,12 +83,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.SortMode = "Price"
 				}
+				m.refreshData()
 			case "E", "e":
 				if m.FilterMode == "Easy" {
 					m.FilterMode = ""
 				} else {
 					m.FilterMode = "Easy"
 				}
+				m.refreshData()
 			case "R", "r":
 				// Simple toggle for now: All -> us-east-1 (example) -> All
 				// Use "Next Region" logic? 
@@ -110,6 +112,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.FilterMode = regions[currIdx+1]
 					}
 				}
+				m.refreshData()
 			}
 		} else if m.state == ViewStateDetail {
 			switch msg.String() {
@@ -144,7 +147,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tickMsg:
 		// Background Stats Update
-		m.updateStats()
+		m.refreshData()
 		
 		// Check if done scanning
 		stats := m.Engine.GetStats()
@@ -195,19 +198,55 @@ func (m Model) View() string {
 
 // Helpers
 
-func (m *Model) updateStats() {
+func (m *Model) refreshData() {
 	var total float64
+	var nodes []*graph.Node
+
 	m.Graph.Mu.RLock()
-	var newItems []*graph.Node
+	defer m.Graph.Mu.RUnlock()
+
 	for _, n := range m.Graph.Nodes {
 		if n.IsWaste && !n.Ignored {
+			// Filtering Logic
+			if m.FilterMode == "Easy" {
+				// Easy Wins: Unattached EIPs, Snapshots, Low Risk
+				isEasy := false
+				if n.Type == "AWS::EC2::EIP" || n.Type == "AWS::EC2::Snapshot" {
+					isEasy = true
+				}
+				if n.RiskScore < 20 {
+					isEasy = true
+				}
+				if !isEasy {
+					continue
+				}
+			} else if m.FilterMode != "" {
+				// Region Filter (Simple string match on "Region" property)
+				// Note: Ensure property exists and is string
+				if r, ok := n.Properties["Region"].(string); !ok || r != m.FilterMode {
+					continue
+				}
+			}
+
 			total += n.Cost
-			newItems = append(newItems, n)
+			nodes = append(nodes, n)
 		}
 	}
-	m.Graph.Mu.RUnlock()
-	
+
+	// Sorting Logic
+	if m.SortMode == "Price" {
+		sort.Slice(nodes, func(i, j int) bool {
+			return nodes[i].Cost > nodes[j].Cost
+		})
+	} else {
+		// Default: ID
+		sort.Slice(nodes, func(i, j int) bool {
+			return nodes[i].ID < nodes[j].ID
+		})
+	}
+
 	m.totalSavings = total
+	m.wasteItems = nodes
 }
 
 
