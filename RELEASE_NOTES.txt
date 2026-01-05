@@ -1,0 +1,31 @@
+# CloudSlash v1.3.2: The "Future-Glass" Update
+
+> **"Context is King."** — This release transforms CloudSlash from a CLI tool into a forensic console.
+
+## 🚀 Key Features
+
+### 1. The Interactive TUI (Terminal User Interface)
+We've overhauled the interface with a "Future-Glass" aesthetic. No emojis. Just data.
+- **Obsidian HUD**: Always-on visibility of your total waste and risk score.
+- **Sparklines**: Visual metric history (`[__▂▄▇]`) right in the terminal.
+- **Blame**: Automatically identifying *who* created the zombie resource.
+
+### 2. Advanced Workflows
+- **Blast Radius Check**: `nuke` now warns you if a resource has active dependents.
+- **Soft Delete (`m`)**: Not ready to delete? Mark it for later.
+- **Clipboard Ninja**: `y` to yank IDs, `shift+Y` for ARNs.
+- **"Guilt Trip"**: See annualized costs (`$1,200/yr`) to see the true price of laziness.
+
+### 3. Accountability
+- **Paper Trail**: Every destructive action is logged to `~/.cloudslash/audit.log`.
+
+## 📦 Installation
+```bash
+# Update current installation
+cloudslash update
+
+# Or install fresh (Pro/Enterprise)
+curl -sL https://cloudslash.io/install | bash
+```
+
+*Compatible with AWS Profiles, SSO, and MFA.*
