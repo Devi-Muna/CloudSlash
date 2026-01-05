@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/DrSkyle/cloudslash/internal/aws"
+	"github.com/DrSkyle/cloudslash/internal/audit"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/heuristics"
 	"github.com/DrSkyle/cloudslash/internal/swarm"
@@ -82,6 +83,29 @@ var NukeCmd = &cobra.Command{
 		for _, item := range waste {
 			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
+
+			// BLAST RADIUS CHECK
+			dependents := g.GetUpstream(item.ID)
+			if len(dependents) > 0 {
+				activeDeps := 0
+				exampleDep := ""
+				g.Mu.RLock()
+				for _, depID := range dependents {
+					if depNode, ok := g.Nodes[depID]; ok {
+						if !depNode.IsWaste {
+							activeDeps++
+							exampleDep = depID
+						}
+					}
+				}
+				g.Mu.RUnlock()
+
+				if activeDeps > 0 {
+					fmt.Printf("\n ⚠️  BLAST RADIUS WARNING: Used by %d ACTIVE resources (e.g. %s)\n", activeDeps, exampleDep)
+					fmt.Printf("    Deleting this may break them.\n")
+				}
+			}
+
 			fmt.Print(" [ACTION] DELETE this resource? [y/N]: ")
 
 			if scanner.Scan() {
@@ -94,6 +118,7 @@ var NukeCmd = &cobra.Command{
 						fmt.Printf("FAILED: %v\n", err)
 					} else {
 						fmt.Printf("GONE.\n")
+						audit.LogAction("DELETED", item.ID, item.Type, item.Cost, fmt.Sprintf("%v", item.Properties["Reason"]))
 					}
 				} else {
 					fmt.Println("    Skipped.")

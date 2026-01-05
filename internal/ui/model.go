@@ -40,6 +40,10 @@ type Model struct {
 	tasksDone    int
 	tfRepairReady bool
 
+	// filters
+	SortMode   string
+	FilterMode string
+
 	// navigation
 	cursor       int // main list cursor
 	detailsScroll int // TODO: implement scroll if needed

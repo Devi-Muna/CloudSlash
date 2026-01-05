@@ -6,23 +6,51 @@ import (
 	"strings"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) viewList() string {
 	s := strings.Builder{}
 
 	// Sort and filter roots
-	m.Graph.Mu.RLock()
 	var nodes []*graph.Node
 	for _, n := range m.Graph.Nodes {
 		if n.IsWaste && !n.Ignored {
+			// Filtering Logic
+			if m.FilterMode == "Easy" {
+				// Easy Wins: Unattached EIPs, Snapshots, Low Risk
+				isEasy := false
+				if n.Type == "AWS::EC2::EIP" || n.Type == "AWS::EC2::Snapshot" {
+					isEasy = true
+				}
+				if n.RiskScore < 20 {
+					isEasy = true
+				}
+				if !isEasy {
+					continue
+				}
+			} else if m.FilterMode != "" {
+				// Region Filter
+				if r, ok := n.Properties["Region"].(string); !ok || r != m.FilterMode {
+					continue
+				}
+			}
 			nodes = append(nodes, n)
 		}
 	}
-	// Sort by Cost Descending
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].Cost > nodes[j].Cost
-	})
+	
+	// Sorting Logic
+	if m.SortMode == "Price" {
+		// Sort by Cost Descending
+		sort.Slice(nodes, func(i, j int) bool {
+			return nodes[i].Cost > nodes[j].Cost
+		})
+	} else {
+		// Default: ID
+		sort.Slice(nodes, func(i, j int) bool {
+			return nodes[i].ID < nodes[j].ID
+		})
+	}
 	m.Graph.Mu.RUnlock()
 
 	// Update local cache for cursor mapping
@@ -40,8 +68,17 @@ func (m Model) viewList() string {
 	start, end := m.calculateWindow(len(nodes))
 
 	// Header
-	s.WriteString(dimStyle.Render(fmt.Sprintf("   %-20s | %-15s | %-10s | %s\n", "RESOURCE ID", "TYPE", "COST", "REASON")))
-	s.WriteString(dimStyle.Render("   " + strings.Repeat("─", 60) + "\n"))
+	headerTxt := fmt.Sprintf("   %-20s | %-15s | %-10s | %s", "RESOURCE ID", "TYPE", "COST", "REASON")
+	s.WriteString(dimStyle.Render(headerTxt) + "\n")
+	
+	filterStatus := ""
+	if m.SortMode != "" { filterStatus += fmt.Sprintf(" [SORT: %s]", m.SortMode) }
+	if m.FilterMode != "" { filterStatus += fmt.Sprintf(" [FILTER: %s]", m.FilterMode) }
+	if filterStatus != "" {
+		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("   " + filterStatus) + "\n")
+	} else {
+		s.WriteString(dimStyle.Render("   " + strings.Repeat("─", 60) + "\n"))
+	}
 
 	for i := start; i < end; i++ {
 		node := nodes[i]

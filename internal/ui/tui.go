@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -54,6 +55,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.cursor < len(m.wasteItems) {
 						id := m.wasteItems[m.cursor].ID
 						m.ignoreNode(id)
+					}
+				}
+			case "P", "p":
+				if m.SortMode == "Price" {
+					m.SortMode = ""
+				} else {
+					m.SortMode = "Price"
+				}
+			case "E", "e":
+				if m.FilterMode == "Easy" {
+					m.FilterMode = ""
+				} else {
+					m.FilterMode = "Easy"
+				}
+			case "R", "r":
+				// Simple toggle for now: All -> us-east-1 (example) -> All
+				// Use "Next Region" logic? 
+				// Let's iterate unique regions in graph
+				regions := m.getUniqueRegions()
+				if len(regions) > 0 {
+					// Find current index
+					currIdx := -1
+					for i, r := range regions {
+						if m.FilterMode == r {
+							currIdx = i
+							break
+						}
+					}
+					// Next
+					if currIdx == len(regions)-1 {
+						m.FilterMode = ""
+					} else {
+						m.FilterMode = regions[currIdx+1]
 					}
 				}
 			}
@@ -160,7 +194,7 @@ func (m *Model) updateStats() {
 func quickHelp(state ViewState) string {
 	base := subtle.Render(" [q] Quit/Back ")
 	if state == ViewStateList {
-		return base + subtle.Render(" [↑/↓] Nav  [Enter] Details  [i] Ignore")
+		return base + subtle.Render(" [↑/↓] Nav  [Enter] Details  [i] Ignore  [P]rice Sort  [E]asy Filter  [R]egion")
 	}
 	if state == ViewStateDetail {
 		return base + subtle.Render(" [o] Open Browser  [i] Ignore")
@@ -222,6 +256,25 @@ func openBrowser(url string) {
 // Needed by other components?
 func helpStyle(s string) string {
 	return subtle.Render(s)
+}
+
+func (m Model) getUniqueRegions() []string {
+	m.Graph.Mu.RLock()
+	defer m.Graph.Mu.RUnlock()
+	unique := make(map[string]bool)
+	var list []string
+	for _, n := range m.Graph.Nodes {
+		if n.IsWaste && !n.Ignored {
+			if r, ok := n.Properties["Region"].(string); ok {
+				if !unique[r] {
+					unique[r] = true
+					list = append(list, r)
+				}
+			}
+		}
+	}
+	sort.Strings(list)
+	return list
 }
 
 func (m Model) getKthWasteNodeID(k int) string {
