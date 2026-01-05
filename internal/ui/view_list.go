@@ -9,10 +9,7 @@ import (
 func (m Model) viewList() string {
 	s := strings.Builder{}
 
-	// Sort and filter roots
-	var nodes []*graph.Node
-	// Use pre-calculated sorted/filtered list from cached state
-	// Logic moved to refreshData() in tui.go to avoid mutex panics/state issues
+	// cache usage
 	nodes := m.wasteItems 
 
 	if len(nodes) == 0 {

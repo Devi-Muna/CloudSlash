@@ -207,9 +207,7 @@ func (m *Model) refreshData() {
 
 	for _, n := range m.Graph.Nodes {
 		if n.IsWaste && !n.Ignored {
-			// Filtering Logic
 			if m.FilterMode == "Easy" {
-				// Easy Wins: Unattached EIPs, Snapshots, Low Risk
 				isEasy := false
 				if n.Type == "AWS::EC2::EIP" || n.Type == "AWS::EC2::Snapshot" {
 					isEasy = true
@@ -233,7 +231,7 @@ func (m *Model) refreshData() {
 		}
 	}
 
-	// Sorting Logic
+
 	if m.SortMode == "Price" {
 		sort.Slice(nodes, func(i, j int) bool {
 			return nodes[i].Cost > nodes[j].Cost
