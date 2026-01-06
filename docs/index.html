@@ -179,28 +179,43 @@
 
         <section id="support" class="support-section">
             <div class="container">
-                <h2 class="section-title">Commercial Use & Support</h2>
-                <div class="support-grid" style="display: flex; justify-content: center; gap: 30px;">
+                <h2 class="section-title">Support the Project</h2>
+                <div class="support-grid" style="display: flex; justify-content: center; gap: 40px; padding: 40px 0;">
                     
-                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 400px;">
-                        <h3>Commercial Exemption</h3>
-                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">
-                            CloudSlash is <strong>AGPLv3</strong>. If your organization requires a commercial license for AGPL compliance (e.g. embedding in proprietary software), or if you cannot open-source your modifications, exemptions are available.
-                        </p>
-                        <a href="mailto:enterprise@cloudslash.com" class="btn-secondary-full" style="margin-top: auto; border-color: #00FF99; color: #00FF99;">Contact for Exemption</a>
+                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 350px;">
+                        <h3>Supporter</h3>
+                        <div class="price" style="font-size: 2rem; font-weight: 800; color: #00FF99; margin: 10px 0;">$9.99<span style="font-size: 1rem; color: #94A3B8;">/mo</span></div>
+                        <ul class="features-list">
+                            <li>Priority Email Support</li>
+                            <li><strong>Directly Funds Development</strong></li>
+                        </ul>
+                        <a href="https://checkout.freemius.com/app/22411/plan/37525/" class="btn-secondary-full" style="margin-top: auto; border-color: #00FF99; color: #00FF99;">Support Now</a>
                     </div>
 
-                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 400px;">
-                        <h3>Support & Community</h3>
-                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">
-                            Need help? Join the community on GitHub or contact us for paid priority support and custom integration services.
-                        </p>
-                        <div style="display: flex; gap: 10px; margin-top: auto;">
-                            <a href="https://github.com/DrSkyle/CloudSlash/issues" target="_blank" class="btn-secondary-full">GitHub Issues</a>
-                            <a href="mailto:support@cloudslash.com" class="btn-primary-full">Paid Support</a>
-                        </div>
+                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 350px;">
+                        <h3>Super Supporter</h3>
+                        <div class="price" style="font-size: 2rem; font-weight: 800; color: #00FF99; margin: 10px 0;">$19.99<span style="font-size: 1rem; color: #94A3B8;">/mo</span></div>
+                        <ul class="features-list">
+                             <li><strong>Priority+ Support</strong></li>
+                            <li><strong>Sustains the Project</strong></li>
+                        </ul>
+                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-primary-full" style="margin-top: auto;">Super Support</a>
                     </div>
 
+                    <div class="price-card glass-panel" style="border: 1px dashed #334155; max-width: 350px; opacity: 0.8;">
+                        <h3>Enterprise</h3>
+                        <div class="price" style="font-size: 1.5rem; font-weight: 800; color: #94A3B8; margin: 10px 0;">Exemption</div>
+                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">
+                            Requires AGPLv3 compliance exemption?<br>Contact us.
+                        </p>
+                        <a href="mailto:drskyle8000@gmail.com" class="btn-secondary-full" style="margin-top: auto;">Contact</a>
+                    </div>
+
+                </div>
+                 <div class="pricing-footer" style="text-align: center; margin-top: 30px; opacity: 0.7;">
+                    <p style="font-size: 0.9rem; color: #94A3B8;">
+                        We donate a portion of proceeds to <strong>cats and orphanages in developing communities</strong>.
+                    </p>
                 </div>
             </div>
         </section>
@@ -270,7 +285,7 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 CloudSlash.</p>
+            <p>Made with ❤️ by DrSkyle.</p>
             <div class="footer-links" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">
                 <a href="privacy.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Privacy Policy</a>
                 <a href="terms.html" style="color: inherit; text-decoration: none;">Terms of Service</a>
@@ -283,5 +298,31 @@
         <a href="#download" class="btn-primary">Download</a>
     </div>
     <script src="terminal.js"></script>
+    <script src="https://checkout.freemius.com/checkout.min.js"></script>
+    <script>
+        // Initialize Freemius
+        var handler = FS.Checkout.configure({
+            plugin_id: '22411',
+            public_key: 'pk_b5689104084666063628359419106',
+            image: 'https://drskyle.github.io/CloudSlash/favicon.svg'
+        });
+
+        // Intercept all Freemius Links
+        document.addEventListener('DOMContentLoaded', function() {
+            var links = document.querySelectorAll('a[href*="checkout.freemius.com"]');
+            links.forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var href = link.href;
+                    // Extract Plan ID
+                     var planId = href.match(/plan\/(\d+)/)[1];
+                     
+                     handler.open({
+                        plan_id: planId
+                     });
+                });
+            });
+        });
+    </script>
 </body>
 </html>

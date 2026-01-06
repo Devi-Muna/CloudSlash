@@ -66,6 +66,14 @@ cd cloudslash
 go build -o /usr/local/bin/cloudslash ./cmd/cloudslash
 ```
 
+## Support the Project
+
+CloudSlash is open source and free. If you'd like to support development or need priority help:
+
+[**Support ($9.99/mo)**](https://checkout.freemius.com/app/22411/plan/37525/) - Priority Support & Gratitude.
+
+[**Super Support ($19.99/mo)**](https://checkout.freemius.com/app/22411/plan/37513/) - Direct Access & Custom Integration Help.
+
 ## License & Commercial Use
 
 **CloudSlash is AGPLv3.**
@@ -75,8 +83,8 @@ _If you modify CloudSlash and provide it as a service/product to others, you mus
 
 **Enterprise Exemption**:
 If your organization requires a commercial license for AGPL compliance (e.g., embedding CloudSlash in proprietary software without releasing source code), exemptions are available.
-Contact: `enterprise@cloudslash.com`
+Contact: `drskyle8000@gmail.com`
 
 ---
 
-Made by DrSkyle
+Made with ❤️ by DrSkyle
