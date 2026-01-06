@@ -1,62 +1,43 @@
 # Contributing to CloudSlash
 
-This guide outlines the development standards and contribution workflow for CloudSlash.
+## The Philosophy
 
-## Open Core Model
+CloudSlash is **100% Open Source** software licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
 
-CloudSlash is Open Source software licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
-
-- **Core Engine**: The scanning logic, heuristics, and TUI are open source. You are encouraged to audit, improve, and extend them.
-- **Enterprise Features**: Automated reporting and remediation generation are reserved for licensed users.
-
-### License Enforcement
-
-You may not modify the source code to bypass or remove license checks for the purpose of redistributing the software as a commercial product or SaaS service. This is a violation of the AGPLv3.
+We do not have a "Pro" version or "Open Core" restrictions. Every heuristic, every feature, and every line of code is available to everyone. We believe in transparency and community ownership.
 
 ## Workflow
 
 ### Reporting Issues
 
-1. Search existing issues to avoid duplicates.
-2. Include the output of `cloudslash --version` (or the commit hash).
-3. Provide a minimal reproduction or a sanitized log output.
+1.  **Search First**: check existing issues to avoid duplicates.
+2.  **Version Info**: Include `cloudslash --version` or commit hash.
+3.  **Logs**: Provide sanitized logs or a minimal reproduction case.
 
 ### Pull Requests
 
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feat/my-feature`).
-3. Ensure your code compiles: `go build ./cmd/cloudslash`.
-4. Format your code: `go fmt ./...`.
-5. Submit a Pull Request.
+1.  **Fork** the repository.
+2.  **Branch**: `git checkout -b feat/my-feature`
+3.  **Verify**: Ensure it builds `go build ./cmd/cloudslash`
+4.  **Format**: `go fmt ./...`
+5.  **Submit**.
 
 ## Development
 
 **Prerequisites**: Go 1.25+
 
-1. **Clone**:
+```bash
+git clone https://github.com/DrSkyle/CloudSlash.git
+cd CloudSlash
+go run ./cmd/cloudslash --mock
+```
 
-   ```bash
-   git clone https://github.com/DrSkyle/CloudSlash.git
-   cd CloudSlash
-   ```
+## Standards
 
-2. **Run**:
+- **Error Handling**: Wrap errors with context. No silent failures.
+- **AWS Safety**: Always validate region/identity. Read-only by default unless `--nuke` is set.
+- **No Fluff**: Keep comments and UI text direct and technical. Avoid emojis and "AI-like" operational phrases.
 
-   ```bash
-   go run ./cmd/cloudslash
-   ```
+## License
 
-3. **Mock Mode** (Run without AWS credentials):
-   ```bash
-   go run ./cmd/cloudslash --mock
-   ```
-
-## Coding Standards
-
-- **Error Handling**: Never ignore errors. Wrap them with context or handle them explicitly.
-- **AWS API**: Always verify identity and region before making calls. Assume credentials may be missing or expired.
-- **UI**: Maintain the existing TUI aesthetic defined in `internal/ui`. Do not introduce new libraries without prior discussion.
-
-## Legal
-
-By contributing to this repository, you agree that your contributions will be licensed under the AGPLv3.
+By contributing, you agree that your code will be licensed under the **AGPLv3** to maintain the freedom of the project.
