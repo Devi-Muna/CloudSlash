@@ -1,4 +1,4 @@
-# CloudSlash Guide (v1.3.2)
+# CloudSlash Operator's Manual (v1.3.3)
 
 This manual outlines the operational workflows for CloudSlash: executing scans, interpreting the dependency graph, and performing safe remediation of Terraform state.
 
@@ -7,62 +7,48 @@ This manual outlines the operational workflows for CloudSlash: executing scans, 
 Ensure the following are configured before execution:
 
 - **AWS Credentials:** A valid session via `~/.aws/credentials` or `AWS_PROFILE`.
-- **IAM Permissions:** The `ViewOnlyAccess` managed policy is sufficient for analysis.
+- **IAM Permissions:** `ViewOnlyAccess` is sufficient for analysis. `ce:GetCostAndUsage` is recommended for accurate pricing.
 - **Terraform CLI:** (Optional) Required locally (v0.12+) only if generating state remediation scripts.
 
-## 1.1 License Activation (Pro)
+## 2. Execution Modes
 
-To unlock Pro features (Headless Mode, Fix Scripts, Reports), provide your license key via flag or environment variable:
+CloudSlash is designed for both interactive exploration and automated pipelines.
 
-**Option A: Flag (One-off)**
+### **Interactive Dashboard (TUI)**
 
-```bash
-cloudslash scan --license "YOUR_KEY_HERE"
-```
-
-**Option B: Environment Variable (Recommended for CI/CD)**
+The default mode. Best for investigating complex dependencies and exploring your account's waste topology.
 
 ```bash
-export CLOUDSLASH_LICENSE="YOUR_KEY_HERE"
-cloudslash scan --headless
+cloudslash
 ```
 
-## 2. Scan Modes
+### **Headless Mode (CI/CD)**
 
-Select the execution mode based on your environment.
+Run cloudslash in your GitHub Actions or Jenkins pipelines. It bypasses the UI and generates exit codes based on findings.
 
-### Standard Scan (Interactive)
-
-The default mode launches a Terminal UI (TUI) for interactive exploration of resource dependencies.
-
-```bash
-cloudslash scan
-```
-
-### Headless Mode (CI/CD)
-
-Designed for automated pipelines (GitHub Actions, Jenkins). It outputs raw logs and exit codes (Exit 0: Clean, Exit 1: Waste Detected).
+- **Exit 0**: Clean System.
+- **Exit 1**: Waste Detected.
 
 ```bash
 cloudslash scan --headless
 ```
 
-### Metadata-Only Scan (Fast)
+### **Metadata-Only Scan (Fast)**
 
-Bypasses CloudWatch metrics API calls to reduce execution time. Checks are limited to metadata (tags, status, configuration) rather than utilization.
+Bypasses CloudWatch metrics API calls. Useful for rapid iteration when you only care about configuration state (e.g., "Is this EIP attached?") rather than utilization (e.g., "Is this CPU idle?").
 
 ```bash
 cloudslash scan --no-metrics
 ```
 
-## 3. The Resource Dependency Graph (TUI)
+## 3. The Dashboard (TUI) Explained
 
-CloudSlash visualizes resources as a **Dependency Tree**. This allows you to evaluate the "blast radius" of a resource before removal by seeing its parent/child relationships.
+CloudSlash visualizes resources as a **Dependency Tree**. This allows you to evaluate the "blast radius" of a resource before removal.
 
-**Dashboard Overview**
+**Dashboard Layout**
 
 ```plaintext
- [ ESTIMATED MONTHLY WASTE: $4,250.00 ]
+ [ CLOUDSLASH v1.3.3 ] [ TASKS: 12/40 ] [ WASTE: $4,250.00/mo ] [ RISK: HIGH ]
 
  [FAIL] NAT Gateway: nat-0abc123
   ├─ Cost: $32.40/mo (Fixed Rate)
@@ -72,153 +58,103 @@ CloudSlash visualizes resources as a **Dependency Tree**. This allows you to eva
 ```
 
 - **Cost Estimate:** Real-time calculation of potential monthly savings.
-- **Dependency Context:** In the example above, the NAT Gateway is flagged because the instances in its connected subnet are stopped, rendering the gateway redundant.
+- **Risk Score:** Heuristic assessment of how "dangerous" the current state is (e.g., Dangling DNS = Critical).
+- **Dependency Context:** Shows _why_ a resource is flagged. In the example above, the NAT Gateway is flagged not just because it has low traffic, but because its connected instances are stopped.
 
-**Controls**
+**Keyboard Controls**
 
-- **Navigation:** Arrow Keys (Up/Down)
-- **Drill Down:** Enter (View IDs, ARNs, Tags)
-- **Suppress:** `i` (Adds resource to local `.cloudslash/ignore.yaml`)
-- **Exit:** `q`
+| Key       | Action       | Description                                        |
+| :-------- | :----------- | :------------------------------------------------- |
+| `↑` / `↓` | **Navigate** | Scroll through the waste list.                     |
+| `Enter`   | **Details**  | Open the Detail View (Sparklines, Tags, JSON).     |
+| `i`       | **Ignore**   | Suppress this resource (Adds to `.ignore.yaml`).   |
+| `m`       | **Mark**     | Soft-delete mark (Simulated).                      |
+| `y`       | **Copy ID**  | Copy Resource ID (e.g., `i-0123...`) to clipboard. |
+| `o`       | **Open**     | Open resource in AWS Console (Browser).            |
+| `q`       | **Quit**     | Exit CloudSlash.                                   |
 
-## 4. Terraform State Reconciliation
+## 4. Remediation Workflows
 
-CloudSlash maps identified AWS resources back to your local Terraform state to facilitate cleanup.
+CloudSlash does not strictly _enforce_ deletion it empowers you to make the decision.
 
-> **Safety Mechanism:** CloudSlash **automatically creates a backup** of your `.tfstate` before any operation. It never modifies `.tfstate` files directly without this safety net, and utilizes `terraform show -json` to safely inspect usage.
+### **Workflow A: The "State Doctor" (Terraform Users)**
 
-**Remediation Workflow**
+If your infrastructure is managed by Terraform, deleting resources manually in the AWS Console will break your state file. CloudSlash solves this.
 
-1. **Navigate to Project Root:**
+1.  **Run Scan in Repo Root:**
+    ```bash
+    cd /path/to/my-infra
+    cloudslash
+    ```
+2.  **Inspect Output:**
+    CloudSlash detects your `.tfstate` and cross-references it with the waste it found.
+3.  **Execute Fix Script:**
+    A script is generated at `cloudslash-out/fix_terraform.sh`.
 
-   ```bash
-   cd /path/to/my-infra
-   ```
+    ```bash
+    # Review changes
+    cat cloudslash-out/fix_terraform.sh
 
-2. **Execute Scan:**
+    # Apply changes (Removes "zombies" from state)
+    ./cloudslash-out/fix_terraform.sh
+    ```
 
-   ```bash
-   cloudslash scan
-   ```
+4.  **Verify:**
+    ```bash
+    terraform plan
+    ```
+    Your plan should now show that Terraform _agrees_ the resources are gone, rather than trying to recreate them.
 
-3. **Review Output:** If drift is detected, a script is generated in the `cloudslash-out/` directory.
+### **Workflow B: The "Janitor" (Console/ClickOps Users)**
 
-   ```bash
-   # 1. Audit the generated script
-   cat cloudslash-out/fix_terraform.sh
+For resources not managed by Terraform (or click-ops accounts).
 
-   # 2. Execute Remediation
-   # This executes 'terraform state rm' for identified resources
-   ./cloudslash-out/fix_terraform.sh
+1.  **Generate Scripts:**
+    CloudSlash creates `cloudslash-out/safe_cleanup.sh`.
+2.  **Run Cleanup:**
+    ```bash
+    ./cloudslash-out/safe_cleanup.sh
+    ```
+    _Note: This script uses the AWS CLI to delete resources. Ensure you have permissions._
 
-   # 3. Verify Consistency
-   terraform plan
-   ```
+## 5. Heuristics Catalog
 
-## 5. Detection Logic & Heuristics
+A reference guide to the detection engines utilized by CloudSlash.
 
-Detailed logic for specific high-value checks.
+### **Compute & Serverless**
 
-### Network Optimization
+| Detection                  | Logic                                                           | Remediation                               |
+| :------------------------- | :-------------------------------------------------------------- | :---------------------------------------- |
+| **Lambda Code Stagnation** | 0 Invocations (90d) AND Last Modified > 90d.                    | Delete function or archive code to S3.    |
+| **ECS Idle Cluster**       | EC2 instances running for >1h but Cluster has 0 Tasks/Services. | Scale ASG to 0 or delete Cluster.         |
+| **ECS Crash Loop**         | Service Desired Count > 0 but Running Count == 0.               | Check Task Definitions / ECR Image pulls. |
 
-**1. Idle NAT Gateways**
+### **Storage & Database**
 
-- **Cost Impact:** ~$32/month base cost + data processing fees.
-- **Logic:** Flagged if traffic < 1GB (30d) OR if all backend instances in connected subnets are in a terminated/stopped state.
+| Detection            | Logic                                                   | Remediation                                    |
+| :------------------- | :------------------------------------------------------ | :--------------------------------------------- |
+| **Zombie EBS**       | Volume state is `available` (unattached) for > 14 days. | Snapshot (optional) then Delete.               |
+| **Legacy EBS (gp2)** | Volume is `gp2`. `gp3` is 20% cheaper and decoupled.    | Modify Volume to `gp3` (No downtime).          |
+| **Fossil Snapshots** | RDS/EBS Snapshot > 90 days old, not attached to AMI.    | Delete old snapshots.                          |
+| **RDS Idle**         | 0 Connections (7d) AND CPU < 5%.                        | Stop instance or take final snapshot & delete. |
 
-**2. Elastic IP DNS Safety Check**
+### **Network & Security**
 
-- **Risk:** "Subdomain Takeover." If an EIP is released to AWS but remains in your Route53 DNS records, a third party could claim the IP and serve traffic on your domain.
-- **Logic:** Cross-references EIPs against Route53 A-records. If a match is found, the EIP is marked **[DANGER]**. DNS records must be updated before release.
+| Detection                   | Logic                                                              | Remediation                                     |
+| :-------------------------- | :----------------------------------------------------------------- | :---------------------------------------------- |
+| **Hollow NAT Gateway**      | Traffic < 1GB (30d) OR Connected Subnets have 0 Running Instances. | Delete NAT Gateway.                             |
+| **Dangling EIP (Critical)** | EIP unattached but matches an A-Record in Route53.                 | **URGENT**: Update DNS first, then release EIP. |
+| **Orphaned ELB**            | Load Balancer has 0 registered/healthy targets.                    | Delete ELB.                                     |
 
-### Storage Hygiene
+### **Containers**
 
-**1. Incomplete S3 Multipart Uploads**
-
-- **Issue:** Failed large file uploads leave hidden data chunks in S3 that incur storage costs but do not appear in standard file listings.
-- **Detection:** Queries the `ListMultipartUploads` API for incomplete segments older than 7 days.
-
-**2. EBS Volume Optimization (gp2 vs gp3)**
-
-- **Benefit:** gp3 volumes offer a 20% lower cost per GB and decouple IOPS from storage size compared to gp2.
-- **Logic:** Identifies gp2 volumes and calculates the specific cost savings and IOPS performance gain of migrating to gp3.
+| Detection                 | Logic                                               | Remediation                                     |
+| :------------------------ | :-------------------------------------------------- | :---------------------------------------------- |
+| **ECR Lifecycle Missing** | Repo has images > 90d old but no expiration policy. | Add Lifecycle Policy to expire untagged images. |
+| **Log Retention Missing** | CloudWatch Group set to "Never Expire" (>1GB size). | Set retention to 30d/90d.                       |
 
 ## 6. Troubleshooting
 
-- **"Permission Denied" errors:** Ensure your IAM user possesses the `ce:GetCostAndUsage` permission in addition to `ViewOnlyAccess`.
-- **"Terraform State Not Found":** Ensure you are executing the CLI from the directory containing `.tfstate` (or the `.terraform` directory). For remote backends (S3), run `terraform init` to refresh the local cache.
-
----
-
-# 7. Command & Control Reference
-
-A complete cheatsheet of all available CLI commands and TUI controls.
-
-## CLI Commands
-
-| Command                        | Description                                                                                                                                         |
-| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cloudslash`                   | **Interactive Mode**. Launches the TUI dashboard. Default entry point.                                                                              |
-| `cloudslash scan`              | **Headless Mode**. Runs analysis and outputs text logs. Ideal for CI/CD or scripting.                                                               |
-| `cloudslash scan --no-metrics` | **Metadata-Only**. Skips CloudWatch APIs for a faster, free scan (less accurate).                                                                   |
-| `cloudslash nuke`              | **[DANGER] Destructive Mode**. Interactively reviews and _permanently deletes_ resources via AWS API. Bypasses Terraform. Use with extreme caution. |
-| `cloudslash export`            | **Export Data**. Runs a scan and forces generation of CSV/JSON/HTML reports (Pro).                                                                  |
-| `cloudslash update`            | **Self-Update**. Checks GitHub for the latest release and auto-updates the binary.                                                                  |
-
-## TUI Controls (Interactive Dashboard)
-
-|        Key        | Action                | Context                                                    |
-| :---------------: | :-------------------- | :--------------------------------------------------------- |
-|     `↑` / `k`     | **Move Up**           | Navigation                                                 |
-|     `↓` / `j`     | **Move Down**         | Navigation                                                 |
-| `Enter` / `Space` | **View Details**      | Expands to show "Sparklines", "Blame", Cost, and Tags.     |
-|        `i`        | **Ignore (Suppress)** | Adds resource to `.ignore.yaml`. Hidden from future scans. |
-|        `m`        | **Soft Delete**       | "Marks" resource for later deletion (Audit Logged).        |
-|        `y`        | **Copy ID**           | Copies Resource ID (e.g., `i-0x123`) to clipboard.         |
-|     `Shift+Y`     | **Copy ARN**          | Copies full ARN to clipboard.                              |
-|        `c`        | **Copy JSON**         | Copies full resource details JSON to clipboard.            |
-|        `P`        | **Sort by Price**     | Toggles sorting by highest monthly cost.                   |
-|        `E`        | **Filter Easy**       | Filters for "Easy Wins" (Low Risk / Unattached).           |
-|        `R`        | **Filter Region**     | Cycles through discovered regions.                         |
-|  `q` / `Ctrl+C`   | **Quit**              | Exits the application.                                     |
-
----
-
-# Appendix: Heuristics Catalog
-
-A reference guide to the detection engines available in v1.3.2.
-
-### 1. Compute & Serverless
-
-| Detection                  | Condition                                                                      | Severity |
-| :------------------------- | :----------------------------------------------------------------------------- | :------- |
-| **Lambda Code Stagnation** | 0 Invocations (90d) AND Last Modified > 90d                                    | [FAIL]   |
-| **Lambda Version Bloat**   | >5 Versions exist (excluding $LATEST or Aliased versions)                      | [WARN]   |
-| **ECS Idle Cluster**       | Cluster contains active EC2 Instances (>1h uptime) but 0 Tasks running         | [FAIL]   |
-| **ECS Crash Loop**         | Service Desired Count > 0 but Running Count == 0 (Checks for OOM/Image errors) | [FAIL]   |
-
-### 2. Data & Storage
-
-| Detection                      | Condition                                                      | Severity |
-| :----------------------------- | :------------------------------------------------------------- | :------- |
-| **Redshift Inactivity**        | 0 Queries executed in last 24h                                 | [WARN]   |
-| **ElastiCache Idle**           | 0 Hits/Misses (7d) AND CPU < 2% AND Network < 5MB/week         | [FAIL]   |
-| **DynamoDB Over-provisioning** | Provisioned Mode with utilization < 15% (Recommends On-Demand) | [WARN]   |
-| **EBS Legacy Type**            | Volume Type is `gp2` (Recommends `gp3` upgrade)                | [WARN]   |
-| **S3 Multipart Abandonment**   | Incomplete Upload parts > 7 days old                           | [WARN]   |
-
-### 3. Network & Infrastructure
-
-| Detection                  | Condition                                                         | Severity |
-| :------------------------- | :---------------------------------------------------------------- | :------- |
-| **Idle NAT Gateway**       | Traffic < 1GB (30d) OR Connected Subnets have 0 Running Instances | [FAIL]   |
-| **Dangling EIP**           | Unattached EIP. (Includes Route53 cross-reference check)          | [FAIL]   |
-| **Orphaned Load Balancer** | ELB exists but has no registered targets/instances                | [FAIL]   |
-
-### 4. Containers & Operations
-
-| Detection                 | Condition                                                             | Severity |
-| :------------------------ | :-------------------------------------------------------------------- | :------- |
-| **ECR Lifecycle Missing** | Repo has No Lifecycle Policy AND Images are Untagged + Unpulled > 90d | [WARN]   |
-| **Log Retention Missing** | Retention = "Never" AND Group Size > 1GB                              | [WARN]   |
-| **Abandoned Log Group**   | Stored Bytes > 0 BUT Incoming Bytes == 0 (30d)                        | [FAIL]   |
+- **"Permission Denied"**: Ensure your IAM User/Role has `ViewOnlyAccess`. for Cost data, `ce:GetCostAndUsage` is required.
+- **"Terraform State Not Found"**: Run CloudSlash from the directory containing your `terraform.tfstate` or `.terraform/` folder.
+- **"TUI Distortion"**: If the dashboard looks broken, try resizing your terminal or ensuring a Nerd Font is installed (though standard fonts should work).

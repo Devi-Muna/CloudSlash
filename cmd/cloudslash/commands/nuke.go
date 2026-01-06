@@ -44,7 +44,7 @@ var NukeCmd = &cobra.Command{
 		// Reusing app.Config and mimicking bootstrap logic quickly.
 		// Ideally refactor bootstrap to return the graph.
 		// For now, let's assume valid creds and basic scan.
-		client, err := aws.NewClient(ctx, "us-east-1", "") // Default region/profile
+		client, err := aws.NewClient(ctx, config.Region, "", config.Verbose) // Default region/profile
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return

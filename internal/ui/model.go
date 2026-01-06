@@ -5,6 +5,7 @@ import (
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/swarm"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,8 +20,9 @@ const (
 
 type Model struct {
 	// core components
-	spinner spinner.Model
-	Engine  *swarm.Engine
+	spinner  spinner.Model
+	progress progress.Model
+	Engine   *swarm.Engine
 	Graph   *graph.Graph
 
 	// state
@@ -30,8 +32,8 @@ type Model struct {
 	err        error
 	width      int
 	height     int
-	isTrial    bool
 	isMock     bool
+	Region     string
 
 	// data
 	wasteItems   []*graph.Node
@@ -39,6 +41,9 @@ type Model struct {
 	riskScore    int
 	tasksDone    int
 	tfRepairReady bool
+	
+	// metrics
+	startTime time.Time
 
 	// filters
 	SortMode   string
@@ -54,19 +59,24 @@ type Model struct {
 
 type tickMsg time.Time
 
-func NewModel(e *swarm.Engine, g *graph.Graph, isTrial bool, isMock bool) Model {
+func NewModel(e *swarm.Engine, g *graph.Graph, isMock bool, region string) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Points // "Future" style spinner (dots)
 	s.Style = special
 
+	// Gradient Progress Bar (Green to Cyan)
+	prog := progress.New(progress.WithGradient("#00FF99", "#00CCFF"))
+
 	return Model{
 		spinner:  s,
+		progress: prog,
 		scanning: !isMock,
-		isTrial:  isTrial,
 		isMock:   isMock,
 		Engine:   e,
 		Graph:    g,
 		state:    ViewStateList,
+		startTime: time.Now(),
+		Region:    region,
 	}
 }
 

@@ -13,7 +13,6 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/heuristics"
 	"github.com/DrSkyle/cloudslash/internal/k8s"
-	"github.com/DrSkyle/cloudslash/internal/license"
 	"github.com/DrSkyle/cloudslash/internal/notifier"
 	"github.com/DrSkyle/cloudslash/internal/pricing"
 	"github.com/DrSkyle/cloudslash/internal/remediation"
@@ -25,8 +24,6 @@ import (
 )
 
 type Config struct {
-	LicenseKey       string
-	MachineID        string // New Field
 	Region           string
 	TFStatePath      string
 	MockMode         bool
@@ -35,26 +32,18 @@ type Config struct {
 	SlackWebhook string
 	Headless         bool
 	DisableCWMetrics bool
+	Verbose          bool
 }
 
 func Run(cfg Config) (bool, *graph.Graph, error) {
-	isTrial := false
-	if cfg.LicenseKey == "" {
-		if !cfg.Headless {
-			fmt.Println("No license key provided. Running Community Edition.")
-		}
-		isTrial = true
-	} else {
-		if err := license.Check(cfg.LicenseKey, cfg.MachineID); err != nil {
-			fmt.Printf("License check failed: %v\n", err)
-			fmt.Println("Falling back to Community Edition.")
-			isTrial = true
-		}
+	
+	if !cfg.Headless {
+		fmt.Println("CloudSlash v1.3.3 [AGPLv3]")
 	}
+	
+	// HEADLESS MODE UNLOCKED for AGPL compliance strategy
+	// We want Enterprises to run this in CI/CD so their scanners flag the license.
 
-	if cfg.Headless && isTrial && !cfg.MockMode {
-		return false, nil, fmt.Errorf("headless Mode (CI/CD Automation) is a CloudSlash Pro feature.\nPlease use the interactive mode ('cloudslash') or upgrade to Enterprise.")
-	}
 
 	ctx := context.Background()
 	var g *graph.Graph
@@ -67,13 +56,13 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 	var doneChan <-chan struct{}
 
 	if cfg.MockMode {
-		runMockMode(ctx, g, engine, cfg.Headless, isTrial)
+		runMockMode(ctx, g, engine, cfg.Headless)
 	} else {
-		doneChan = runRealMode(ctx, cfg, g, engine, isTrial)
+		doneChan = runRealMode(ctx, cfg, g, engine)
 	}
 
 	if !cfg.Headless {
-		model := ui.NewModel(engine, g, isTrial, cfg.MockMode)
+		model := ui.NewModel(engine, g, cfg.MockMode, cfg.Region)
 		p := tea.NewProgram(model)
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Alas, there's been an error: %v", err)
@@ -85,10 +74,10 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 		}
 	}
 
-	return !isTrial, g, nil
+	return true, g, nil
 }
 
-func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, headless bool, isTrial bool) {
+func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, headless bool) {
 	mockScanner := aws.NewMockScanner(g)
 	mockScanner.Scan(ctx)
 
@@ -122,32 +111,29 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 	report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
 	report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
-	// PRO FEATURES
-	if !isTrial {
-		if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
-			fmt.Printf("Failed to generate dashboard: %v\n", err)
-		}
-		
-		// The Scalpel
-		gen := tf.NewGenerator(g, nil)
-		gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
-		os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
-
-		// The Executive Brief
-		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
+	// UNLOCKED FEATURES (AGPLv3)
+	if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
+		fmt.Printf("Failed to generate dashboard: %v\n", err)
 	}
+	
+	// The Scalpel
+	gen := tf.NewGenerator(g, nil)
+	gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
+	os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
+
+	// The Executive Brief
+	report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
 }
 
-func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, isTrial bool) <-chan struct{} {
+func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) <-chan struct{} {
 	done := make(chan struct{})
 
 	var pricingClient *pricing.Client
-	if !isTrial {
-		var err error
-		pricingClient, err = pricing.NewClient(ctx)
-		if err != nil {
-			fmt.Printf("Warning: Failed to initialize Pricing Client: %v\n", err)
-		}
+	var err error
+	pricingClient, err = pricing.NewClient(ctx)
+	if err != nil {
+		// Log but continue (Pricing is optional but nice)
+		// fmt.Printf("Warning: Failed to initialize Pricing Client: %v\n", err)
 	}
 
 	profiles := []string{""}
@@ -182,7 +168,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 				continue
 			}
 
-			client, err := runScanForProfile(ctx, region, profile, g, engine, &scanWg)
+			client, err := runScanForProfile(ctx, region, profile, cfg.Verbose, g, engine, &scanWg)
 			if err != nil {
 				fmt.Printf("Scan failed for profile %s region %s: %v\n", profile, region, err)
 				continue
@@ -291,13 +277,8 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			fmt.Printf("Time Machine Analysis failed: %v\n", err)
 		}
 
-		if !isTrial {
-			detective := forensics.NewDetective(ctClient)
-			detective.InvestigateGraph(ctx, g)
-		} else {
-			detective := forensics.NewDetective(nil)
-			detective.InvestigateGraph(ctx, g)
-		}
+		detective := forensics.NewDetective(ctClient)
+		detective.InvestigateGraph(ctx, g)
 
 		// OUTPUT GENERATION (Updated Logic)
 		os.Mkdir("cloudslash-out", 0755)
@@ -306,36 +287,34 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
 		report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
-		// 2. Pro Features
-		if !isTrial {
-			gen := tf.NewGenerator(g, state)
-			gen.GenerateWasteTF("cloudslash-out/waste.tf")
-			gen.GenerateImportScript("cloudslash-out/import.sh")
-			gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
-			
-			// The Scalpel
-			gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
-			os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
+		// 2. Advanced Features (Unlocked AGPLv3)
+		gen := tf.NewGenerator(g, state)
+		gen.GenerateWasteTF("cloudslash-out/waste.tf")
+		gen.GenerateImportScript("cloudslash-out/import.sh")
+		gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
+		
+		// The Scalpel
+		gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
+		os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
 
-			remGen := remediation.NewGenerator(g)
-			remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
-			os.Chmod("cloudslash-out/safe_cleanup.sh", 0755)
+		remGen := remediation.NewGenerator(g)
+		remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
+		os.Chmod("cloudslash-out/safe_cleanup.sh", 0755)
 
-			remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
-			os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
+		remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
+		os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
 
-			if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
-				fmt.Printf("Failed to generate dashboard: %v\n", err)
-			}
-			
-			// The Executive Brief
-			report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
+		if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
+			fmt.Printf("Failed to generate dashboard: %v\n", err)
+		}
+		
+		// The Executive Brief
+		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
 
-			if cfg.SlackWebhook != "" {
-				if err := notifier.SendSlackReport(cfg.SlackWebhook, g); err != nil {
-					fmt.Printf("Failed to send Slack report: %v\n", err)
-				}
+		if cfg.SlackWebhook != "" {
+			if err := notifier.SendSlackReport(cfg.SlackWebhook, g); err != nil {
+				fmt.Printf("Failed to send Slack report: %v\n", err)
 			}
 		}
 	}()
@@ -343,8 +322,8 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	return done
 }
 
-func runScanForProfile(ctx context.Context, region, profile string, g *graph.Graph, engine *swarm.Engine, scanWg *sync.WaitGroup) (*aws.Client, error) {
-	awsClient, err := aws.NewClient(ctx, region, profile)
+func runScanForProfile(ctx context.Context, region, profile string, verbose bool, g *graph.Graph, engine *swarm.Engine, scanWg *sync.WaitGroup) (*aws.Client, error) {
+	awsClient, err := aws.NewClient(ctx, region, profile, verbose)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AWS client: %v", err)
 	}
@@ -352,7 +331,7 @@ func runScanForProfile(ctx context.Context, region, profile string, g *graph.Gra
 	identity, err := awsClient.VerifyIdentity(ctx)
 	if err != nil {
 		if strings.Contains(err.Error(), "no EC2 IMDS role found") || strings.Contains(err.Error(), "failed to get caller identity") {
-			return nil, fmt.Errorf("\n❌ Unable to find AWS Credentials.\n   Please run 'aws configure' or set AWS_PROFILE.\n   (Error: %v)", err)
+			return nil, fmt.Errorf("\n[ERROR] Unable to find AWS Credentials.\n   Please run 'aws configure' or set AWS_PROFILE.\n   (Error: %v)", err)
 		}
 		return nil, fmt.Errorf("failed to verify identity: %v", err)
 	}

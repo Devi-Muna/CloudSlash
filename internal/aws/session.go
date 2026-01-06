@@ -22,7 +22,7 @@ type Client struct {
 }
 
 // NewClient initializes a new AWS client.
-func NewClient(ctx context.Context, region, profile string) (*Client, error) {
+func NewClient(ctx context.Context, region, profile string, verbose bool) (*Client, error) {
 	opts := []func(*config.LoadOptions) error{
 		config.WithRegion(region),
 	}
@@ -31,8 +31,6 @@ func NewClient(ctx context.Context, region, profile string) (*Client, error) {
 	}
 
 	// TRAP: User-Agent Fingerprint
-	// If a competitor forks this codebase but forgets to change this,
-	// their API calls will be permanently stamped with "CS-v1-7f8a9d-AGPL".
 	const signature = "CS-v1-7f8a9d-AGPL"
 
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
@@ -56,6 +54,20 @@ func NewClient(ctx context.Context, region, profile string) (*Client, error) {
 			return next.HandleBuild(ctx, input)
 		}), middleware.After)
 	})
+
+	// 💊 MATRIX MODE (Visual Logging)
+	if verbose {
+		cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
+			return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("MatrixLogger", func(ctx context.Context, input middleware.InitializeInput, next middleware.InitializeHandler) (
+				middleware.InitializeOutput, middleware.Metadata, error,
+			) {
+				opName := middleware.GetOperationName(ctx)
+				// Green/Dim Text: \033[2m (Dim) \033[32m (Green)
+				fmt.Printf("\033[2m\033[32m[MATRIX] AWS API Call: %s\033[0m\n", opName)
+				return next.HandleInitialize(ctx, input)
+			}), middleware.Before)
+		})
+	}
 
 	return &Client{
 		Config: cfg,

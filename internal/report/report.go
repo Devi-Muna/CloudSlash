@@ -324,7 +324,7 @@ const htmlTemplate = `
                 </div>
             </div>
             <div>
-                <span class="meta-tag">v1.3.0 Enterprise</span>
+                <span class="meta-tag">v1.3.3 [AGPLv3]</span>
             </div>
         </header>
 
@@ -432,7 +432,7 @@ const htmlTemplate = `
         </div>
 
         <footer style="margin-top: 4rem; text-align: center; opacity: 0.5; padding-bottom: 2rem;">
-            <p style="font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;">CloudSlash Forensic Engine // v1.3.0</p>
+            <p style="font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;">CloudSlash Forensic Engine // v1.3.3 [AGPLv3]</p>
         </footer>
     </div>
 

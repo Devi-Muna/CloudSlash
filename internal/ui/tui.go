@@ -14,8 +14,10 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -138,11 +140,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.progress.Width = msg.Width - 20 // Padding
 
 	case spinner.TickMsg:
 		m.tickCount++
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+
+	case progress.FrameMsg:
+		progressModel, cmd := m.progress.Update(msg)
+		m.progress = progressModel.(progress.Model)
 		return m, cmd
 
 	case tickMsg:
@@ -152,9 +160,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Check if done scanning
 		stats := m.Engine.GetStats()
 		m.tasksDone = int(stats.TasksCompleted)
+
+		// Heuristic Progress: Completed / (Completed + Active + 1)
+		// The +1 prevents division by zero and keeps it < 100% until truly done
+		total := float64(stats.TasksCompleted + int64(stats.ActiveWorkers))
+		if total == 0 { total = 1 }
+		pct := float64(stats.TasksCompleted) / total
+		
+		// If scanning is done (Active=0 and >10 tasks), force 100%
 		if stats.TasksCompleted > 10 && stats.ActiveWorkers == 0 {
 			m.scanning = false
+			pct = 1.0
 		}
+		
+		cmd := m.progress.SetPercent(pct)
 		
 		// Check TF Repair
 		if _, err := os.Stat("cloudslash-out/fix_terraform.sh"); err == nil {
@@ -163,9 +182,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tfRepairReady = false
 		}
 
-		return m, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+		return m, tea.Batch(cmd, tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 			return tickMsg(t)
-		})
+		}))
 	}
 	return m, nil
 }
@@ -175,7 +194,32 @@ func (m Model) View() string {
 		return m.err.Error()
 	}
 	if m.quitting {
-		return "CloudSlash Session Terminated.\n"
+		// Performance Flex
+		duration := time.Since(m.startTime).Seconds()
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		memMB := mem.Alloc / 1024 / 1024
+		
+		nodeCount := 0
+		if m.Graph != nil {
+			m.Graph.Mu.RLock()
+			nodeCount = len(m.Graph.Nodes)
+			m.Graph.Mu.RUnlock()
+		}
+
+		stats := fmt.Sprintf("\n[SUCCESS] Scan Complete. Audited %d resources in %.2fs. (Memory: %dMB)\n", nodeCount, duration, memMB)
+		// Exit View
+		s := "\n" +
+			lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#00FF99")).
+				Bold(true).
+				Render("CLOUDSLASH v1.3.3 [AGPLv3]") + "\n" +
+			`Open Source Infrastructure Forensics
+Maintained by DrSkyle | github.com/drskyle/cloudslash
+
+License: AGPLv3. For commercial use without open-source obligations, please acquire a Commercial Exemption.
+`
+		return stats + s
 	}
 
 	// 1. Render HUD

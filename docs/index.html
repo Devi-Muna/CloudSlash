@@ -31,12 +31,9 @@
             </div>
             <nav>
                 <a href="#features">Features</a>
-                <a href="#pricing">Pricing</a>
-                <a href="mission.html">Mission</a>
                 <a href="https://github.com/DrSkyle/CloudSlash" target="_blank" class="github-link">
                     GitHub
                 </a>
-                <a href="#download" class="btn-primary-sm">Community Edition</a>
             </nav>
         </div>
     </header>
@@ -180,46 +177,33 @@
             </div>
         </section>
 
-        <section id="pricing" class="pricing">
+        <section id="support" class="support-section">
             <div class="container">
-                <h2 class="section-title">Invest in Efficiency</h2>
-                <div class="pricing-grid">
-                    <div class="price-card glass-panel" style="border: 1px solid #334155; height: 100%;">
-                        <h3>Indie Developer License</h3>
-                        <div class="price">$49<span>/once</span></div>
-                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">Own the tool forever. Stop renting SaaS.<br>(Strictly for Personal / Solo use)</p>
-                        <ul class="features-list">
-                            <li>✅ <strong>Lifetime Updates</strong> (No subscription)</li>
-                            <li>✅ Full Forensic Scan Capabilities</li>
-                            <li>❤️ <strong>Funds Direct Aid</strong></li>
-                        </ul>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37525/" class="btn-secondary-full" style="margin-top: auto; border-color: #00FF99; color: #00FF99;">Support the Mission</a>
+                <h2 class="section-title">Commercial Use & Support</h2>
+                <div class="support-grid" style="display: flex; justify-content: center; gap: 30px;">
+                    
+                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 400px;">
+                        <h3>Commercial Exemption</h3>
+                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">
+                            CloudSlash is <strong>AGPLv3</strong>. If your organization requires a commercial license for AGPL compliance (e.g. embedding in proprietary software), or if you cannot open-source your modifications, exemptions are available.
+                        </p>
+                        <a href="mailto:enterprise@cloudslash.com" class="btn-secondary-full" style="margin-top: auto; border-color: #00FF99; color: #00FF99;">Contact for Exemption</a>
                     </div>
 
-                    <div class="price-card glass-panel featured" style="border-color: #22C55E; box-shadow: 0 0 30px rgba(34, 197, 94, 0.1);">
-                        <div class="badge">Commercial Standard</div>
-                        <h3 style="color: #F8FAFC;">Company / Pro</h3>
-                        <div class="price" style="font-family: 'JetBrains Mono', monospace;">$299<span>/year</span></div>
-                        <p style="color: #94A3B8; margin-bottom: 24px; font-size: 0.9rem;">Full spectrum forensics for teams.</p>
-                        <ul class="features-list">
-                            <li>✅ <strong>Everything in Community</strong></li>
-                            <li>✅ <strong>Terraform Bridge</strong> (State Doctor)</li>
-                            <li>✅ <strong>Surgical Fix Scripts</strong> (Remediation)</li>
-                            <li>✅ <strong>Owner Forensics</strong> (Blame Game)</li>
-                            <li>✅ Detailed Artifacts (HTML/JSON)</li>
-                            <li>✅ Priority Support</li>
-                        </ul>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" target="_blank" class="btn-primary-full" style="margin-top: auto;">Get License</a>
+                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 400px;">
+                        <h3>Support & Community</h3>
+                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">
+                            Need help? Join the community on GitHub or contact us for paid priority support and custom integration services.
+                        </p>
+                        <div style="display: flex; gap: 10px; margin-top: auto;">
+                            <a href="https://github.com/DrSkyle/CloudSlash/issues" target="_blank" class="btn-secondary-full">GitHub Issues</a>
+                            <a href="mailto:support@cloudslash.com" class="btn-primary-full">Paid Support</a>
+                        </div>
                     </div>
-                </div>
-                <div class="pricing-footer" style="text-align: center; margin-top: 30px; opacity: 0.7;">
-                    <p style="font-size: 0.9rem; color: #94A3B8;">
-                        Want to make a difference? Support Orphanages & Sanctuaries on our <a href="mission.html" style="color: #00FF99; text-decoration: none; border-bottom: 1px dotted #00FF99;">Mission Page</a>.
-                    </p>
+
                 </div>
             </div>
         </section>
-
         <section id="download" class="cta-section">
             <div class="container">
                 <div class="glass-panel centered-panel">
@@ -282,15 +266,6 @@
         </section>
 
 
-    <section class="support-section" style="border-top: 1px solid #1E293B; margin-top: 80px;">
-        <div class="container" style="display: flex; align-items: center; justify-content: center; gap: 24px; opacity: 0.7;">
-            <div style="font-size: 2rem; color: #64748B;">❤️</div>
-            <div style="text-align: left;">
-                <h4 style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; letter-spacing: 0.1em; color: #94A3B8; text-transform: uppercase; margin-bottom: 4px;">SOCIAL IMPACT PLEDGE</h4>
-                <p style="font-size: 0.9rem; color: #64748B; max-width: 450px;">We are independently bootstrapped. A portion of every license funds infrastructure for orphanages and animal sanctuaries.</p>
-            </div>
-        </div>
-    </section>
     </main>
 
     <footer>
@@ -303,38 +278,7 @@
         </div>
     </footer>
 
-    <script src="https://checkout.freemius.com/checkout.min.js"></script>
-    <script>
-        // Initialize Freemius
-        var handler = FS.Checkout.configure({
-            plugin_id: '22411',
-            public_key: 'pk_b5689104084666063628359419106', // Public key from previous context or standard
-            image: 'https://drskyle.github.io/CloudSlash/favicon.svg'
-        });
 
-        // Intercept all Freemius Links
-        document.addEventListener('DOMContentLoaded', function() {
-            var links = document.querySelectorAll('a[href*="checkout.freemius.com"]');
-            links.forEach(function(link) {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    var href = link.href;
-                    // Extract Plan ID
-                    var match = href.match(/plan\/(\d+)/);
-                    var planId = match ? match[1] : null;
-
-                    if (planId) {
-                        handler.open({
-                            plan_id: planId,
-                            cancel_url: 'https://drskyle.github.io/CloudSlash/index.html#download'
-                        });
-                    } else {
-                        window.location.href = href; // Fallback
-                    }
-                });
-            });
-        });
-    </script>
     <div class="mobile-sticky-cta">
         <a href="#download" class="btn-primary">Download</a>
     </div>

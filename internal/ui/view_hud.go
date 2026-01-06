@@ -43,8 +43,24 @@ func (m Model) viewHUD() string {
 	// Assemble Segments
 	// [ CLOUDSLASH v1.3.2 ] [ TASKS: 12/40 ] [ WASTE: $... ] [ RISK: ... ]
 	
-	segTitle := highlight.Render("CLOUDSLASH v1.3.2")
-	segStatus := statusColor.Render(fmt.Sprintf("[ STATUS: %-10s ]", status))
+	// Top Status Bar
+	m.Graph.Mu.RLock()
+	count := len(m.Graph.Nodes)
+	m.Graph.Mu.RUnlock()
+	segTitle := highlight.Render(fmt.Sprintf(" CLOUDSLASH v1.3.3 [AGPLv3] | %s | %d Resources Scanned", m.Region, count))
+	// Status Segment (Progress Bar or Static Status)
+	var segStatus string
+	if m.scanning {
+		// "Scanning..." label is implicit or added before? 
+		// Let's just use the bar. The user wanted: "Scanning AWS Region us-east-1 [████] 80%"
+		// We can add the text prefix.
+		segStatus = lipgloss.JoinHorizontal(lipgloss.Center, 
+			statusColor.Render("Scanning... "), 
+			m.progress.View(),
+		)
+	} else {
+		segStatus = statusColor.Render(fmt.Sprintf("[ STATUS: %-10s ]", status))
+	}
 	segWaste := hudLabelStyle.Render("WASTE:") + hudValueStyle.Render(savings)
 	segRisk := hudLabelStyle.Render("RISK:") + riskColor.Render(riskLevel)
 
