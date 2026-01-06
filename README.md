@@ -12,7 +12,7 @@ Most cloud tools simply list resources via API calls (e.g., `aws ec2 describe-in
 
 By mapping the edges between resources (Safety Groups -> ENIs -> Instances -> Subnets), CloudSlash can mathematically prove isolation. If a NAT Gateway has an **In-Degree of 0** (no active subnets or instances routing to it), it is hollow. This topological analysis prevents false positives that occur when relying solely on CloudWatch metrics.
 
-<img src="assets/cloudslashmap.svg" width="100%" alt="Architecture Diagram">
+<img src="assets/cloudslashmap.png" width="100%" alt="Architecture Diagram">
 
 ### The Heuristic Swarm
 
@@ -23,7 +23,7 @@ An autonomous swarm of detection engines crawls this graph to identify specific 
 - **The Time Traveler:** Finds RDS Snapshots > 90 days old that are detached from any active cluster.
 - **The Safety Lock:** preventing "Subdomain Takeover" by cross-referencing Elastic IPs against Route53 A-Records before release.
 
-## The Killer Feature: Terraform Bridge
+## Terraform Bridge
 
 **The State Doctor.**
 
