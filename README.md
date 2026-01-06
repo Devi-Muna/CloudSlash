@@ -12,7 +12,7 @@ Most cloud tools simply list resources via API calls (e.g., `aws ec2 describe-in
 
 By mapping the edges between resources (Safety Groups -> ENIs -> Instances -> Subnets), CloudSlash can mathematically prove isolation. If a NAT Gateway has an **In-Degree of 0** (no active subnets or instances routing to it), it is hollow. This topological analysis prevents false positives that occur when relying solely on CloudWatch metrics.
 
-![Architecture Diagram](assets/cloudslashmap.svg)
+<img src="assets/cloudslashmap.svg" width="100%" alt="Architecture Diagram">
 
 ### The Heuristic Swarm
 
