@@ -108,7 +108,7 @@ CloudSlash is open source and free. If you'd like to support development or need
 
 [**Support ($9.99/mo)**](https://checkout.freemius.com/app/22411/plan/37525/) - Priority Support & Gratitude.
 
-[**Super Support ($19.99/mo)**](https://checkout.freemius.com/app/22411/plan/37513/) - Direct Access & Custom Integration Help.
+[**Super Support ($19.99/mo)**](https://checkout.freemius.com/app/22411/plan/37513/) - Prioritized Feature Requests & Sponsor Recognition.
 
 ## License & Commercial Use
 
