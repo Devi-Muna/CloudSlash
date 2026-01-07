@@ -1,9 +1,5 @@
 # CloudSlash
 
-<p align="center">
-  <img src="assets/logo.png" width="120" alt="CloudSlash Logo">
-</p>
-
 ![Version](https://img.shields.io/badge/version-v1.3.3-00FF99?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-blue?style=flat-square) ![Status](https://img.shields.io/badge/status-production-green?style=flat-square)
 
 **The Forensic Cloud Accountant for AWS.**

@@ -112,7 +112,7 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 	report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
 	// UNLOCKED FEATURES (AGPLv3)
-	if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
+	if err := report.GenerateDashboard(g, "cloudslash-out/dashboard.html"); err != nil {
 		fmt.Printf("Failed to generate dashboard: %v\n", err)
 	}
 	
@@ -304,7 +304,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
 		os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
 
-		if err := report.GenerateHTML(g, "cloudslash-out/dashboard.html"); err != nil {
+		if err := report.GenerateDashboard(g, "cloudslash-out/dashboard.html"); err != nil {
 			fmt.Printf("Failed to generate dashboard: %v\n", err)
 		}
 		
