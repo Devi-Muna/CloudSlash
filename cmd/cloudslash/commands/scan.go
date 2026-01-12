@@ -8,6 +8,7 @@ import (
 
 	"github.com/DrSkyle/cloudslash/internal/app"
 	"github.com/DrSkyle/cloudslash/internal/graph"
+	"github.com/DrSkyle/cloudslash/internal/provenance"
 	tf "github.com/DrSkyle/cloudslash/internal/terraform"
 	script "github.com/DrSkyle/cloudslash/internal/tf"
 	"github.com/DrSkyle/cloudslash/internal/version"
@@ -50,7 +51,7 @@ Example:
 			_ = os.Mkdir("cloudslash-out", 0755)
 		}
 		gen := script.NewGenerator(g, nil)
-		if err := gen.GenerateAtomicNuke(nukePath); err != nil {
+		if err := gen.GenerateDeletionScript(nukePath); err != nil {
 			fmt.Printf("[WARN] Failed to generate deletion script: %v\n", err)
 		} else {
 			fmt.Printf("\n[SUCCESS] Resource deletion script generated: %s\n", nukePath)
@@ -81,9 +82,21 @@ Example:
 					}
 					g.Mu.RUnlock()
 
+					// Provenance Analysis
+					provEngine := provenance.NewEngine(".")
+					provMap := make(map[string]*provenance.ProvenanceRecord)
+
+					// Attribute all unused resources
+					for _, z := range zombies {
+						rec, err := provEngine.Attribute(z.ID, state)
+						if err == nil && rec != nil {
+							provMap[rec.TFAddress] = rec
+						}
+					}
+
 					report := tf.Analyze(zombies, state)
 
-					printTerraformReport(report)
+					printTerraformReport(report, provMap)
 					generateFixScript(report)
 				}
 			}
@@ -96,11 +109,13 @@ func init() {
 	scanCmd.Flags().Bool("no-metrics", false, "Disable CloudWatch Metric calls (Saves money)")
 	scanCmd.Flags().Bool("fast", false, "Alias for --no-metrics (Fast scan)")
 	scanCmd.Flags().Bool("headless", false, "Run without TUI (for CI/CD)")
+	scanCmd.Flags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL for Reporting")
+	scanCmd.Flags().StringVar(&config.SlackChannel, "slack-channel", "", "Override Slack Channel")
 }
 
-func printTerraformReport(report *tf.AnalysisReport) {
+func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provenance.ProvenanceRecord) {
 	if report.TotalZombiesFound == 0 {
-		fmt.Println("\n[Success] No Terraform-managed zombies found.")
+		fmt.Println("\n[Success] No Terraform-managed unused resources found.")
 		return
 	}
 
@@ -116,13 +131,34 @@ func printTerraformReport(report *tf.AnalysisReport) {
 	}
 
 	for _, res := range report.ResourcesToDelete {
-		fmt.Printf("# Remove orphaned resource\n")
-		fmt.Printf("terraform state rm %s\n", res)
+		fmt.Printf("# Remove orphaned resource: %s\n", res)
+		
+		// PRINT PROVENANCE AUDIT BOX
+		if rec, ok := provMap[res]; ok {
+			printProvenanceBox(rec)
+		}
+		
+		fmt.Printf("terraform state rm %s\n\n", res)
 	}
 
-	fmt.Println("\n-------------------------------------------------------------")
+	fmt.Println("-------------------------------------------------------------")
 	fmt.Println("  Next Step: Run 'terraform plan' to verify the state is clean.")
 	fmt.Println("  Script generated: cloudslash-out/fix_terraform.sh")
+}
+
+func printProvenanceBox(rec *provenance.ProvenanceRecord) {
+	fmt.Println("  ┌── PROVENANCE AUDIT ──────────────────────────────────────────")
+	fmt.Printf("  │ Author:  %s\n", rec.Author)
+	fmt.Printf("  │ Commit:  %s (%s)\n", rec.CommitHash[:7], rec.CommitDate.Format("2006-01-02"))
+	fmt.Printf("  │ Message: \"%s\"\n", strings.TrimSpace(rec.Message))
+	fmt.Printf("  │ File:    %s:%d\n", rec.FilePath, rec.LineStart)
+	
+	if rec.IsLegacy {
+		fmt.Println("  │ Status:  [LEGACY DEBT] (> 1 year old)")
+	} else {
+		fmt.Println("  │ Status:  [ACTIVE COMMIT] (Recent change)")
+	}
+	fmt.Println("  └──────────────────────────────────────────────────────────────")
 }
 
 func generateFixScript(report *tf.AnalysisReport) {

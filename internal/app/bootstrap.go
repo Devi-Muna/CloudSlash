@@ -33,6 +33,7 @@ type Config struct {
 	AllProfiles      bool
 	RequiredTags     string
 	SlackWebhook     string
+	SlackChannel     string
 	Headless         bool
 	DisableCWMetrics bool
 	Verbose          bool
@@ -77,7 +78,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 	var doneChan <-chan struct{}
 
 	if cfg.MockMode {
-		runMockMode(ctx, g, engine, cfg.Headless)
+		runMockMode(ctx, cfg, g, engine)
 	} else {
 		doneChan = runRealMode(ctx, cfg, g, engine)
 	}
@@ -98,7 +99,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 	return true, g, nil
 }
 
-func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, headless bool) {
+func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) {
 	mockScanner := aws.NewMockScanner(g)
 
 	// v1.3.5: Seed Mock History for Derivative Engine Demo
@@ -149,8 +150,32 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 	// Executive Summary
 	report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
 
+	var slackClient *notifier.SlackClient
+	if cfg.SlackWebhook != "" {
+		fmt.Println(" -> Transmitting Cost Report to Slack (MOCK)...")
+		slackClient = notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
+		
+		// Recalculate summary for Slack
+		summary := report.Summary{
+			Region:       cfg.Region,
+			TotalScanned: len(g.Nodes),
+			TotalWaste:   0,
+			TotalSavings: 0,
+		}
+		g.Mu.RLock()
+		for _, n := range g.Nodes {
+			if n.IsWaste {
+				summary.TotalWaste++
+				summary.TotalSavings += n.Cost
+			}
+		}
+		g.Mu.RUnlock()
+		
+		slackClient.SendAnalysisReport(summary)
+	}
+
 	// Historical Analysis
-	performSignalAnalysis(g)
+	performSignalAnalysis(g, slackClient)
 }
 
 func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) <-chan struct{} {
@@ -341,14 +366,43 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		// Executive Summary
 		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
+
 		if cfg.SlackWebhook != "" {
-			if err := notifier.SendSlackReport(cfg.SlackWebhook, g); err != nil {
-				fmt.Printf("Failed to send Slack report: %v\n", err)
+			fmt.Println(" -> Transmitting Cost Report to Slack...")
+			client := notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
+
+			// Recalculate summary for Slack
+			summary := report.Summary{
+				Region:       cfg.Region,
+				TotalScanned: len(g.Nodes), // Approximate
+				TotalWaste:   0,
+				TotalSavings: 0,
+			}
+
+			g.Mu.RLock()
+			for _, n := range g.Nodes {
+				if n.IsWaste {
+					summary.TotalWaste++
+					summary.TotalSavings += n.Cost
+				}
+			}
+			g.Mu.RUnlock()
+
+			if err := client.SendAnalysisReport(summary); err != nil {
+				fmt.Printf(" [WARN] Failed to send Slack report: %v\n", err)
+			} else {
+				fmt.Println(" [SUCCESS] Report delivered.")
 			}
 		}
 
+
+
 		// v1.3.5: Signal Processing
-		performSignalAnalysis(g)
+		var slackClient *notifier.SlackClient
+		if cfg.SlackWebhook != "" {
+			slackClient = notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
+		}
+		performSignalAnalysis(g, slackClient)
 
 		// Partial Graph Check
 		g.Mu.RLock()
@@ -437,7 +491,7 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 }
 
 // performSignalAnalysis executes the v1.3.5 Derivative Engine logic
-func performSignalAnalysis(g *graph.Graph) {
+func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
 	// 1. Snapshot State
 	s := history.Snapshot{
 		Timestamp:      time.Now().Unix(),
@@ -476,6 +530,11 @@ func performSignalAnalysis(g *graph.Graph) {
 			fmt.Printf(" Current Velocity: %+.2f $/mo per hour\n", res.Velocity)
 			if res.Acceleration > 0 {
 				fmt.Printf(" Acceleration:     %+.2f $/mo/h^2 (SPEND ACCELERATING)\n", res.Acceleration)
+
+				// Budget Burn Rate Alert
+				if slack != nil && res.Acceleration > 20.0 {
+					slack.SendBudgetAlert(res.Velocity, res.Acceleration)
+				}
 			}
 			fmt.Println("-----------------------------------------------------------------")
 		} else if res.Velocity != 0 {
