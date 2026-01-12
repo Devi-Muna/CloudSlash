@@ -151,7 +151,7 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
 
 	var slackClient *notifier.SlackClient
-	if cfg.SlackWebhook != "" {
+	if cfg.SlackWebhook != "" && cfg.Headless {
 		fmt.Println(" -> Transmitting Cost Report to Slack (MOCK)...")
 		slackClient = notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
 		
@@ -367,7 +367,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
 
-		if cfg.SlackWebhook != "" {
+		if cfg.SlackWebhook != "" && cfg.Headless {
 			fmt.Println(" -> Transmitting Cost Report to Slack...")
 			client := notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
 
