@@ -1,25 +1,27 @@
-name: CloudSlash Verification
+name: Verify
 
 on:
   push:
-    branches: [main, v1.2-beta, "feature/**"]
+    branches: [main, "feature/*"]
     paths-ignore:
       - "**.md"
-      - ".gitignore"
-      - "**.txt"
+      - "docs/**"
   pull_request:
-    branches: [main, v1.2-beta, "feature/**"]
-    paths-ignore:
-      - "**.md"
-      - ".gitignore"
-      - "**.txt"
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  # 1. Windows Verification (The Critical Path)
-  verify-windows:
-    name: Windows Server 2022 (AMD64)
-    runs-on: windows-latest
+  smoke-test:
+    name: ${{ matrix.os }} Build & Mock Scan
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,58 +29,37 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.21"
+          cache: true
 
       - name: Build Binary
-        run: go build -v -ldflags="-X 'github.com/DrSkyle/CloudSlash/cmd/cloudslash/commands.CurrentVersion=v1.0.3-CI'" -o cloudslash.exe ./cmd/cloudslash
-        env:
-          GOOS: windows
-          GOARCH: amd64
+        shell: bash
+        run: |
+          VERSION="CI-$(git rev-parse --short HEAD)"
+          # Inject version into internal/version package
+          LDFLAGS="-s -w -X 'github.com/DrSkyle/cloudslash/internal/version.Current=${VERSION}'"
 
-      - name: Smoke Test - Version
-        run: .\cloudslash.exe --version
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            go build -v -ldflags "$LDFLAGS" -o cloudslash.exe cmd/cloudslash/main.go
+          else
+            go build -v -ldflags "$LDFLAGS" -o cloudslash cmd/cloudslash/main.go
+          fi
 
-      - name: Smoke Test - Mock Scan
-        # Runs the headless scan with mock data to verify runtime stability on Windows
-        run: .\cloudslash.exe scan --mock --region us-east-1
+      - name: Verify Version
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            ./cloudslash.exe --version
+          else
+            ./cloudslash --version
+          fi
 
-  # 2. Linux Verification (Baseline)
-  verify-linux:
-    name: Ubuntu Latest (AMD64)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-
-      - name: Build Binary
-        run: go build -v -ldflags="-X 'github.com/DrSkyle/CloudSlash/cmd/cloudslash/commands.CurrentVersion=v1.0.3-CI'" -o cloudslash ./cmd/cloudslash
-
-      - name: Smoke Test - Mock Scan
-        run: ./cloudslash scan --mock --region us-east-1
-
-  # 3. macOS Verification
-  verify-mac:
-    name: macOS Latest (ARM64)
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-
-      - name: Build Binary
-        run: go build -v -ldflags="-X 'github.com/DrSkyle/CloudSlash/cmd/cloudslash/commands.CurrentVersion=v1.0.3-CI'" -o cloudslash ./cmd/cloudslash
-
-      - name: Smoke Test - Version
-        run: ./cloudslash --version
-
-      - name: Smoke Test - Mock Scan
-        run: ./cloudslash scan --mock --region us-east-1
+      - name: Run Headless Mock Scan
+        shell: bash
+        run: |
+          # Run a mock scan in headless mode to verify crash-free execution
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            ./cloudslash.exe scan --mock --headless --region us-east-1
+          else
+            ./cloudslash scan --mock --headless --region us-east-1
+          fi

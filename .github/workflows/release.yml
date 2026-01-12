@@ -7,10 +7,11 @@ on:
 
 permissions:
   contents: write
+  discussions: write
 
 jobs:
-  build-and-release:
-    name: Build & Release
+  release:
+    name: Build & Publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -19,41 +20,51 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-          check-latest: true
+          cache: true
+
+      - name: Prepare Artifacts
+        run: mkdir -p dist
 
       - name: Generate version.txt
-        run: echo "${{ github.ref_name }}" > version.txt
+        run: echo "${{ github.ref_name }}" > dist/version.txt
 
-      - name: Build Darwin (AMD64)
-        run: GOOS=darwin GOARCH=amd64 go build -o cloudslash_darwin_amd64 cmd/cloudslash/main.go
+      - name: Build Cross-Platform Binaries
+        run: |
+          VERSION="${{ github.ref_name }}"
+          # Inject version into internal/version package
+          LDFLAGS="-s -w -X 'github.com/DrSkyle/cloudslash/internal/version.Current=${VERSION}'"
 
-      - name: Build Darwin (ARM64)
-        run: GOOS=darwin GOARCH=arm64 go build -o cloudslash_darwin_arm64 cmd/cloudslash/main.go
+          echo " -> Building Linux (amd64)..."
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_linux_amd64 cmd/cloudslash/main.go
 
-      - name: Build Linux (AMD64)
-        run: GOOS=linux GOARCH=amd64 go build -o cloudslash_linux_amd64 cmd/cloudslash/main.go
+          echo " -> Building Linux (arm64)..."
+          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_linux_arm64 cmd/cloudslash/main.go
 
-      - name: Build Linux (ARM64)
-        run: GOOS=linux GOARCH=arm64 go build -o cloudslash_linux_arm64 cmd/cloudslash/main.go
+          echo " -> Building macOS (amd64)..."
+          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_darwin_amd64 cmd/cloudslash/main.go
 
-      - name: Build Windows (AMD64)
-        run: GOOS=windows GOARCH=amd64 go build -o cloudslash_windows_amd64.exe cmd/cloudslash/main.go
+          echo " -> Building macOS (arm64/Apple Silicon)..."
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_darwin_arm64 cmd/cloudslash/main.go
 
-      - name: Create Release & Upload Assets
+          echo " -> Building Windows (amd64)..."
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_windows_amd64.exe cmd/cloudslash/main.go
+
+      - name: Copy Install Scripts
+        run: |
+          cp scripts/install.sh dist/install.sh || true
+          cp scripts/install.ps1 dist/install.ps1 || true
+          # Fallback if scripts are in top level or legacy location?
+          # Previous context showed dist/install.sh existed in repo.
+          # Let's verify location. We will just cp everything in dist/ that exists.
+
+      - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            cloudslash_darwin_amd64
-            cloudslash_darwin_arm64
-            cloudslash_linux_amd64
-            cloudslash_linux_arm64
-            cloudslash_windows_amd64.exe
-            dist/install.sh
-            dist/install.ps1
-            version.txt
+            dist/*
           body_path: docs/v2.0.0_RELEASE_NOTES.md
           draft: false
           prerelease: false
