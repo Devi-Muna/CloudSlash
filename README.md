@@ -1,156 +1,165 @@
 # CloudSlash v2.0.0
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey?style=flat-square)
 
-## Project Overview
+> **"Infrastructure that heals itself."**
 
 CloudSlash is an autonomous infrastructure optimization platform designed for enterprise-scale cloud environments. Unlike passive observability tools that simply report metrics, CloudSlash leverages advanced mathematical modeling and graph topology analysis to actively solve resource inefficiency problems.
 
 It functions as a forensic auditor and autonomous agent, correlating disparate data sources—CloudWatch metrics, network traffic logs, infrastructure-as-code (IaC) definitions, and git provenance—to identify, attribute, and remediate waste with mathematical certainty.
 
-**Core Value Proposition:**
+## Executive Summary
 
-- **Autonomous Optimization:** Uses Mixed-Integer Linear Programming (MILP) to calculate mathematically optimal fleet compositions.
-- **Forensic Attribution:** Links every cloud resource back to the specific line of code and engineer who created it.
-- **Non-Destructive Remediation:** Enforces a "Safety First" lifecycle for retiring resources, prioritizing soft deletion and state restoration over immediate termination.
+Modern cloud environments suffer from "Resource Sprawl"—ghost assets that incur cost but deliver zero business value. Traditional tools mostly report these metrics. **CloudSlash actuates them.**
+
+By combining **Linear Programming** (for fleet optimization) with **Abstract Syntax Tree (AST) Parsing** (for code attribution), CloudSlash delivers a closed-loop system that finds waste, identifies the exact engineer responsible, and provides the mathematically optimal remediation plan.
 
 ---
 
 ## Installation
 
-CloudSlash is distributed as a single static binary with no external dependencies.
+CloudSlash is distributed as a single static binary. No external dependencies (Python, Node.js, etc.) are required.
 
 ### macOS & Linux
 
-Execute the following command in your terminal to download and install the latest binary:
-
 ```bash
-curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash
+curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
 ```
 
 ### Windows (PowerShell)
 
-Run the following command in PowerShell:
-
 ```powershell
-irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex
+irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex
 ```
 
-### Prerequisites
+### Configuration
 
-- **AWS Credentials:** The tool utilizes the standard AWS credential chain (Environment Variables, `~/.aws/credentials`, or IAM Instance Profiles).
-- **Terraform (Optional):** Required only for the State Analysis and Provenance Engine features.
+The tool utilizes the standard AWS Credential Chain. Ensure your environment is configured:
+
+```bash
+export AWS_PROFILE=production
+export AWS_REGION=us-east-1
+```
+
+_(Optional)_ Create a `cloudslash.yaml` in your root directory for persistent settings.
 
 ---
 
 ## Key Capabilities
 
-### 1. The Autonomy Engine
+### 1. The Autonomy Engine (Optimization)
 
-The core intelligence of CloudSlash v2.0, responsible for prescriptive optimization.
+Instead of simple "right-sizing" rules, the Autonomy Engine treats infrastructure as a **Mixed-Integer Linear Programming (MILP)** problem.
 
-- **The Solver (MILP Optimizer):**
-  Analyzes workload requirements (CPU, RAM, Network) against the cloud provider's catalog to determine the most cost-efficient instance fleet. It solves constraints for Availability Zone distribution and reserved capacity coverage using a Mixed-Integer Linear Programming model.
+- **The Solver:** Calculates the perfect mix of EC2 instances to satisfy CPU/RAM requirements while minimizing cost.
+- **Tetris Engine:** Uses **2D Bin Packing** (Best Fit Decreasing algorithm) to visualize how workloads are fragmented across Kubernetes clusters, identifying "slack" capacity that metrics miss.
+- **The Oracle:** A Bayesian Risk model that tracks Spot Instance interruptions per-AZ, assigning a verifiable "Reliability Score" to every potential instance type.
 
-- **Tetris Engine (Bin Packing):**
-  Visualizes and solves Kubernetes cluster fragmentation. Utilizing "Best Fit Decreasing" (BFD) algorithms, it calculates the optimal packing of Pods onto Nodes, quantifying the exact "waste" caused by inefficient scheduling rather than idle capacity.
+### 2. The Provenance Engine (Attribution)
 
-- **The Oracle (Risk Assessment):**
-  A Bayesian Probability engine that evaluates the stability of Spot Instances. It maintains a decaying "Risk Score" for every instance pool based on historical interruption data, ensuring that cost optimization never compromises availability.
+Links every runtime resource ID (e.g., `i-012345`) back to its **Genetic Code**.
 
-### 2. The Provenance Engine
+- **Terraform AST Parsing:** Parses `main.tf` files to find the exact resource definition block.
+- **Git Blame Integration:** Queries the `.git` directory to identify the specific commit hash, date, and author who introduced the resource.
+- **Technical Debt Attribution:** Flags resources created >1 year ago as "Fossilized Code."
 
-Provides deep auditability by linking runtime resources to their static definitions.
+### 3. The Accountability Engine (Identity)
 
-- **Git Forensics:** reverse-engineers active resource IDs to their origin in the Terraform state, then parses the `main.tf` Abstract Syntax Tree (AST) to identify the Git commit hash and author responsible for the resource.
-- **Technical Debt Attribution:** Shifts the remediation focus from technical auditing to social accountability by notifying specific engineers of their unmanaged resources.
+Maps abstract IAM ARNs to real humans.
 
-### 3. The Accountability Engine
+- **Identity Resolution:** Correlates `arn:aws:iam::123:user/jdoe` -> `jdoe@company.com` -> `SlackID: U12345`.
+- **Direct Notification:** Sends "Waste Reports" directly to the responsible engineer via Slack, bypassing generic channels to ensure action is taken.
 
-- **Identity Resolution:** Automatically maps IAM User ARNs and Git Committer emails to corporate identity providers (e.g., Slack User IDs).
-- **Direct Notification:** Facilitates targeted communication, allowing the platform to send optimization reports directly to resource owners rather than generic broadcast channels.
+### 4. The Lazarus Protocol (Remediation)
 
-### 4. The Lazarus Protocol
+Standardizes the lifecycle of remediation to prevent data loss.
 
-- **Soft Deletion Lifecycle:** Implements a rigorous remediation standard where resources are never immediately destroyed.
-  - **Instances:** Stopped and tagged.
-  - **Volumes:** Snapshotted and detached.
-- **Drift-Based Restoration:** Automatically generates Terraform `import` blocks (`terraform import ...`) for every remediated resource, enabling rapid state restoration in the event of a false positive.
+- **Lifecycle:** `Active` -> `Stopped` -> `Snapshot` -> `Detached` -> `Archived`.
+- **Resurrection:** Automatically generates `terraform import` blocks effectively allowing you to "Undo" a deletion by restoring state management in seconds.
+
+<details>
+<summary><strong>View Heuristics Catalog (Deep Dive)</strong></summary>
+
+CloudSlash v2.0 includes 15+ specialized heuristic definitions located in `internal/heuristics`.
+
+| ID        | Heuristic Name    | Logic Description                                               |
+| :-------- | :---------------- | :-------------------------------------------------------------- |
+| **H-001** | `ZombieEBS`       | Unattached EBS volumes > 7 days old.                            |
+| **H-002** | `HollowNAT`       | NAT Gateways with 0 bytes processed in 14 days.                 |
+| **H-003** | `GhostLB`         | ELBs with 0 dependent targets or 0 active connections.          |
+| **H-004** | `FossilAMI`       | AMIs > 2 years old not in use by any active ASG.                |
+| **H-005** | `LogHoarder`      | CloudWatch Log Groups with > 10GB storage and 0 reads.          |
+| **H-006** | `EIPWaste`        | Elastic IPs unattached or attached to stopped instances.        |
+| **H-007** | `StaleLambda`     | Functions with `LastModified` < 30 days and `Invocations` == 0. |
+| **H-008** | `SnapRot`         | EBS Snapshots > 1 year old referencing deleted volumes.         |
+| **H-009** | `MultipartDebris` | Incomplete S3 Multipart uploads older than 7 days.              |
+| **H-010** | `GP2Legacy`       | Detects `gp2` volumes eligible for free migration to `gp3`.     |
+
+</details>
 
 ---
 
-## Functional Modules
+## Reporting & Output
 
-CloudSlash includes specialized heuristic engines for various AWS services:
+- **Dashboard (HTML):** Interactive report with charts (`cloudslash-out/dashboard.html`).
+- **Data Export:** Raw `waste_report.csv` and `waste_report.json`.
+- **Executive Summary:** Markdown audit brief (`executive_summary.md`).
+- **Remediation Scripts:**
+  - `resource_deletion.sh`: Bash script for bulk cleanup (AWS CLI).
+  - `fix_terraform.sh`: Script to remove items from `.tfstate`.
 
-- **Traffic Cessation Analysis (NAT/ELB):** Identifies gateways and load balancers that have processed zero bytes of data over a configurable retention period (default: 7 days).
-- **Storage Hygiene:** Detects unattached EBS volumes, incomplete S3 Multipart Uploads (hidden costs), and legacy `gp2` volumes eligible for `gp3` modernization.
-- **Compute Rationalization:** Identifies idle EC2 instances and "stale" Lambda functions (deployed but never invoked).
+## Command Reference
 
----
+### `scan`
 
-## Usage Guidelines
-
-The application is controlled via a command-line interface (CLI).
-
-### 1. Standard Scan (TUI Mode)
-
-Launches an interactive Terminal User Interface for exploring resources and visualizing topology.
+The primary entry point. Orchestrates the graph resolution and waste detection.
 
 ```bash
-cloudslash scan
+cloudslash scan [flags]
 ```
 
-### 2. Headless Mode (CI/CD)
+**Flags:**
 
-Runs the analysis without a UI, suitable for automated pipelines. Output is logged to `stdout` and JSON reports.
+- `--headless`: Disables the TUI. Best for cron jobs.
+- `--region <list>`: Comma-separated target regions (e.g., `us-east-1,eu-central-1`).
+- `--no-metrics`: Skip CloudWatch API calls (faster, but less accurate).
+- `--mock`: Run against internal simulation data (evaluation mode).
+
+### `nuke`
+
+The interactive remediation console. Reads the graph and prompts for deletion.
 
 ```bash
-cloudslash scan --headless --region us-east-1,us-west-2
+cloudslash nuke
 ```
 
-### 3. Mock Mode (Evaluation)
+_Warning: This effectively runs `aws <service> delete-...`. Use with caution._
 
-Simulates a scan against an internal mock dataset to demonstrate engine capabilities without requiring AWS credentials.
+### `export`
+
+Extracts internal graph data for external auditing tools.
 
 ```bash
-cloudslash scan --mock
+cloudslash export
 ```
 
-### Configuration
+---
 
-Configuration can be supplied via flags or a `config.yaml` file.
+## Support the Project
 
-- `--region`: Comma-separated list of target regions.
-- `--no-metrics`: Disables CloudWatch API calls to save costs (relies on state data only).
+CloudSlash is open source and free. If you'd like to support development or need priority help:
+
+- **[Support ($9.99/mo)](https://github.com/sponsors/DrSkyle)** - Priority Support & Gratitude.
+- **[Super Support ($19.99/mo)](https://github.com/sponsors/DrSkyle)** - Prioritized Feature Requests & Sponsor Recognition.
 
 ---
 
-## Troubleshooting & FAQ
+## License & Commercial Use
 
-**Q: I am receiving "Access Denied" errors.**
-**A:** CloudSlash requires `ReadOnlyAccess` to the target AWS account. For Remediation features, specific `Write` permissions (e.g., `ec2:StopInstance`) are required. Ensure your AWS credentials are valid.
+**CloudSlash is AGPLv3.**
 
-**Q: The Terraform State analysis is empty.**
-**A:** Ensure you are running CloudSlash from the root directory of your Terraform project, or that the system has access to the remote state backend defined in your `terraform` block.
+You are free to use it, modify it, and run it internally for your business. _If you modify CloudSlash and provide it as a service/product to others, you must open-source your changes._
 
-**Q: How is "Waste" defined?**
-**A:** Waste is strictly defined by heuristics located in `internal/heuristics`. Generally, a resource is flagged if it has zero utilization (CPU, Network, I/O) over the analysis window (default 7 days).
+**Enterprise Exemption:** If your organization requires a commercial license for AGPL compliance (e.g., embedding CloudSlash in proprietary software without releasing source code), exemptions are available. Contact: [sales@cloudslash.io](mailto:sales@cloudslash.io).
 
----
-
-## Contribution Guidelines
-
-We welcome contributions from the engineering community.
-
-1.  **Fork & Clone:** Fork the repository and clone it locally.
-2.  **Branching:** Create a feature branch (`feature/my-enhancement`).
-3.  **Testing:** Ensure all unit tests pass (`make test`). New features must include accompanying tests.
-4.  **Submission:** Open a Pull Request against the `main` branch. Provide a detailed description of the change and the problem it solves.
-
----
-
-## Licensing
-
-This software is licensed under the **AGPLv3**.
-Copyright © 2026 CloudSlash Contributors.
+_Copyright © 2026 Dr. Skyle & The CloudSlash Authors._
