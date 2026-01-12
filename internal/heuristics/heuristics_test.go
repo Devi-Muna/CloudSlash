@@ -47,7 +47,7 @@ func TestZombieEBSHeuristic(t *testing.T) {
 	defer g.Mu.RUnlock()
 
 	// Check Zombie
-	if node, ok := g.Nodes["vol-zombie"]; !ok {
+	if node := g.GetNode("vol-zombie"); node == nil {
 		t.Fatal("Zombie volume not found in graph")
 	} else {
 		if !node.IsWaste {
@@ -59,7 +59,7 @@ func TestZombieEBSHeuristic(t *testing.T) {
 	}
 
 	// Check Healthy
-	if node, ok := g.Nodes["vol-healthy"]; !ok {
+	if node := g.GetNode("vol-healthy"); node == nil {
 		t.Fatal("Healthy volume not found in graph")
 	} else {
 		if node.IsWaste {
@@ -92,11 +92,11 @@ func TestS3MultipartHeuristic(t *testing.T) {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
-	if node, ok := g.Nodes["upload-old"]; !ok || !node.IsWaste {
+	if node := g.GetNode("upload-old"); node == nil || !node.IsWaste {
 		t.Error("Expected upload-old to be waste")
 	}
 
-	if node, ok := g.Nodes["upload-new"]; !ok || node.IsWaste {
+	if node := g.GetNode("upload-new"); node == nil || node.IsWaste {
 		t.Error("Expected upload-new NOT to be waste")
 	}
 }

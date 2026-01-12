@@ -9,11 +9,14 @@ import (
 	"time"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
+	"github.com/DrSkyle/cloudslash/internal/version"
 )
 
 // ReportData holds data for the HTML template.
 type ReportData struct {
 	GeneratedAt      string
+	Version          string
+	License          string
 	TotalWasteCost   float64
 	TotalWaste       int
 	TotalResources   int
@@ -42,7 +45,7 @@ const htmlTemplate = `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudSlash // Infrastructure Forensics</title>
+    <title>CloudSlash // Infrastructure Analysis</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -324,7 +327,7 @@ const htmlTemplate = `
                 </div>
             </div>
             <div>
-                <span class="meta-tag">v1.3.3 [AGPLv3]</span>
+                <span class="meta-tag">{{.Version}} [{{.License}}]</span>
             </div>
         </header>
 
@@ -375,7 +378,7 @@ const htmlTemplate = `
 
         <div class="glass-panel table-container">
             <div style="padding: 2rem; border-bottom: 1px solid var(--border-glass);">
-                <h2 style="margin: 0; font-size: 1.5rem;">Forensic Evidence Log</h2>
+                <h2 style="margin: 0; font-size: 1.5rem;">Resource Analysis Log</h2>
             </div>
             <table>
                 <thead>
@@ -408,7 +411,7 @@ const htmlTemplate = `
                     {{else}}
                     <tr>
                         <td colspan="5" style="text-align: center; padding: 4rem; color: var(--text-secondary);">
-                            SYSTEM CLEAN. NO ANOMALIES DETECTED.
+                            System clean. No issues detected.
                         </td>
                     </tr>
                     {{end}}
@@ -432,7 +435,7 @@ const htmlTemplate = `
         </div>
 
         <footer style="margin-top: 4rem; text-align: center; opacity: 0.5; padding-bottom: 2rem;">
-            <p style="font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;">CloudSlash Forensic Engine // v1.3.3 [AGPLv3]</p>
+            <p style="font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase;">CloudSlash Analysis Engine // {{.Version}} [{{.License}}]</p>
         </footer>
     </div>
 
@@ -537,6 +540,8 @@ const htmlTemplate = `
 func GenerateHTML(g *graph.Graph, outputPath string) error {
 	data := ReportData{
 		GeneratedAt: time.Now().Format(time.RFC822),
+		Version:     version.Current,
+		License:     version.License,
 	}
 
 	// Aggregate for Charts

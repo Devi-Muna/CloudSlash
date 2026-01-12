@@ -73,10 +73,8 @@ func extractPublicIp(addrs []types.NatGatewayAddress) string {
 }
 
 func (s *NATScanner) checkTraffic(ctx context.Context, id string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[id]
-	s.Graph.Mu.Unlock()
-	if !exists { return }
+	node := s.Graph.GetNode(id)
+	if node == nil { return }
 
 	endTime := time.Now()
 	startTime := endTime.Add(-7 * 24 * time.Hour)
@@ -143,11 +141,12 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 	}
 	
 	// Store RouteTables for visualization
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[natId]; ok {
+	node := s.Graph.GetNode(natId)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["RouteTables"] = rtbIds
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 	
 	if len(subnets) == 0 {
 		// No subnets use this NAT? Then it is DEFINITELY waste (if metric is low).
@@ -210,17 +209,20 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 		}
 	}
 	
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[natId]; ok {
-		node.Properties["ActiveUserENIs"] = activeENICount
-		node.Properties["EmptySubnets"] = emptySubnetIds
+	// Re-fetch node safely
+	nodeRedecl := s.Graph.GetNode(natId)
+	if nodeRedecl != nil {
+		s.Graph.Mu.Lock()
+		nodeRedecl.Properties["ActiveUserENIs"] = activeENICount
+		nodeRedecl.Properties["EmptySubnets"] = emptySubnetIds
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }
 func (s *NATScanner) updateActiveCount(natId string, count int) {
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[natId]; ok {
+	node := s.Graph.GetNode(natId)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["ActiveUserENIs"] = count
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }

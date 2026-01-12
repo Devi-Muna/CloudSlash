@@ -65,9 +65,9 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "S3 Iceberg: Stalled Multipart Upload",
 			mockNode: &graph.Node{
-				ID:      "s3-multipart-upload-1",
-				Type:    "AWS::S3::MultipartUpload",
-				IsWaste: true,
+				ID:        "s3-multipart-upload-1",
+				Type:      "AWS::S3::MultipartUpload",
+				IsWaste:   true,
 				RiskScore: 20,
 				Properties: map[string]interface{}{
 					"Reason":    "Stalled Upload: Initiated 10 days ago.",
@@ -124,8 +124,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 			g.Nodes[tc.mockNode.ID] = tc.mockNode
 
 			eng := swarm.NewEngine()
-			model := NewModel(eng, g, false, true)
-			
+			model := NewModel(eng, g, false, "us-east-1")
+
 			model.refreshData()
 
 			updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -156,11 +156,11 @@ func TestTUI_TerraformIndicator(t *testing.T) {
 		SourceLocation: "main.tf:12",
 	}
 	g.Nodes[node.ID] = node
-	
+
 	eng := swarm.NewEngine()
-	model := NewModel(eng, g, false, true)
+	model := NewModel(eng, g, false, "us-east-1")
 	view := model.View()
-	
+
 	if strings.Contains(view, "[TERRAFORM DETECTED]") {
 		// Pass
 	}

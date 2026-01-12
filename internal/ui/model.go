@@ -15,8 +15,16 @@ type ViewState int
 const (
 	ViewStateList ViewState = iota
 	ViewStateDetail
+	ViewStateTopology // Added: Hierarchy View
 	ViewStateHelp
 )
+
+type TopologyLine struct {
+	ID    string
+	Text  string
+	Level int
+	Node  *graph.Node
+}
 
 type Model struct {
 	// core components
@@ -37,6 +45,7 @@ type Model struct {
 
 	// data
 	wasteItems   []*graph.Node
+	topologyLines []TopologyLine // Added: Flattened tree for display
 	totalSavings float64
 	riskScore    int
 	tasksDone    int
@@ -51,6 +60,7 @@ type Model struct {
 
 	// navigation
 	cursor       int // main list cursor
+	topologyCursor int // topology view cursor
 	detailsScroll int // TODO: implement scroll if needed
 
 	// animation

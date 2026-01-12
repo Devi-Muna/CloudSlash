@@ -9,12 +9,9 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/DrSkyle/cloudslash/internal/version"
 	"github.com/spf13/cobra"
 )
-
-// This usually comes from -ldflags "-X ...CurrentVersion=..."
-// But for this simple implementation, we can hardcode or use the version.txt strategy.
-var CurrentVersion = "v1.3.3"
 
 const VersionURL = "https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/version.txt"
 
@@ -30,19 +27,19 @@ var updateCmd = &cobra.Command{
 			return
 		}
 
-		if strings.TrimSpace(latest) == CurrentVersion {
-			fmt.Printf("You are already running the latest version (%s).\n", CurrentVersion)
+		if strings.TrimSpace(latest) == version.Current {
+			fmt.Printf("You are already running the latest version (%s).\n", version.Current)
 			return
 		}
 
 		// Basic semantic check to prevent "downgrade" notifications if local > remote
 		// (Assuming format vX.Y.Z)
-		if latest < CurrentVersion {
-			fmt.Printf("You are running a newer version (%s) than the latest release (%s).\n", CurrentVersion, latest)
+		if latest < version.Current {
+			fmt.Printf("You are running a newer version (%s) than the latest release (%s).\n", version.Current, latest)
 			return
 		}
 
-		fmt.Printf("Found new version: %s (Current: %s)\n", latest, CurrentVersion)
+		fmt.Printf("Found new version: %s (Current: %s)\n", latest, version.Current)
 		fmt.Println("Downloading update...")
 
 		if err := doUpdate(); err != nil {

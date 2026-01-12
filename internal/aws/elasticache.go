@@ -68,9 +68,9 @@ func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 }
 
 func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID string, nodeType *string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[clusterID]
-	s.Graph.Mu.Unlock()
+	node := s.Graph.GetNode(clusterID)
+	// s.Graph.Mu.Unlock() - Removed, GetNode handles lock
+	exists := (node != nil)
 	if !exists {
 		return
 	}

@@ -100,12 +100,14 @@ func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 		if foundInDNS { break }
 	}
 	
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[id]; ok {
+	// Updated for Integer Graph
+	node := s.Graph.GetNode(id)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["FoundInDNS"] = foundInDNS
 		if foundInDNS {
 			node.Properties["DNSZone"] = badZone
 		}
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }

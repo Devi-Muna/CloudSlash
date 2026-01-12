@@ -7,6 +7,7 @@ import (
 	"time"
 
 	internalaws "github.com/DrSkyle/cloudslash/internal/aws"
+	internalconfig "github.com/DrSkyle/cloudslash/internal/config"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/pricing"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -79,6 +80,7 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 // ZombieEBSHeuristic checks for unattached or zombie volumes.
 type ZombieEBSHeuristic struct {
 	Pricing *pricing.Client
+	Config  internalconfig.ZombieEBSConfig
 }
 
 func (h *ZombieEBSHeuristic) Name() string { return "ZombieEBSHeuristic" }
@@ -132,21 +134,30 @@ func (h *ZombieEBSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		} else if vol.State == "in-use" && vol.AttachedInstance != "" {
 			instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", vol.AttachedInstance)
 
-			g.Mu.RLock()
-			instanceNode, ok := g.Nodes[instanceARN]
+
+			// GetNode handles locking internally for node retrieval
+			instanceNode := g.GetNode(instanceARN)
 			var instanceState string
 			var launchTime time.Time
-			if ok {
+			
+			if instanceNode != nil {
+				// Lock strictly for property read
+				g.Mu.RLock()
 				instanceState, _ = instanceNode.Properties["State"].(string)
 				launchTime, _ = instanceNode.Properties["LaunchTime"].(time.Time)
+				g.Mu.RUnlock()
 			}
-			g.Mu.RUnlock()
 
-			if ok {
-				if instanceState == "stopped" && time.Since(launchTime) > 30*24*time.Hour && !vol.DeleteOnTerm {
+			if instanceNode != nil {
+				thresholdDays := h.Config.UnusedDays
+				if thresholdDays == 0 {
+					thresholdDays = 30 // Default
+				}
+				
+				if instanceState == "stopped" && time.Since(launchTime) > time.Duration(thresholdDays)*24*time.Hour && !vol.DeleteOnTerm {
 					isWaste = true
 					score = 70
-					reason = "Zombie EBS: Attached to stopped instance > 30 days"
+					reason = fmt.Sprintf("Zombie EBS: Attached to stopped instance > %d days", thresholdDays)
 				}
 			}
 		}
@@ -198,8 +209,8 @@ func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", instanceID)
-		instanceNode, ok := g.Nodes[instanceARN]
-		if ok {
+		instanceNode := g.GetNode(instanceARN)
+		if instanceNode != nil {
 			state, _ := instanceNode.Properties["State"].(string)
 			if state == "stopped" {
 				node.IsWaste = true
@@ -212,7 +223,9 @@ func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 }
 
 // S3MultipartHeuristic checks for incomplete multipart uploads.
-type S3MultipartHeuristic struct{}
+type S3MultipartHeuristic struct{
+	Config internalconfig.S3MultipartConfig
+}
 
 func (h *S3MultipartHeuristic) Name() string { return "S3MultipartHeuristic" }
 
@@ -223,10 +236,15 @@ func (h *S3MultipartHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	for _, node := range g.Nodes {
 		if node.Type == "AWS::S3::MultipartUpload" {
 			initiated, ok := node.Properties["Initiated"].(time.Time)
-			if ok && time.Since(initiated) > 7*24*time.Hour {
+			threshold := h.Config.AgeThreshold
+			if threshold == 0 {
+				threshold = 7 * 24 * time.Hour
+			}
+
+			if ok && time.Since(initiated) > threshold {
 				node.IsWaste = true
 				node.RiskScore = 40
-				node.Properties["Reason"] = "Stale S3 Multipart Upload (> 7 days)"
+				node.Properties["Reason"] = fmt.Sprintf("Stale S3 Multipart Upload (> %s)", threshold)
 			}
 		}
 	}

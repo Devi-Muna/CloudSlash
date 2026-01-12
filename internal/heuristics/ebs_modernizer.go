@@ -7,7 +7,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// EBSModernizerHeuristic (v1.3.1)
+// EBSModernizerHeuristic
 type EBSModernizerHeuristic struct{}
 
 func (h *EBSModernizerHeuristic) Name() string { return "EBSModernizer" }
@@ -77,9 +77,9 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 		rsn += fmt.Sprintf(" [PERFORMANCE] %.1fx Speed Boost (Switch to gp3).", boost)
 	}
 	rsn += fmt.Sprintf(" Save $%.2f/mo.", n.Cost)
-	
+
 	n.Properties["Reason"] = rsn
-    // This connects to the Terraform Generator
+	// This connects to the Terraform Generator
 	n.Properties["FixRecommendation"] = "Run 'cloudslash fix' to generate gp3 upgrade code."
-    n.Properties["IsGP2"] = true 
+	n.Properties["IsGP2"] = true
 }

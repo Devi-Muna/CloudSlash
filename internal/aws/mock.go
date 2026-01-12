@@ -25,14 +25,17 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"LaunchTime": time.Now().Add(-60 * 24 * time.Hour), // 60 days old
 	})
 
-	// 2. Unattached Volume (v1.2 Auditor Test)
+	// 2. Unattached Volume (Auditor Test)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890", "AWS::EC2::Volume", map[string]interface{}{
 		"State": "available",
 		"Size":  100, // GB
 	})
-	if node, ok := s.Graph.Nodes["arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890"]; ok {
-		node.Cost = 8.00                                // Manually set cost to test TUI
-		node.SourceLocation = "terraform/storage.tf:24" // Manually set source to test TUI
+	nodeMockVol := s.Graph.GetNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890")
+	if nodeMockVol != nil {
+		s.Graph.Mu.Lock()
+		nodeMockVol.Cost = 8.00                                // Manually set cost to test TUI
+		nodeMockVol.SourceLocation = "terraform/storage.tf:24" // Manually set source to test TUI
+		s.Graph.Mu.Unlock()
 	}
 
 	// 3. Zombie Volume (Attached to stopped instance)
@@ -42,17 +45,17 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"DeleteOnTermination": false,
 	})
 
-	// 4. Hollow NAT Gateway (v1.3.0)
+	// 4. Hollow NAT Gateway
 	// Triggers NetworkForensicsHeuristic
 	natArn := "arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"
 	s.Graph.AddNode(natArn, "aws_nat_gateway", map[string]interface{}{
-		"State": "available",
+		"State":            "available",
 		"SumConnections7d": 0.0,
-		"ActiveUserENIs": 0,
-		"EmptySubnets": []string{"subnet-mock-empty-1", "subnet-mock-empty-2"},
-		"Region": "us-east-1",
+		"ActiveUserENIs":   0,
+		"EmptySubnets":     []string{"subnet-mock-empty-1", "subnet-mock-empty-2"},
+		"Region":           "us-east-1",
 	})
-	
+
 	// 5. Mock Snapshot (Time Machine Test)
 	// Parent volume is vol-0mock1234567890 (which is waste)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild", "AWS::EC2::Snapshot", map[string]interface{}{
@@ -61,52 +64,50 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"VolumeSize": 100,
 	})
 
-	// 5b. Safe-Release Elastic IP (v1.3.0)
+	// 5b. Safe-Release Elastic IP
 	// Triggers NetworkForensicsHeuristic
 	eipArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mock123"
 	s.Graph.AddNode(eipArn, "aws_eip", map[string]interface{}{
-		"PublicIp": "203.0.113.10",
-		"Region":   "us-east-1",
-		"AssociationId": "", // Unattached
-		"FoundInDNS": false, // Safe
-	})
-	
-	// 5c. Dangerous Zombie EIP (v1.3.0)
-	eipDangerArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger"
-	s.Graph.AddNode(eipDangerArn, "aws_eip", map[string]interface{}{
-		"PublicIp": "203.0.113.99",
-		"Region":   "us-east-1",
-		"AssociationId": "",
-		"FoundInDNS": true,
-		"DNSZone": "production.com",
+		"PublicIp":      "203.0.113.10",
+		"Region":        "us-east-1",
+		"AssociationId": "",    // Unattached
+		"FoundInDNS":    false, // Safe
 	})
 
-	// 5d. S3 Iceberg (v1.3.0)
+	// 5c. Dangerous Zombie EIP
+	eipDangerArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger"
+	s.Graph.AddNode(eipDangerArn, "aws_eip", map[string]interface{}{
+		"PublicIp":      "203.0.113.99",
+		"Region":        "us-east-1",
+		"AssociationId": "",
+		"FoundInDNS":    true,
+		"DNSZone":       "production.com",
+	})
+
+	// 5d. S3 Iceberg
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket-iceberg", "AWS::S3::Bucket", map[string]interface{}{
-		"Name": "mock-bucket-iceberg",
+		"Name":              "mock-bucket-iceberg",
 		"HasAbortLifecycle": false,
 	})
 	s.Graph.AddNode("arn:aws:s3:::multipart/mock-bucket-iceberg/upload-1", "AWS::S3::MultipartUpload", map[string]interface{}{
 		"Initiated": time.Now().Add(-15 * 24 * time.Hour), // 15 days old
-		"Bucket": "mock-bucket-iceberg",
+		"Bucket":    "mock-bucket-iceberg",
 	})
-	
-	// 5e. EBS Modernizer (v1.3.0)
+
+	// 5e. EBS Modernizer
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockGp2", "AWS::EC2::Volume", map[string]interface{}{
-		"State": "in-use",
-		"Size": int32(500), // 500GB
-		"VolumeType": "gp2",
+		"State":       "in-use",
+		"Size":        int32(500), // 500GB
+		"VolumeType":  "gp2",
 		"IsModifying": false,
-		"Region": "us-east-1",
+		"Region":      "us-east-1",
 	})
 
 	// 5f. Orphaned ELB (Graph-based)
 	// Needs to be tagged with a cluster that is also waste (or missing?)
 	// ... (Rest of existing mocks)
-	
-	// ... (Truncating for clarity, keeping required context)
-	
 
+	// ... (Truncating for clarity, keeping required context)
 
 	// 5c. Orphaned ELB (Graph-based)
 	// Needs to be tagged with a cluster that is also waste (or missing?)
@@ -159,9 +160,12 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region": "us-east-1",
 	})
 	s.Graph.MarkWaste(elbArn, 70)
-	if n, ok := s.Graph.Nodes[elbArn]; ok {
-		n.Properties["Reason"] = "ELB unused: Only 2 requests in 7 days"
-		n.Cost = 22.50
+	nodeElb := s.Graph.GetNode(elbArn)
+	if nodeElb != nil {
+		s.Graph.Mu.Lock()
+		nodeElb.Properties["Reason"] = "ELB unused: Only 2 requests in 7 days"
+		nodeElb.Cost = 22.50
+		s.Graph.Mu.Unlock()
 	}
 
 	// Right-Sizing EC2 (CW needed -> Manual Waste)
@@ -172,9 +176,12 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region":       "us-east-1",
 	})
 	s.Graph.MarkWaste(ec2Arn, 60)
-	if n, ok := s.Graph.Nodes[ec2Arn]; ok {
-		n.Properties["Reason"] = "Right-Sizing Opportunity: Max CPU 2.1% < 5% over 7 days"
-		n.Cost = 600.00
+	nodeEc2 := s.Graph.GetNode(ec2Arn)
+	if nodeEc2 != nil {
+		s.Graph.Mu.Lock()
+		nodeEc2.Properties["Reason"] = "Right-Sizing Opportunity: Max CPU 2.1% < 5% over 7 days"
+		nodeEc2.Cost = 600.00
+		s.Graph.Mu.Unlock()
 	}
 
 	// 5. Stale S3 Multipart Upload
@@ -219,10 +226,50 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region": "us-east-1",
 	})
 	// Link to cluster (which is NOT waste, but service IS)
-	s.Graph.AddNode("arn:aws:ecs:us-east-1:123456789012:cluster/frontend-cluster", "AWS::ECS::Cluster", map[string]interface{}{
+	frontendClusterArn := "arn:aws:ecs:us-east-1:123456789012:cluster/frontend-cluster"
+	s.Graph.AddNode(frontendClusterArn, "AWS::ECS::Cluster", map[string]interface{}{
 		"Name": "frontend-cluster",
 	})
-	s.Graph.AddTypedEdge("arn:aws:ecs:us-east-1:123456789012:cluster/frontend-cluster", serviceArn, graph.EdgeTypeContains, 1)
+	s.Graph.AddTypedEdge(frontendClusterArn, serviceArn, graph.EdgeTypeContains, 1)
+
+	// 9. ECS: Healthy Production Topology (Harmony Test)
+	prodMockCluster := "arn:aws:ecs:us-east-1:123456789012:cluster/production-cluster"
+	s.Graph.AddNode(prodMockCluster, "AWS::ECS::Cluster", map[string]interface{}{
+		"Name":                "production-cluster",
+		"Status":              "ACTIVE",
+		"RunningTasksCount":   15,
+		"ActiveServicesCount": 2,
+	})
+
+	// Service A: Auth (Healthy)
+	authSvc := "arn:aws:ecs:us-east-1:123456789012:service/production-cluster/auth-service"
+	s.Graph.AddNode(authSvc, "AWS::ECS::Service", map[string]interface{}{
+		"Name":         "auth-service",
+		"DesiredCount": 5,
+		"RunningCount": 5,
+		"Status":       "ACTIVE",
+	})
+	s.Graph.AddTypedEdge(prodMockCluster, authSvc, graph.EdgeTypeContains, 1)
+	
+	// Task A1 (Running)
+	taskA1 := "arn:aws:ecs:us-east-1:123456789012:task/production-cluster/auth-task-uuid-1"
+	s.Graph.AddNode(taskA1, "AWS::ECS::Task", map[string]interface{}{
+		"Name":           "auth-task-uuid-1",
+		"LastStatus":     "RUNNING",
+		"DesiredStatus":  "RUNNING",
+		"TaskDefinition": "arn:aws:ecs:task-def/auth:1",
+	})
+	s.Graph.AddTypedEdge(authSvc, taskA1, graph.EdgeTypeRuns, 1)
+
+	// Service B: Payment (Healthy)
+	paymentSvc := "arn:aws:ecs:us-east-1:123456789012:service/production-cluster/payment-service"
+	s.Graph.AddNode(paymentSvc, "AWS::ECS::Service", map[string]interface{}{
+		"Name":         "payment-service",
+		"DesiredCount": 10,
+		"RunningCount": 10,
+		"Status":       "ACTIVE",
+	})
+	s.Graph.AddTypedEdge(prodMockCluster, paymentSvc, graph.EdgeTypeContains, 1)
 
 	// 6. Ignored Resource (Should NOT appear in TUI)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockIGNORED", "AWS::EC2::Volume", map[string]interface{}{

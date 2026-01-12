@@ -72,10 +72,8 @@ func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 }
 
 func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[arn]
-	s.Graph.Mu.Unlock()
-	if !exists { return }
+	node := s.Graph.GetNode(arn)
+	if node == nil { return }
 	
 	// Extract Resource ID for CW (app/lb-name/id) from ARN
 	// AWS CW Dimension 'LoadBalancer' expects format 'app/my-load-balancer/50dc6c495c0c9188'
@@ -161,11 +159,12 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 		}
 	}
 	
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[arn]; ok {
+	node := s.Graph.GetNode(arn)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["IsRedirectOnly"] = allRedirects
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }
 
 func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
@@ -184,10 +183,11 @@ func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
 		wafCost = 5.0
 	}
 	
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[arn]; ok {
+	node := s.Graph.GetNode(arn)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["HasWAF"] = hasWAF
 		node.Properties["WAFCostEst"] = wafCost
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }

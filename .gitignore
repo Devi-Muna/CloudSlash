@@ -44,3 +44,15 @@ go/
 # Commercial Backend (Private IP)
 license-server/
 INTERNAL_keygen.go
+
+# Local Testing & Mocks (Do Not Commit)
+internal/graph/mock_factory.go
+internal/heuristics/integration_test.go
+
+# Integration Tests (Dev Only)
+internal/aws/integration_test.go
+internal/aws/scan_test.go
+
+# Logs
+gift_licenses.log
+cmd/gift_licenses.log

@@ -64,9 +64,8 @@ func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 }
 
 func (s *RedshiftScanner) enrichClusterMetrics(ctx context.Context, clusterID string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[clusterID]
-	s.Graph.Mu.Unlock()
+	node := s.Graph.GetNode(clusterID)
+	exists := (node != nil)
 	if !exists {
 		return
 	}

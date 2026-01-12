@@ -9,6 +9,8 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/app"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	tf "github.com/DrSkyle/cloudslash/internal/terraform"
+	script "github.com/DrSkyle/cloudslash/internal/tf"
+	"github.com/DrSkyle/cloudslash/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +22,7 @@ var scanCmd = &cobra.Command{
 Example:
   cloudslash scan --region us-west-2`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if !cmd.Flags().Changed("region") {
+		if !cmd.Flags().Changed("region") && !config.MockMode {
 			regions, err := PromptForRegions()
 			if err == nil {
 				config.Region = strings.Join(regions, ",")
@@ -41,10 +43,24 @@ Example:
 			os.Exit(1)
 		}
 
-		// The State Doctor (Terraform Integration)
+		// Resource Deletion Script
+		nukePath := "cloudslash-out/resource_deletion.sh"
+		// Ensure output dir exists
+		if _, err := os.Stat("cloudslash-out"); os.IsNotExist(err) {
+			_ = os.Mkdir("cloudslash-out", 0755)
+		}
+		gen := script.NewGenerator(g, nil)
+		if err := gen.GenerateAtomicNuke(nukePath); err != nil {
+			fmt.Printf("[WARN] Failed to generate deletion script: %v\n", err)
+		} else {
+			fmt.Printf("\n[SUCCESS] Resource deletion script generated: %s\n", nukePath)
+			_ = os.Chmod(nukePath, 0755)
+		}
+
+		// Terraform Integration
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
-			fmt.Println("\n[INFO] Terraform detected. Initializing 'The State Doctor'...")
+			fmt.Println("\n[INFO] Terraform detected. Initializing State Analysis...")
 			fmt.Println("[WARN] Ensure your local 'terraform workspace' matches the target AWS account.")
 
 			stateBytes, err := tfClient.PullState(context.Background())
@@ -79,6 +95,7 @@ func init() {
 	rootCmd.AddCommand(scanCmd)
 	scanCmd.Flags().Bool("no-metrics", false, "Disable CloudWatch Metric calls (Saves money)")
 	scanCmd.Flags().Bool("fast", false, "Alias for --no-metrics (Fast scan)")
+	scanCmd.Flags().Bool("headless", false, "Run without TUI (for CI/CD)")
 }
 
 func printTerraformReport(report *tf.AnalysisReport) {
@@ -87,9 +104,9 @@ func printTerraformReport(report *tf.AnalysisReport) {
 		return
 	}
 
-	fmt.Printf("\n[ Analysis Complete ]\nFound %d Zombie resources managed by Terraform.\n", report.TotalZombiesFound)
+	fmt.Printf("\n[ Analysis Complete ]\nFound %d unused resources managed by Terraform.\n", report.TotalZombiesFound)
 	fmt.Println("\n-------------------------------------------------------------")
-	fmt.Println("RECOMMENDED ACTION (The State Doctor):")
+	fmt.Println("RECOMMENDED ACTION:")
 	fmt.Println("-------------------------------------------------------------")
 
 	for _, mod := range report.ModulesToDelete {
@@ -126,16 +143,16 @@ func generateFixScript(report *tf.AnalysisReport) {
 	defer f.Close()
 
 	fmt.Fprintf(f, "#!/bin/bash\n")
-	fmt.Fprintf(f, "# CloudSlash v1.2.8 - Terraform Surgical Fix Script\n")
+	fmt.Fprintf(f, "# CloudSlash %s - Terraform Surgical Fix Script\n", version.Current)
 	fmt.Fprintf(f, "# Generated based on AWS Scan vs Terraform State Analysis\n\n")
 
 	for _, mod := range report.ModulesToDelete {
-		fmt.Fprintf(f, "echo \"Removing Zombie Module: %s\"\n", mod)
+		fmt.Fprintf(f, "echo \"Removing Unused Module: %s\"\n", mod)
 		fmt.Fprintf(f, "terraform state rm %s\n", mod)
 	}
 
 	for _, res := range report.ResourcesToDelete {
-		fmt.Fprintf(f, "echo \"Removing Zombie Resource: %s\"\n", res)
+		fmt.Fprintf(f, "echo \"Removing Unused Resource: %s\"\n", res)
 		fmt.Fprintf(f, "terraform state rm %s\n", res)
 	}
 

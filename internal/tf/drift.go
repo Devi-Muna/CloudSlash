@@ -28,7 +28,7 @@ func (d *DriftDetector) ScanForDrift() {
 	d.Graph.Mu.Lock() // Assuming we added Mu to Graph struct, or use existing mutex
 	defer d.Graph.Mu.Unlock()
 
-	for id, node := range d.Graph.Nodes {
+	for _, node := range d.Graph.Nodes {
 		// Skip if node is already marked as waste (optimization)
 		if node.IsWaste {
 			continue
@@ -37,6 +37,7 @@ func (d *DriftDetector) ScanForDrift() {
 		// Check if the ID or ARN exists in the managed set
 		// Note: The graph ID is usually the ARN. The state might have ID or ARN.
 		// We need robust matching.
+		id := node.ID
 
 		isManaged := false
 

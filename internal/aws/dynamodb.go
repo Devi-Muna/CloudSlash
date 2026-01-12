@@ -110,17 +110,23 @@ func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string
 		}
 	}
 
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[tableName]; ok {
+	// Check node existence first without holding lock (GetNode locks internally)
+	node := s.Graph.GetNode(tableName)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["HasAutoScaling"] = hasAS
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }
 
 func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[tableName]
-	s.Graph.Mu.Unlock()
+	// GetNode locks internally, no need for external lock here
+	node := s.Graph.GetNode(tableName)
+	// Remove manual unlock as GetNode handles it
+	if node == nil {
+		return
+	}
+	exists := true
 	if !exists { return }
 
 	endTime := time.Now()

@@ -19,9 +19,9 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 
 	// 1. Collect all Active AMIs
 	activeAMIs := make(map[string]bool)
-	for id, node := range g.Nodes {
+	for _, node := range g.Nodes {
 		if node.Type == "AWS::EC2::AMI" {
-			activeAMIs[id] = true
+			activeAMIs[node.ID] = true
 		}
 	}
 
@@ -46,7 +46,8 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			upstream := g.ReverseEdges[id]
 			hasAMI := false
 			for _, edge := range upstream {
-				if strings.Contains(edge.TargetID, ":image/") || strings.Contains(edge.TargetID, ":ami/") {
+				targetNode := g.GetNodeByID(edge.TargetID)
+				if targetNode != nil && (strings.Contains(targetNode.ID, ":image/") || strings.Contains(targetNode.ID, ":ami/")) {
 					hasAMI = true
 					break
 				}

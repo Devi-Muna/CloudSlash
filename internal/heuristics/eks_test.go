@@ -54,8 +54,8 @@ func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
-	clusterNode, ok := g.Nodes[clusterArn]
-	if !ok {
+	clusterNode := g.GetNode(clusterArn)
+	if clusterNode == nil {
 		t.Fatal("Cluster node not found")
 	}
 

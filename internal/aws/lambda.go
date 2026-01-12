@@ -63,9 +63,9 @@ func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 }
 
 func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[funcName]
-	s.Graph.Mu.Unlock()
+	node := s.Graph.GetNode(funcName)
+	// s.Graph.Mu.Unlock() - Removed, GetNode handles lock
+	exists := (node != nil)
 	if !exists { return }
 
 	endTime := time.Now()
@@ -140,12 +140,14 @@ func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName str
 	}
 
 	// Store data for Heuristic to process (separation of concerns)
-	s.Graph.Mu.Lock()
-	if node, ok := s.Graph.Nodes[funcName]; ok {
+	// Store data for Heuristic to process (separation of concerns)
+	node := s.Graph.GetNode(funcName)
+	if node != nil {
+		s.Graph.Mu.Lock()
 		node.Properties["AllVersions"] = versions
 		node.Properties["AliasVersions"] = aliases // map[string]bool
 		node.Properties["TotalCodeSizeBytes"] = totalSize
 		node.Properties["VersionCount"] = len(versions)
+		s.Graph.Mu.Unlock()
 	}
-	s.Graph.Mu.Unlock()
 }

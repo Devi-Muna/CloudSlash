@@ -91,7 +91,7 @@ var NukeCmd = &cobra.Command{
 				exampleDep := ""
 				g.Mu.RLock()
 				for _, depID := range dependents {
-					if depNode, ok := g.Nodes[depID]; ok {
+					if depNode := g.GetNode(depID); depNode != nil {
 						if !depNode.IsWaste {
 							activeDeps++
 							exampleDep = depID

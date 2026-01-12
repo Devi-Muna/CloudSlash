@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/DrSkyle/cloudslash/internal/aws"
+	internalconfig "github.com/DrSkyle/cloudslash/internal/config"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	awsecs "github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
 // IdleClusterHeuristic detects ECS Clusters that are costing money (EC2) but doing nothing.
-type IdleClusterHeuristic struct{}
+type IdleClusterHeuristic struct {
+	Config internalconfig.IdleClusterConfig
+}
 
 func (h *IdleClusterHeuristic) Name() string { return "IdleClusterHeuristic" }
 
@@ -60,15 +63,20 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			continue
 		}
 
-		// 3. The Verification (The "Pro" Check)
-		// Rule: If runningTasks == 0 AND Instance Uptime > 1 hour, IT IS WASTE.
+		// Check 3: The Verification (The "Pro" Check)
+		// Rule: If runningTasks == 0 AND Instance Uptime > Threshold, IT IS WASTE.
 		isWaste := true
 
 		instances := instancesByCluster[cluster.ID]
 		hasOldInstances := false
+		
+		uptimeThreshold := h.Config.UptimeThreshold
+		if uptimeThreshold == 0 {
+			uptimeThreshold = 1 * time.Hour // Default
+		}
 
-		// Logic: If ANY instance is fresh (< 1h), the cluster might be scaling up.
-		// If ALL instances are old (> 1h), it is waste.
+		// Logic: If ANY instance is fresh (< threshold), the cluster might be scaling up.
+		// If ALL instances are old (> threshold), it is waste.
 
 		if len(instances) == 0 {
 			// Inconsistency: regInstances > 0 but no nodes found. Safest is to skip.
@@ -77,7 +85,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			for _, inst := range instances {
 				registeredAt, ok := inst.Properties["RegisteredAt"].(time.Time)
 				if ok {
-					if time.Since(registeredAt) > 1*time.Hour {
+					if time.Since(registeredAt) > uptimeThreshold {
 						hasOldInstances = true
 					} else {
 						// Found a fresh instance. Abort waste flag.

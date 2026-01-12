@@ -51,34 +51,26 @@ func (h *NetworkForensicsHeuristic) topo(g *graph.Graph, nat *graph.Node) {
 	}
 
 	for _, id := range subnets {
-		g.Mu.Lock()
-		g.Nodes[id] = &graph.Node{
-			ID:      id,
-			Type:    "aws_subnet",
-			IsWaste: true,
-			Properties: map[string]interface{}{
-				"Reason":   "Empty Subnet (Linked to Hollow NAT)",
-				"ParentID": nat.ID,
-				"Name":     fmt.Sprintf("Subnet: %s (Empty)", id),
-			},
+		g.AddNode(id, "aws_subnet", map[string]interface{}{
+			"Reason":   "Empty Subnet (Linked to Hollow NAT)",
+			"ParentID": nat.ID,
+			"Name":     fmt.Sprintf("Subnet: %s (Empty)", id),
+		})
+		if node := g.GetNode(id); node != nil {
+			node.IsWaste = true
 		}
-		g.Mu.Unlock()
 	}
 
 	if rtbs, ok := nat.Properties["RouteTables"].([]string); ok {
 		for _, id := range rtbs {
-			g.Mu.Lock()
-			g.Nodes[id] = &graph.Node{
-				ID:      id,
-				Type:    "aws_route_table",
-				IsWaste: true,
-				Properties: map[string]interface{}{
-					"Reason":   "Route Table targeting Hollow NAT",
-					"ParentID": nat.ID,
-					"Name":     fmt.Sprintf("Route Table: %s", id),
-				},
+			g.AddNode(id, "aws_route_table", map[string]interface{}{
+				"Reason":   "Route Table targeting Hollow NAT",
+				"ParentID": nat.ID,
+				"Name":     fmt.Sprintf("Route Table: %s", id),
+			})
+			if node := g.GetNode(id); node != nil {
+				node.IsWaste = true
 			}
-			g.Mu.Unlock()
 		}
 	}
 }

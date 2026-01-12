@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
+	"github.com/DrSkyle/cloudslash/internal/version"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,19 +28,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			m.quitting = true
 			return m, tea.Quit
-		
+
 		// Global View Switch
 		case "q":
-			if m.state == ViewStateDetail {
+			if m.state == ViewStateDetail || m.state == ViewStateTopology {
 				m.state = ViewStateList
 				return m, nil
 			}
 			m.quitting = true
 			return m, tea.Quit
+		
+		// View Switching
+		case "t":
+			if m.state == ViewStateTopology {
+				m.state = ViewStateList
+			} else {
+				m.state = ViewStateTopology
+				m.buildTopology() // Ensure fresh build on switch
+			}
 		}
 
 		// State-Specific Handling
-		if m.state == ViewStateList {
+		if m.state == ViewStateTopology {
+			switch msg.String() {
+			case "up", "k":
+				if m.topologyCursor > 0 {
+					m.topologyCursor--
+				}
+			case "down", "j":
+				if m.topologyCursor < len(m.topologyLines)-1 {
+					m.topologyCursor++
+				}
+			case "enter", " ":
+				// Toggle expansion? For now, maybe select/copy ID
+				// Future: m.toggleExpansion(m.topologyCursor)
+			}
+		} else if m.state == ViewStateList {
 			switch msg.String() {
 			case "up", "k":
 				if m.cursor > 0 {
@@ -60,9 +84,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// In a real app, this would call AWS: TagResource("cloudslash:status", "to-delete")
 					// For now, we simulate/log it and visually indicate it (e.g., ignore/hide it or mark it)
 					// Let's re-use ignore logic but with a "soft-delete" flag if we had one.
-					// For v1.3.2 TUI demo, we'll log it to audit and treat it as 'handled' (ignored)
+					// For TUI demo, we'll log it to audit and treat it as 'handled' (ignored)
 					audit.LogAction("SOFT_DELETE", id, "MARKED", 0, "Marked for later collision")
-					m.ignoreNode(id) 
+					m.ignoreNode(id)
 				}
 			case "y":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
@@ -95,7 +119,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshData()
 			case "R", "r":
 				// Simple toggle for now: All -> us-east-1 (example) -> All
-				// Use "Next Region" logic? 
+				// Use "Next Region" logic?
 				// Let's iterate unique regions in graph
 				regions := m.getUniqueRegions()
 				if len(regions) > 0 {
@@ -156,7 +180,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		// Background Stats Update
 		m.refreshData()
-		
+
 		// Check if done scanning
 		stats := m.Engine.GetStats()
 		m.tasksDone = int(stats.TasksCompleted)
@@ -164,17 +188,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Heuristic Progress: Completed / (Completed + Active + 1)
 		// The +1 prevents division by zero and keeps it < 100% until truly done
 		total := float64(stats.TasksCompleted + int64(stats.ActiveWorkers))
-		if total == 0 { total = 1 }
+		if total == 0 {
+			total = 1
+		}
 		pct := float64(stats.TasksCompleted) / total
-		
+
 		// If scanning is done (Active=0 and >10 tasks), force 100%
 		if stats.TasksCompleted > 10 && stats.ActiveWorkers == 0 {
 			m.scanning = false
 			pct = 1.0
 		}
-		
+
 		cmd := m.progress.SetPercent(pct)
-		
+
 		// Check TF Repair
 		if _, err := os.Stat("cloudslash-out/fix_terraform.sh"); err == nil {
 			m.tfRepairReady = true
@@ -199,7 +225,7 @@ func (m Model) View() string {
 		var mem runtime.MemStats
 		runtime.ReadMemStats(&mem)
 		memMB := mem.Alloc / 1024 / 1024
-		
+
 		nodeCount := 0
 		if m.Graph != nil {
 			m.Graph.Mu.RLock()
@@ -213,7 +239,7 @@ func (m Model) View() string {
 			lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#00FF99")).
 				Bold(true).
-				Render("CLOUDSLASH v1.3.3 [AGPLv3]") + "\n" +
+				Render(fmt.Sprintf("%s %s [%s]", version.AppName, version.Current, version.License)) + "\n" +
 			`Open Source Infrastructure Forensics
 Maintained by DrSkyle | github.com/drskyle/cloudslash
 
@@ -232,6 +258,8 @@ License: AGPLv3. For commercial use without open-source obligations, please acqu
 		body = m.viewList()
 	case ViewStateDetail:
 		body = m.viewDetails()
+	case ViewStateTopology:
+		body = m.viewTopology()
 	}
 
 	// 3. Render Footer (Help)
@@ -275,7 +303,6 @@ func (m *Model) refreshData() {
 		}
 	}
 
-
 	if m.SortMode == "Price" {
 		sort.Slice(nodes, func(i, j int) bool {
 			return nodes[i].Cost > nodes[j].Cost
@@ -289,8 +316,11 @@ func (m *Model) refreshData() {
 
 	m.totalSavings = total
 	m.wasteItems = nodes
+	
+	// Refresh topology logic too if in that view or always? 
+	// To be safe, let's keep it updated.
+	m.buildTopology()
 }
-
 
 func quickHelp(state ViewState) string {
 	base := subtle.Render(" [q] Quit/Back ")
@@ -300,17 +330,20 @@ func quickHelp(state ViewState) string {
 	if state == ViewStateDetail {
 		return base + subtle.Render(" [o] Open Browser  [i] Ign  [m] Mark  [y] Copy")
 	}
+	if state == ViewStateTopology {
+		return base + subtle.Render(" [↑/↓] Nav  [Enter] Action(WIP)")
+	}
 	return base
 }
 
 func (m Model) ignoreNode(id string) {
-	m.Graph.Mu.Lock()
-	node, exists := m.Graph.Nodes[id]
-	if exists {
+	node := m.Graph.GetNode(id)
+	if node != nil {
+		m.Graph.Mu.Lock()
 		node.Ignored = true
 		node.IsWaste = false
+		m.Graph.Mu.Unlock()
 	}
-	m.Graph.Mu.Unlock()
 
 	// Persist to .ignore.yaml
 	type IgnoreFile struct {
@@ -328,8 +361,10 @@ func (m Model) ignoreNode(id string) {
 
 func getConsoleURL(node *graph.Node) string {
 	region := fmt.Sprintf("%v", node.Properties["Region"])
-	if region == "" || region == "<nil>" { region = "us-east-1" }
-	
+	if region == "" || region == "<nil>" {
+		region = "us-east-1"
+	}
+
 	switch node.Type {
 	case "AWS::EC2::Instance":
 		return fmt.Sprintf("https://%s.console.aws.amazon.com/ec2/home?region=%s#InstanceDetails:instanceId=%s", region, region, node.ID)
@@ -359,7 +394,7 @@ func copyToClipboard(text string) {
 	}
 
 	cmd.Stdin = strings.NewReader(text)
-	cmd.Start() 
+	cmd.Start()
 	// Don't wait, just fire and forget for UI responsiveness
 }
 
@@ -403,7 +438,7 @@ func (m Model) getUniqueRegions() []string {
 }
 
 func (m Model) getKthWasteNodeID(k int) string {
-	// Not used in new logic, but kept for compatibility if needed? 
-    // New logic uses m.wasteItems list.
+	// Not used in new logic, but kept for compatibility if needed?
+	// New logic uses m.wasteItems list.
 	return ""
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// StorageOptimizationHeuristic (v1.3.0)
+// StorageOptimizationHeuristic
 type StorageOptimizationHeuristic struct{}
 
 func (h *StorageOptimizationHeuristic) Name() string { return "StorageOptimization" }
@@ -41,5 +41,3 @@ func (h *StorageOptimizationHeuristic) analyzeMultipart(n *graph.Node) {
 		n.Properties["FixRecommendation"] = "Add AbortIncompleteMultipartUpload Lifecycle Rule (7 days)."
 	}
 }
-
-

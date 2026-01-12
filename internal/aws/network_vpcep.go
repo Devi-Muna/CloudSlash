@@ -58,10 +58,8 @@ func (s *VpcEndpointScanner) ScanEndpoints(ctx context.Context) error {
 }
 
 func (s *VpcEndpointScanner) checkFlow(ctx context.Context, id string, props map[string]interface{}) {
-	s.Graph.Mu.Lock()
-	node, exists := s.Graph.Nodes[id]
-	s.Graph.Mu.Unlock()
-	if !exists { return }
+	node := s.Graph.GetNode(id)
+	if node == nil { return }
 	
 	// Metric: BytesProcessed
 	// Note: Per Endpoint

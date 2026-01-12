@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/DrSkyle/cloudslash/internal/aws"
+	internalconfig "github.com/DrSkyle/cloudslash/internal/config"
 	"github.com/DrSkyle/cloudslash/internal/forensics"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/heuristics"
+	"github.com/DrSkyle/cloudslash/internal/history"
 	"github.com/DrSkyle/cloudslash/internal/k8s"
 	"github.com/DrSkyle/cloudslash/internal/notifier"
 	"github.com/DrSkyle/cloudslash/internal/pricing"
@@ -20,6 +22,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/swarm"
 	"github.com/DrSkyle/cloudslash/internal/tf"
 	"github.com/DrSkyle/cloudslash/internal/ui"
+	"github.com/DrSkyle/cloudslash/internal/version"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -28,22 +31,40 @@ type Config struct {
 	TFStatePath      string
 	MockMode         bool
 	AllProfiles      bool
-	RequiredTags string
-	SlackWebhook string
+	RequiredTags     string
+	SlackWebhook     string
 	Headless         bool
 	DisableCWMetrics bool
 	Verbose          bool
+	Heuristics       internalconfig.HeuristicConfig
 }
 
 func Run(cfg Config) (bool, *graph.Graph, error) {
-	
-	if !cfg.Headless {
-		fmt.Println("CloudSlash v1.3.3 [AGPLv3]")
-	}
-	
-	// HEADLESS MODE UNLOCKED for AGPL compliance strategy
-	// We want Enterprises to run this in CI/CD so their scanners flag the license.
 
+	if !cfg.Headless {
+		fmt.Printf("%s %s [%s]\n", version.AppName, version.Current, version.License)
+	}
+
+	// Global Panic Recovery Middleware
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("\n[CRITICAL FAILURE]")
+			fmt.Printf("Error: %v\n", r)
+			
+			// Log stack trace
+			crashFile := fmt.Sprintf("crash_log_%d.txt", time.Now().Unix())
+			f, _ := os.Create(crashFile)
+			defer f.Close()
+			fmt.Fprintf(f, "Crash Time: %s\nError: %v\n", time.Now(), r)
+			
+			fmt.Printf("Details saved to %s\n", crashFile)
+			fmt.Println("Please report this issue.")
+			os.Exit(1)
+		}
+	}()
+
+	// HEADLESS MODE
+	// Enterprise compliance for license scanning.
 
 	ctx := context.Background()
 	var g *graph.Graph
@@ -79,24 +100,28 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 
 func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, headless bool) {
 	mockScanner := aws.NewMockScanner(g)
+
+	// v1.3.5: Seed Mock History for Derivative Engine Demo
+	history.SeedMockData()
+
 	mockScanner.Scan(ctx)
 
 	// Demo Heuristics
 	heuristicEngine := heuristics.NewEngine()
-	heuristicEngine.Register(&heuristics.ZombieEBSHeuristic{})
-	heuristicEngine.Register(&heuristics.S3MultipartHeuristic{})
-	heuristicEngine.Register(&heuristics.IdleClusterHeuristic{})
+	heuristicEngine.Register(&heuristics.ZombieEBSHeuristic{Config: internalconfig.DefaultHeuristicConfig().ZombieEBS})
+	heuristicEngine.Register(&heuristics.S3MultipartHeuristic{Config: internalconfig.DefaultHeuristicConfig().S3Multipart})
+	heuristicEngine.Register(&heuristics.IdleClusterHeuristic{Config: internalconfig.DefaultHeuristicConfig().IdleCluster})
 	heuristicEngine.Register(&heuristics.EmptyServiceHeuristic{})
 	heuristicEngine.Register(&heuristics.ZombieEKSHeuristic{})
 	heuristicEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
 	heuristicEngine.Register(&heuristics.ElasticIPHeuristic{})
 	heuristicEngine.Register(&heuristics.RDSHeuristic{})
-	
+
 	// v1.3.0
 	heuristicEngine.Register(&heuristics.NetworkForensicsHeuristic{})
 	heuristicEngine.Register(&heuristics.StorageOptimizationHeuristic{})
-    heuristicEngine.Register(&heuristics.EBSModernizerHeuristic{})
-	
+	heuristicEngine.Register(&heuristics.EBSModernizerHeuristic{})
+
 	if err := heuristicEngine.Run(ctx, g); err != nil {
 		fmt.Printf("Heuristic run failed: %v\n", err)
 	}
@@ -107,22 +132,25 @@ func runMockMode(ctx context.Context, g *graph.Graph, engine *swarm.Engine, head
 
 	os.Mkdir("cloudslash-out", 0755)
 
-	// FREE FEATURES (The Evidence Locker)
+	// Output Generation
 	report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
 	report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
-	// UNLOCKED FEATURES (AGPLv3)
+	// Dashboard Generation
 	if err := report.GenerateDashboard(g, "cloudslash-out/dashboard.html"); err != nil {
 		fmt.Printf("Failed to generate dashboard: %v\n", err)
 	}
-	
-	// The Scalpel
+
+	// Remediation Scripts
 	gen := tf.NewGenerator(g, nil)
 	gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
 	os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
 
-	// The Executive Brief
+	// Executive Summary
 	report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
+
+	// Historical Analysis
+	performSignalAnalysis(g)
 }
 
 func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) <-chan struct{} {
@@ -223,7 +251,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		}
 
 		hEngine := heuristics.NewEngine()
-		
+
 		if cwClient != nil {
 			hEngine.Register(&heuristics.RDSHeuristic{CW: cwClient})
 			if pricingClient != nil {
@@ -232,9 +260,9 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		}
 
 		if pricingClient != nil {
-			hEngine.Register(&heuristics.ZombieEBSHeuristic{Pricing: pricingClient})
+			hEngine.Register(&heuristics.ZombieEBSHeuristic{Pricing: pricingClient, Config: cfg.Heuristics.ZombieEBS})
 		} else {
-			hEngine.Register(&heuristics.ZombieEBSHeuristic{})
+			hEngine.Register(&heuristics.ZombieEBSHeuristic{Config: cfg.Heuristics.ZombieEBS})
 		}
 
 		if cfg.RequiredTags != "" {
@@ -251,9 +279,11 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		hEngine.Register(&heuristics.LambdaHeuristic{})
 		hEngine.Register(&heuristics.NetworkForensicsHeuristic{})
 		hEngine.Register(&heuristics.StorageOptimizationHeuristic{})
-        hEngine.Register(&heuristics.EBSModernizerHeuristic{})
+		hEngine.Register(&heuristics.EBSModernizerHeuristic{})
 		hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
-		hEngine.Register(&heuristics.IdleClusterHeuristic{})
+		
+		// v1.3.6: ECS Waste Detection
+		hEngine.Register(&heuristics.IdleClusterHeuristic{Config: cfg.Heuristics.IdleCluster})
 		hEngine.Register(&heuristics.EmptyServiceHeuristic{ECR: ecrScanner, ECS: ecsScanner})
 
 		if k8sClient, err := k8s.NewClient(); err == nil {
@@ -266,7 +296,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			fmt.Printf("Deep Analysis failed: %v\n", err)
 		}
 
-		// The Time Machine
+		// Time Machine Analysis
 		hEngine2 := heuristics.NewEngine()
 		if pricingClient != nil {
 			hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{Pricing: pricingClient})
@@ -280,20 +310,20 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		detective := forensics.NewDetective(ctClient)
 		detective.InvestigateGraph(ctx, g)
 
-		// OUTPUT GENERATION (Updated Logic)
+		// OUTPUT GENERATION
 		os.Mkdir("cloudslash-out", 0755)
 
-		// 1. Evidence Locker (FREE)
+		// 1. Report Generation
 		report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
 		report.GenerateJSON(g, "cloudslash-out/waste_report.json")
 
-		// 2. Advanced Features (Unlocked AGPLv3)
+		// 2. Remediation & Planning
 		gen := tf.NewGenerator(g, state)
 		gen.GenerateWasteTF("cloudslash-out/waste.tf")
 		gen.GenerateImportScript("cloudslash-out/import.sh")
 		gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
-		
-		// The Scalpel
+
+		// Remediation Scripts
 		gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
 		os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
 
@@ -307,16 +337,31 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		if err := report.GenerateDashboard(g, "cloudslash-out/dashboard.html"); err != nil {
 			fmt.Printf("Failed to generate dashboard: %v\n", err)
 		}
-		
-		// The Executive Brief
-		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
+		// Executive Summary
+		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
 		if cfg.SlackWebhook != "" {
 			if err := notifier.SendSlackReport(cfg.SlackWebhook, g); err != nil {
 				fmt.Printf("Failed to send Slack report: %v\n", err)
 			}
 		}
+
+		// v1.3.5: Signal Processing
+		performSignalAnalysis(g)
+
+		// Partial Graph Check
+		g.Mu.RLock()
+		if g.Metadata.Partial {
+			fmt.Println("\n[ WARNING: PARTIAL GRAPH ]")
+			fmt.Println(" The graph is incomplete due to missing permissions or API errors.")
+			fmt.Println(" Reachability analysis may be inaccurate.")
+			for _, failure := range g.Metadata.FailedScopes {
+				fmt.Printf(" - %s: %s\n", failure.Scope, failure.Error)
+			}
+			fmt.Println("----------------------------------------------------------")
+		}
+		g.Mu.RUnlock()
 	}()
 
 	return done
@@ -352,35 +397,90 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 	dynamoScanner := aws.NewDynamoDBScanner(awsClient.Config, g)
 	lambdaScanner := aws.NewLambdaScanner(awsClient.Config, g)
 
-	submitTask := func(task func(ctx context.Context) error) {
+	submitTask := func(taskName string, task func(ctx context.Context) error) {
 		scanWg.Add(1)
 		engine.Submit(func(ctx context.Context) error {
 			defer scanWg.Done()
-			return task(ctx)
+			err := task(ctx)
+			if err != nil {
+				// Capture partial failure
+				scope := fmt.Sprintf("%s:%s [%s]", profile, region, taskName)
+				g.AddError(scope, err)
+			}
+			return err
 		})
 	}
 
-	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanInstances(ctx) })
-	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanVolumes(ctx) })
-	submitTask(func(ctx context.Context) error { return natScanner.ScanNATGateways(ctx) })
-	submitTask(func(ctx context.Context) error { return eipScanner.ScanAddresses(ctx) })
-	submitTask(func(ctx context.Context) error { return albScanner.ScanALBs(ctx) })
-	submitTask(func(ctx context.Context) error { return vpcepScanner.ScanEndpoints(ctx) })
-	submitTask(func(ctx context.Context) error { return s3Scanner.ScanBuckets(ctx) })
-	submitTask(func(ctx context.Context) error { return rdsScanner.ScanInstances(ctx) })
-	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
-	submitTask(func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
-	submitTask(func(ctx context.Context) error { return eksScanner.ScanClusters(ctx) })
-	submitTask(func(ctx context.Context) error { return ecsScanner.ScanClusters(ctx) })
-	submitTask(func(ctx context.Context) error { return elasticacheScanner.ScanClusters(ctx) })
-	submitTask(func(ctx context.Context) error { return redshiftScanner.ScanClusters(ctx) })
-	submitTask(func(ctx context.Context) error { return dynamoScanner.ScanTables(ctx) })
-	submitTask(func(ctx context.Context) error { return lambdaScanner.ScanFunctions(ctx) })
+	submitTask("ScanInstances", func(ctx context.Context) error { return ec2Scanner.ScanInstances(ctx) })
+	submitTask("ScanVolumes", func(ctx context.Context) error { return ec2Scanner.ScanVolumes(ctx) })
+	submitTask("ScanNATGateways", func(ctx context.Context) error { return natScanner.ScanNATGateways(ctx) })
+	submitTask("ScanAddresses", func(ctx context.Context) error { return eipScanner.ScanAddresses(ctx) })
+	submitTask("ScanALBs", func(ctx context.Context) error { return albScanner.ScanALBs(ctx) })
+	submitTask("ScanEndpoints", func(ctx context.Context) error { return vpcepScanner.ScanEndpoints(ctx) })
+	submitTask("ScanBuckets", func(ctx context.Context) error { return s3Scanner.ScanBuckets(ctx) })
+	submitTask("ScanInstances", func(ctx context.Context) error { return rdsScanner.ScanInstances(ctx) })
+	submitTask("ScanSnapshots", func(ctx context.Context) error { return ec2Scanner.ScanSnapshots(ctx, "self") })
+	submitTask("ScanImages", func(ctx context.Context) error { return ec2Scanner.ScanImages(ctx) })
+	submitTask("ScanClusters", func(ctx context.Context) error { return eksScanner.ScanClusters(ctx) })
+	submitTask("ScanClusters", func(ctx context.Context) error { return ecsScanner.ScanClusters(ctx) })
+	submitTask("ScanClusters", func(ctx context.Context) error { return elasticacheScanner.ScanClusters(ctx) })
+	submitTask("ScanClusters", func(ctx context.Context) error { return redshiftScanner.ScanClusters(ctx) })
+	submitTask("ScanTables", func(ctx context.Context) error { return dynamoScanner.ScanTables(ctx) })
+	submitTask("ScanFunctions", func(ctx context.Context) error { return lambdaScanner.ScanFunctions(ctx) })
 
 	if k8sClient, err := k8s.NewClient(); err == nil {
 		k8sScanner := k8s.NewScanner(k8sClient, g)
-		submitTask(func(ctx context.Context) error { return k8sScanner.Scan(ctx) })
+		submitTask("K8sScan", func(ctx context.Context) error { return k8sScanner.Scan(ctx) })
 	}
 
 	return awsClient, nil
+}
+
+// performSignalAnalysis executes the v1.3.5 Derivative Engine logic
+func performSignalAnalysis(g *graph.Graph) {
+	// 1. Snapshot State
+	s := history.Snapshot{
+		Timestamp:      time.Now().Unix(),
+		ResourceCounts: make(map[string]int),
+	}
+
+	g.Mu.RLock()
+	var wasteVector history.Vector
+	for _, n := range g.Nodes {
+		s.TotalMonthlyCost += n.Cost
+		s.ResourceCounts[n.Type]++
+		if n.IsWaste {
+			s.WasteCount++
+			wasteVector = append(wasteVector, n.Cost)
+		}
+	}
+	g.Mu.RUnlock()
+
+	// 2. Persist
+	if err := history.Append(s); err != nil {
+		// Non-critical failure, just log to debug if needed
+	}
+
+	// 3. Analyze History Window
+	window, err := history.LoadWindow(10)
+	if err == nil {
+		// Budget set to 0 for now (TTB skipped)
+		res := history.Analyze(window, 0)
+
+		// 4. Output Alerts
+		if len(res.Alerts) > 0 {
+			fmt.Println("\n[ COST ANOMALY DETECTED ]")
+			for _, alert := range res.Alerts {
+				fmt.Printf(" %s\n", alert)
+			}
+			fmt.Printf(" Current Velocity: %+.2f $/mo per hour\n", res.Velocity)
+			if res.Acceleration > 0 {
+				fmt.Printf(" Acceleration:     %+.2f $/mo/h^2 (SPEND ACCELERATING)\n", res.Acceleration)
+			}
+			fmt.Println("-----------------------------------------------------------------")
+		} else if res.Velocity != 0 {
+			// Verbose / Info level
+			// fmt.Printf("\n[Signal] Spend Velocity: %+.2f $/mo/h\n", res.Velocity)
+		}
+	}
 }

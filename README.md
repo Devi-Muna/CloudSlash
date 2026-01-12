@@ -1,6 +1,6 @@
 # CloudSlash
 
-![Version](https://img.shields.io/badge/version-v1.3.3-00FF99?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-blue?style=flat-square) ![Status](https://img.shields.io/badge/status-production-green?style=flat-square)
+![Version](https://img.shields.io/badge/version-v1.3.5-00FF99?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-blue?style=flat-square) ![Status](https://img.shields.io/badge/status-production-green?style=flat-square)
 
 **The Forensic Cloud Accountant for AWS.**
 
@@ -56,6 +56,14 @@ irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 |
 ```bash
 cloudslash
 ```
+
+## Intelligence (New in v1.3.5)
+
+CloudSlash now includes **"The Derivative"**, a signal processing engine that tracks the _velocity_ of your spend, not just the total.
+
+- **Time-to-Bankrupt (TTB)**: Predicts exactly when your runway will hit zero based on current acceleration.
+- **Anomaly Detection**: Uses vector embeddings to detect abnormal spending spikes (e.g., "Why did NAT Gateway cost double in 1 hour?").
+- **Local Ledger**: Tracks historical performance in `~/.cloudslash/ledger.jsonl`. Your data never leaves your machine.
 
 ## Key Capabilities
 

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/DrSkyle/cloudslash/internal/sys/intern"
 )
 
 type EdgeType string
@@ -14,17 +16,28 @@ const (
 	EdgeTypeAttachedTo EdgeType = "AttachedTo"
 	EdgeTypeSecuredBy  EdgeType = "SecuredBy"
 	EdgeTypeContains   EdgeType = "Contains"
+	EdgeTypeRuns       EdgeType = "Runs" // Added for ECS Task relationships
 	EdgeTypeFlowsTo    EdgeType = "FlowsTo"
 	EdgeTypeUnknown    EdgeType = "Unknown"
 )
 
+type ReachabilityState string
+
+const (
+	ReachabilityUnknown    ReachabilityState = "Unknown"
+	ReachabilityReachable  ReachabilityState = "Reachable"
+	ReachabilityDarkMatter ReachabilityState = "DarkMatter"
+)
+
 type Edge struct {
-	TargetID string
+	TargetID uint32
 	Type     EdgeType
 	Weight   int
+	Metadata map[string]interface{}
 }
 
 type Node struct {
+	Index          uint32
 	ID             string
 	Type           string
 	Properties     map[string]interface{}
@@ -35,21 +48,82 @@ type Node struct {
 	RiskScore      int
 	Cost           float64
 	SourceLocation string
+	Reachability   ReachabilityState
+}
+
+type GraphMetadata struct {
+	Partial      bool
+	FailedScopes []ScopeError
+}
+
+type ScopeError struct {
+	Scope string
+	Error string
 }
 
 type Graph struct {
 	Mu           sync.RWMutex
-	Nodes        map[string]*Node
-	Edges        map[string][]Edge
-	ReverseEdges map[string][]Edge
+	Nodes        []*Node
+	Edges        [][]Edge
+	ReverseEdges [][]Edge
+	idMap        map[string]uint32
+	Metadata     GraphMetadata
 }
 
 func NewGraph() *Graph {
 	return &Graph{
-		Nodes:        make(map[string]*Node),
-		Edges:        make(map[string][]Edge),
-		ReverseEdges: make(map[string][]Edge),
+		Nodes:        make([]*Node, 0, 1000),
+		Edges:        make([][]Edge, 0, 1000),
+		ReverseEdges: make([][]Edge, 0, 1000),
+		idMap:        make(map[string]uint32),
+		Metadata:     GraphMetadata{Partial: false},
 	}
+}
+
+func (g *Graph) AddError(scope string, err error) {
+	g.Mu.Lock()
+	defer g.Mu.Unlock()
+	
+	g.Metadata.Partial = true
+	g.Metadata.FailedScopes = append(g.Metadata.FailedScopes, ScopeError{
+		Scope: scope,
+		Error: err.Error(),
+	})
+}
+
+// GetID returns the internal integer ID for a given string ID (ARN).
+// Returns 0, false if not found.
+func (g *Graph) GetID(id string) (uint32, bool) {
+	// Optimistic Read Lock
+	g.Mu.RLock()
+	idx, ok := g.idMap[id]
+	g.Mu.RUnlock()
+	return idx, ok
+}
+
+// GetNode returns the Node pointer for a given string ID.
+// This is a helper for legacy code but relies on the map lookup.
+func (g *Graph) GetNode(id string) *Node {
+	idx, ok := g.GetID(id)
+	if !ok {
+		return nil
+	}
+	g.Mu.RLock()
+	defer g.Mu.RUnlock()
+	if int(idx) < len(g.Nodes) {
+		return g.Nodes[idx]
+	}
+	return nil
+}
+
+// GetNodeByID returns the Node pointer for a given internal integer ID.
+func (g *Graph) GetNodeByID(idx uint32) *Node {
+	g.Mu.RLock()
+	defer g.Mu.RUnlock()
+	if int(idx) < len(g.Nodes) {
+		return g.Nodes[idx]
+	}
+	return nil
 }
 
 func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
@@ -59,19 +133,31 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	if node, exists := g.Nodes[id]; exists {
+	// Intern the resource type
+	resourceType = intern.String(resourceType)
+
+	if idx, exists := g.idMap[id]; exists {
+		// Update existing node
+		node := g.Nodes[idx]
 		for k, v := range props {
 			node.Properties[k] = v
 		}
-		if node.Type == "Unknown" && resourceType != "Unknown" {
+		if node.Type == intern.String("Unknown") && resourceType != intern.String("Unknown") {
 			node.Type = resourceType
 		}
 	} else {
-		g.Nodes[id] = &Node{
+		// Create new node
+		newIdx := uint32(len(g.Nodes))
+		g.idMap[id] = newIdx
+		g.Nodes = append(g.Nodes, &Node{
+			Index:      newIdx,
 			ID:         id,
 			Type:       resourceType,
 			Properties: props,
-		}
+		})
+		// Expand Edge lists
+		g.Edges = append(g.Edges, nil)
+		g.ReverseEdges = append(g.ReverseEdges, nil)
 	}
 }
 
@@ -87,35 +173,57 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	if _, ok := g.Nodes[sourceID]; !ok {
-		g.Nodes[sourceID] = &Node{ID: sourceID, Type: "Unknown", Properties: make(map[string]interface{})}
+	// Ensure Nodes Exist
+	srcIdx, ok := g.idMap[sourceID]
+	if !ok {
+		srcIdx = uint32(len(g.Nodes))
+		g.idMap[sourceID] = srcIdx
+		g.Nodes = append(g.Nodes, &Node{Index: srcIdx, ID: sourceID, Type: intern.String("Unknown"), Properties: make(map[string]interface{})})
+		g.Edges = append(g.Edges, nil)
+		g.ReverseEdges = append(g.ReverseEdges, nil)
 	}
-	if _, ok := g.Nodes[targetID]; !ok {
-		g.Nodes[targetID] = &Node{ID: targetID, Type: "Unknown", Properties: make(map[string]interface{})}
+
+	dstIdx, ok := g.idMap[targetID]
+	if !ok {
+		dstIdx = uint32(len(g.Nodes))
+		g.idMap[targetID] = dstIdx
+		g.Nodes = append(g.Nodes, &Node{Index: dstIdx, ID: targetID, Type: intern.String("Unknown"), Properties: make(map[string]interface{})})
+		g.Edges = append(g.Edges, nil)
+		g.ReverseEdges = append(g.ReverseEdges, nil)
 	}
 
 	// Forward Edge
 	exists := false
-	for _, e := range g.Edges[sourceID] {
-		if e.TargetID == targetID && e.Type == edgeType {
+	for _, e := range g.Edges[srcIdx] {
+		if e.TargetID == dstIdx && e.Type == edgeType {
 			exists = true
 			break
 		}
 	}
 	if !exists {
-		g.Edges[sourceID] = append(g.Edges[sourceID], Edge{TargetID: targetID, Type: edgeType, Weight: weight})
+		g.Edges[srcIdx] = append(g.Edges[srcIdx], Edge{
+			TargetID: dstIdx,
+			Type:     edgeType,
+			Weight:   weight,
+			Metadata: make(map[string]interface{}),
+		})
 	}
 
 	// Reverse Edge
 	revExists := false
-	for _, e := range g.ReverseEdges[targetID] {
-		if e.TargetID == sourceID && e.Type == edgeType {
+	for _, e := range g.ReverseEdges[dstIdx] {
+		if e.TargetID == srcIdx && e.Type == edgeType {
 			revExists = true
 			break
 		}
 	}
 	if !revExists {
-		g.ReverseEdges[targetID] = append(g.ReverseEdges[targetID], Edge{TargetID: sourceID, Type: edgeType, Weight: weight})
+		g.ReverseEdges[dstIdx] = append(g.ReverseEdges[dstIdx], Edge{
+			TargetID: srcIdx,
+			Type:     edgeType,
+			Weight:   weight,
+			Metadata: make(map[string]interface{}),
+		})
 	}
 }
 
@@ -124,32 +232,44 @@ func (g *Graph) GetConnectedComponent(startID string) []*Node {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
-	visited := make(map[string]bool)
-	queue := []string{startID}
+	startIdx, ok := g.idMap[startID]
+	if !ok {
+		return nil
+	}
+
+	visited := make(map[uint32]bool)
+	queue := []uint32{startIdx}
 	var component []*Node
 
 	for len(queue) > 0 {
-		currentID := queue[0]
+		currentIdx := queue[0]
 		queue = queue[1:]
 
-		if visited[currentID] {
+		if visited[currentIdx] {
 			continue
 		}
-		visited[currentID] = true
+		visited[currentIdx] = true
 
-		if node, ok := g.Nodes[currentID]; ok {
+		if int(currentIdx) < len(g.Nodes) {
+			node := g.Nodes[currentIdx]
 			component = append(component, node)
 		}
 
-		for _, edge := range g.Edges[currentID] {
-			if !visited[edge.TargetID] {
-				queue = append(queue, edge.TargetID)
+		// Forward
+		if int(currentIdx) < len(g.Edges) {
+			for _, edge := range g.Edges[currentIdx] {
+				if !visited[edge.TargetID] {
+					queue = append(queue, edge.TargetID)
+				}
 			}
 		}
 
-		for _, edge := range g.ReverseEdges[currentID] {
-			if !visited[edge.TargetID] {
-				queue = append(queue, edge.TargetID)
+		// Reverse
+		if int(currentIdx) < len(g.ReverseEdges) {
+			for _, edge := range g.ReverseEdges[currentIdx] {
+				if !visited[edge.TargetID] {
+					queue = append(queue, edge.TargetID)
+				}
 			}
 		}
 	}
@@ -161,88 +281,100 @@ func (g *Graph) MarkWaste(id string, score int) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	if node, ok := g.Nodes[id]; ok {
-		// cloudslash:ignore logic
-		if tags, ok := node.Properties["Tags"].(map[string]string); ok {
-			if val, ok := tags["cloudslash:ignore"]; ok {
-				val = strings.ToLower(strings.TrimSpace(val))
+	idx, ok := g.idMap[id]
+	if !ok {
+		return
+	}
+	node := g.Nodes[idx]
 
-				if val == "true" {
-					return
-				}
+	// cloudslash:ignore logic
+	if tags, ok := node.Properties["Tags"].(map[string]string); ok {
+		if val, ok := tags["cloudslash:ignore"]; ok {
+			val = strings.ToLower(strings.TrimSpace(val))
 
-				if strings.HasPrefix(val, "cost<") {
-					limitStr := strings.TrimPrefix(val, "cost<")
-					if limit, err := strconv.ParseFloat(limitStr, 64); err == nil {
-						if node.Cost < limit {
-							return
-						}
-					}
-				}
+			if val == "true" {
+				return
+			}
 
-				if strings.HasPrefix(val, "justified:") {
-					node.IsWaste = true
-					node.Justified = true
-					node.Justification = strings.TrimPrefix(val, "justified:")
-					node.RiskScore = score
-					return
-				}
-
-				if ignoreUntil, err := time.Parse("2006-01-02", val); err == nil {
-					if time.Now().Before(ignoreUntil) {
+			if strings.HasPrefix(val, "cost<") {
+				limitStr := strings.TrimPrefix(val, "cost<")
+				if limit, err := strconv.ParseFloat(limitStr, 64); err == nil {
+					if node.Cost < limit {
 						return
 					}
 				}
+			}
 
-				// Grace period (e.g., "30d")
-				if strings.HasSuffix(val, "d") || strings.HasSuffix(val, "h") {
-					hours := 0
-					var err error
+			if strings.HasPrefix(val, "justified:") {
+				node.IsWaste = true
+				node.Justified = true
+				node.Justification = strings.TrimPrefix(val, "justified:")
+				node.RiskScore = score
+				return
+			}
 
-					if strings.HasSuffix(val, "d") {
-						daysStr := strings.TrimSuffix(val, "d")
-						days, _ := strconv.Atoi(daysStr)
-						hours = days * 24
-					} else {
-						hoursStr := strings.TrimSuffix(val, "h")
-						hours, _ = strconv.Atoi(hoursStr)
+			if ignoreUntil, err := time.Parse("2006-01-02", val); err == nil {
+				if time.Now().Before(ignoreUntil) {
+					return
+				}
+			}
+
+			// Grace period (e.g., "30d")
+			if strings.HasSuffix(val, "d") || strings.HasSuffix(val, "h") {
+				hours := 0
+				var err error
+
+				if strings.HasSuffix(val, "d") {
+					daysStr := strings.TrimSuffix(val, "d")
+					days, _ := strconv.Atoi(daysStr)
+					hours = days * 24
+				} else {
+					hoursStr := strings.TrimSuffix(val, "h")
+					hours, _ = strconv.Atoi(hoursStr)
+				}
+
+				if err == nil {
+					var launchTime time.Time
+					foundTime := false
+
+					for _, key := range []string{"LaunchTime", "CreateTime", "StartTime", "Created"} {
+						if tVal, ok := node.Properties[key].(time.Time); ok {
+							launchTime = tVal
+							foundTime = true
+							break
+						}
 					}
 
-					if err == nil {
-						var launchTime time.Time
-						foundTime := false
-
-						for _, key := range []string{"LaunchTime", "CreateTime", "StartTime", "Created"} {
-							if tVal, ok := node.Properties[key].(time.Time); ok {
-								launchTime = tVal
-								foundTime = true
-								break
-							}
-						}
-
-						if foundTime {
-							if time.Since(launchTime).Hours() < float64(hours) {
-								return
-							}
+					if foundTime {
+						if time.Since(launchTime).Hours() < float64(hours) {
+							return
 						}
 					}
 				}
 			}
 		}
-
-		node.IsWaste = true
-		node.RiskScore = score
 	}
+
+	node.IsWaste = true
+	node.RiskScore = score
 }
 
 func (g *Graph) GetDownstream(id string) []string {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
+	startIdx, ok := g.idMap[id]
+	if !ok {
+		return nil
+	}
+
 	var downstream []string
-	if edges, ok := g.Edges[id]; ok {
-		for _, e := range edges {
-			downstream = append(downstream, e.TargetID)
+	if int(startIdx) < len(g.Edges) {
+		for _, e := range g.Edges[startIdx] {
+			// Convert index back to ID
+			if int(e.TargetID) < len(g.Nodes) {
+				downstream = append(downstream, g.Nodes[e.TargetID].ID)
+			}
 		}
 	}
 	return downstream
@@ -252,10 +384,17 @@ func (g *Graph) GetUpstream(id string) []string {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
+	startIdx, ok := g.idMap[id]
+	if !ok {
+		return nil
+	}
+
 	var upstream []string
-	if edges, ok := g.ReverseEdges[id]; ok {
-		for _, e := range edges {
-			upstream = append(upstream, e.TargetID)
+	if int(startIdx) < len(g.ReverseEdges) {
+		for _, e := range g.ReverseEdges[startIdx] {
+			if int(e.TargetID) < len(g.Nodes) {
+				upstream = append(upstream, g.Nodes[e.TargetID].ID)
+			}
 		}
 	}
 	return upstream
@@ -264,5 +403,10 @@ func (g *Graph) GetUpstream(id string) []string {
 func (g *Graph) DumpStats() string {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
-	return fmt.Sprintf("Nodes: %d | Edges: %d", len(g.Nodes), len(g.Edges))
+	
+	totalEdges := 0
+	for _, edges := range g.Edges {
+		totalEdges += len(edges)
+	}
+	return fmt.Sprintf("Nodes: %d | Edges: %d", len(g.Nodes), totalEdges)
 }

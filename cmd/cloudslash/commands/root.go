@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/DrSkyle/cloudslash/internal/app"
+	internalconfig "github.com/DrSkyle/cloudslash/internal/config"
+	"github.com/DrSkyle/cloudslash/internal/version"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -20,17 +22,18 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "cloudslash",
-	Short: "The Forensic Cloud Accountant",
-	Long: `CloudSlash - Zero Trust Infrastructure Analysis
+	Short: "Infrastructure Optimization Tool",
+	Long: `CloudSlash - Infrastructure Analysis Platform
     
-Identify. Audit. Slash.`,
-	Version: CurrentVersion,
+Identify. Audit. Optimize.`,
+	Version: version.Current,
 	Run: func(cmd *cobra.Command, args []string) {
-		if !cmd.Flags().Changed("region") {
-			regions, err := PromptForRegions()
-			if err == nil {
-				config.Region = strings.Join(regions, ",")
-			}
+
+
+		// Load Heuristics Config
+		config.Heuristics = internalconfig.DefaultHeuristicConfig()
+		if err := viper.UnmarshalKey("heuristics", &config.Heuristics); err != nil {
+			// Log error but continue with defaults? Or maybe fmt.Println
 		}
 
 		config.Headless = false
@@ -73,35 +76,12 @@ func init() {
 
 	rootCmd.AddCommand(NukeCmd)
 	rootCmd.AddCommand(ExportCmd)
-	rootCmd.AddCommand(coffeeCmd)
-}
-
-var coffeeCmd = &cobra.Command{
-	Use:   "coffee",
-	Short: "418 I'm a teapot",
-	Hidden: true, // Easter egg
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(`
-    (  )   (   )  )
-     ) (   )  (  (
-     ( )  (    ) )
-     _____________
-    <_____________> ___
-    |             |/ _ \
-    |               | | |
-    |               |_| |
-    |             |\___/
-    \_____________/
-`)
-		fmt.Println("418 I'm a teapot.")
-		fmt.Println("But seriously, buy me a coffee: \u001b]8;;https://buymeacoffee.com/drskyle\u001b\\Click Here\u001b]8;;\u001b\\") 
-	},
 }
 
 func checkUpdate() {
 	latest, err := fetchLatestVersion()
-	if err == nil && strings.TrimSpace(latest) > CurrentVersion {
-		fmt.Printf("\n[UPDATE] Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", CurrentVersion, latest)
+	if err == nil && strings.TrimSpace(latest) > version.Current {
+		fmt.Printf("\n[UPDATE] Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", version.Current, latest)
 	}
 }
 
@@ -128,8 +108,8 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 	flagStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#AAAAAA"))
 
-	fmt.Println(titleStyle.Render(fmt.Sprintf("CLOUDSLASH %s [Future-Glass]", CurrentVersion)))
-	fmt.Println("The Forensic Cloud Accountant for AWS.")
+	fmt.Println(titleStyle.Render(fmt.Sprintf("CLOUDSLASH %s", version.Current)))
+	fmt.Println("Infrastructure Optimization and Analysis Tool.")
 
 	fmt.Println(titleStyle.Render("USAGE"))
 	fmt.Printf("  %s\n\n", cmd.UseLine())
@@ -155,33 +135,32 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 	})
 	fmt.Println("")
 
-
 }
 
 func safeWriteConfig() {
-    // 1. Try SafeWrite (creates if creates if missing, fails if exists)
+	// 1. Try SafeWrite (creates if creates if missing, fails if exists)
 	if err := viper.SafeWriteConfig(); err != nil {
-        // 2. If already exists, try Overwrite
+		// 2. If already exists, try Overwrite
 		if err2 := viper.WriteConfig(); err2 != nil {
-            // 3. Fallback: Force create file at explicit path
-            path := viper.ConfigFileUsed()
-            if path != "" {
-                 f, createErr := os.Create(path)
-                 if createErr == nil {
-                     f.Close()
-                     viper.WriteConfig()
-                 } else {
-                     fmt.Printf("Error creating config file: %v\n", createErr)
-                 }
-            } else {
-                // If path is empty, try manual home construction
-                 home, _ := os.UserHomeDir()
-                 path = filepath.Join(home, ".cloudslash.yaml")
-                 f, _ := os.Create(path)
-                 f.Close()
-                 viper.SetConfigFile(path)
-                 viper.WriteConfig()
-            }
-        }
+			// 3. Fallback: Force create file at explicit path
+			path := viper.ConfigFileUsed()
+			if path != "" {
+				f, createErr := os.Create(path)
+				if createErr == nil {
+					f.Close()
+					viper.WriteConfig()
+				} else {
+					fmt.Printf("Error creating config file: %v\n", createErr)
+				}
+			} else {
+				// If path is empty, try manual home construction
+				home, _ := os.UserHomeDir()
+				path = filepath.Join(home, ".cloudslash.yaml")
+				f, _ := os.Create(path)
+				f.Close()
+				viper.SetConfigFile(path)
+				viper.WriteConfig()
+			}
+		}
 	}
 }
