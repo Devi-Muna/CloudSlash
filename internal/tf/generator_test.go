@@ -8,7 +8,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-func TestGenerateAtomicNuke(t *testing.T) {
+func TestGenerateDeletionScript(t *testing.T) {
 	// 1. Setup Graph: Instance -> Subnet -> VPC
 	g := graph.NewGraph()
 	g.AddNode("vpc-1", "AWS::EC2::VPC", nil)
@@ -34,10 +34,10 @@ func TestGenerateAtomicNuke(t *testing.T) {
 
 	// 2. Generate Script
 	gen := NewGenerator(g, nil)
-	tmpFile := "test_atomic_nuke.sh"
+	tmpFile := "test_deletion_script.sh"
 	defer os.Remove(tmpFile)
 
-	err := gen.GenerateAtomicNuke(tmpFile)
+	err := gen.GenerateDeletionScript(tmpFile)
 	if err != nil {
 		t.Fatalf("Generation failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestGenerateAtomicNuke(t *testing.T) {
 		t.Errorf("Missing VPC deletion command")
 	}
 
-	// 4. Verify Order (The Gordian Knot Logic)
+	// 4. Verify Order (Dependency Resolution)
 	// Instance must be deleted BEFORE Subnet
 	idxInstance := strings.Index(content, "terminate-instances")
 	idxSubnet := strings.Index(content, "delete-subnet")

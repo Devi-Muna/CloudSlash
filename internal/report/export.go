@@ -18,7 +18,7 @@ type ExportItem struct {
 	NameTag          string  `json:"name_tag"`
 	MonthlyCost      float64 `json:"monthly_cost"`
 	RiskScore        int     `json:"risk_score"`
-	ForensicEvidence string  `json:"forensic_evidence"`
+	AuditDetail      string  `json:"audit_detail"`
 	OwnerARN         string  `json:"owner_arn"`
 	Action           string  `json:"action"`
 }
@@ -49,7 +49,7 @@ func GenerateCSV(g *graph.Graph, path string) error {
 		"NameTag",
 		"MonthlyCost",
 		"RiskScore",
-		"ForensicEvidence",
+		"AuditDetail",
 		"OwnerARN",
 		"Action",
 	}
@@ -65,7 +65,7 @@ func GenerateCSV(g *graph.Graph, path string) error {
 			item.NameTag,
 			fmt.Sprintf("$%.2f", item.MonthlyCost),
 			fmt.Sprintf("%d", item.RiskScore),
-			item.ForensicEvidence,
+			item.AuditDetail,
 			item.OwnerARN,
 			item.Action,
 		}
@@ -137,7 +137,7 @@ func extractItems(g *graph.Graph) []ExportItem {
 				NameTag:          nameTag,
 				MonthlyCost:      node.Cost,
 				RiskScore:        node.RiskScore,
-				ForensicEvidence: reason,
+				AuditDetail:      reason,
 				OwnerARN:         owner,
 				Action:           action,
 			})

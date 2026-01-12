@@ -1,328 +1,638 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="google-site-verification"
+      content="cE4g3_aZ9YvRm0_LQtr56jRWuyGS1PzEJw1jICXLTYg"
+    />
+    <title>CloudSlash | The Cloud Accountant</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-site-verification" content="cE4g3_aZ9YvRm0_LQtr56jRWuyGS1PzEJw1jICXLTYg" />
-    <title>CloudSlash | The Forensic Cloud Accountant</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800,500,700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-</head>
-
-<body>
+  <body>
     <div class="glass-overlay"></div>
     <div class="noise-overlay"></div>
 
     <header>
-        <div class="container nav-container">
-            <div class="logo">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M16 4C10 4 5 8 5 14C5 18 8 21 12 23" stroke="#00FF99" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M26 14C26 8 21 4 16 4" stroke="#00FF99" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M20 23C24 21 27 18 27 14" stroke="#00FF99" stroke-width="2" stroke-linecap="round"/>
-                    <path d="M22 6L10 26" stroke="#00FF99" stroke-width="3" stroke-linecap="round" class="slash-anim"/>
-                </svg>
-                <span class="logo-text">CLOUDSLASH</span>
-            </div>
-            <nav>
-                <a href="#features">Features</a>
-                <a href="https://github.com/DrSkyle/CloudSlash" target="_blank" class="github-link">
-                    GitHub
-                </a>
-            </nav>
+      <div class="container nav-container">
+        <div class="logo">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 32 32"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M16 4C10 4 5 8 5 14C5 18 8 21 12 23"
+              stroke="#00FF99"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M26 14C26 8 21 4 16 4"
+              stroke="#00FF99"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M20 23C24 21 27 18 27 14"
+              stroke="#00FF99"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <path
+              d="M22 6L10 26"
+              stroke="#00FF99"
+              stroke-width="3"
+              stroke-linecap="round"
+              class="slash-anim"
+            />
+          </svg>
+          <span class="logo-text">CLOUDSLASH</span>
         </div>
+        <nav>
+          <a href="#features">Features</a>
+          <a
+            href="https://github.com/DrSkyle/CloudSlash"
+            target="_blank"
+            class="github-link"
+          >
+            GitHub
+          </a>
+        </nav>
+      </div>
     </header>
 
     <main>
-        <section class="hero">
-            <div class="container hero-content">
-                <div class="hero-text">
-                    <h1 class="glitch-text" data-text="Identify.">Identify.</h1>
-                    <h1 class="glitch-text" data-text="Audit.">Audit.</h1>
-                    <h1 class="glitch-text highlight" data-text="Slash.">Slash.</h1>
-                    <p class="subtitle">
-                        <strong>The Forensic Cloud Accountant for Indie Devs & Startups.</strong><br>
-                        Stop bleeding cash. Discover accurate waste metrics and fix Terraform state without the Enterprise sales calls or contracts.
-                    </p>
-                    <div class="cta-group">
-                         <a href="#download" class="btn-primary">
-                            Download CLI
-                        </a>
-                    </div>
-                </div>
-                <div class="hero-visual">
-                    <div class="terminal-window glass-panel">
-                        <div class="terminal-header">
-                            <div class="dots">
-                                <span class="dot red"></span>
-                                <span class="dot yellow"></span>
-                                <span class="dot green"></span>
-                            </div>
-                            <span class="title">user@cloudslash: ~</span>
-                        </div>
-                        <div class="terminal-body" id="term-body">
-                            <!-- Typewriter effect will inject content here -->
-                        </div>
-                    </div>
-                </div>
+      <section class="hero">
+        <div class="container hero-content">
+          <div class="hero-text">
+            <h1 class="glitch-text" data-text="Identify.">Identify.</h1>
+            <h1 class="glitch-text" data-text="Audit.">Audit.</h1>
+            <h1 class="glitch-text highlight" data-text="Slash.">Slash.</h1>
+            <p class="subtitle">
+              <strong>The Cloud Accountant for DevOps & Startups.</strong><br />
+              Stop bleeding cash. Discover accurate waste metrics and fix
+              Terraform state without the Enterprise sales calls or contracts.
+            </p>
+            <div class="cta-group">
+              <a href="#download" class="btn-primary"> Download CLI </a>
             </div>
-        </section>
-
-
-        <!-- Trust Battery / Tech Stack -->
-        <section class="tech-stack">
-            <div class="container">
-                <p class="tech-label">POWERED BY MODERN INFRASTRUCTURE</p>
-                <div class="tech-logos">
-                    <!-- Go Logo (Simple Icons) -->
-                    <div class="tech-item" title="Built with Go">
-                        <svg viewBox="0 0 24 24" fill="currentColor" class="tech-logo"><path d="M1.811 10.231c-.047 0-.058-.023-.035-.059l.246-.315c.023-.035.081-.058.128-.058h4.172c.046 0 .058.035.035.07l-.199.303c-.023.036-.082.07-.117.07zM.047 11.306c-.047 0-.059-.023-.035-.058l.245-.316c.023-.035.082-.058.129-.058h5.328c.047 0 .07.035.058.07l-.093.28c-.012.047-.058.07-.105.07zm2.828 1.075c-.047 0-.059-.035-.035-.07l.163-.292c.023-.035.07-.07.117-.07h2.337c.047 0 .07.035.07.082l-.023.28c0 .047-.047.082-.082.082zm12.129-2.36c-.736.187-1.239.327-1.963.514-.176.046-.187.058-.34-.117-.174-.199-.303-.327-.548-.444-.737-.362-1.45-.257-2.115.175-.795.514-1.204 1.274-1.192 2.22.011.935.654 1.706 1.577 1.835.795.105 1.46-.175 1.987-.77.105-.13.198-.27.315-.434H10.47c-.245 0-.304-.152-.222-.35.152-.362.432-.97.596-1.274a.315.315 0 01.292-.187h4.253c-.023.316-.023.631-.07.947a4.983 4.983 0 01-.958 2.29c-.841 1.11-1.94 1.8-3.33 1.986-1.145.152-2.209-.07-3.143-.77-.865-.655-1.356-1.52-1.484-2.595-.152-1.274.222-2.419.993-3.424.83-1.086 1.928-1.776 3.272-2.02 1.098-.2 2.15-.07 3.096.571.62.41 1.063.97 1.356 1.648.07.105.023.164-.117.2m3.868 6.461c-1.064-.024-2.034-.328-2.852-1.029a3.665 3.665 0 01-1.262-2.255c-.21-1.32.152-2.489.947-3.529.853-1.122 1.881-1.706 3.272-1.95 1.192-.21 2.314-.095 3.33.595.923.63 1.496 1.484 1.648 2.605.198 1.578-.257 2.863-1.344 3.962-.771.783-1.718 1.273-2.805 1.495-.315.06-.63.07-.934.106zm2.78-4.72c-.011-.153-.011-.27-.034-.387-.21-1.157-1.274-1.81-2.384-1.554-1.087.245-1.788.935-2.045 2.033-.21.912.234 1.835 1.075 2.21.643.28 1.285.244 1.905-.07.923-.48 1.425-1.228 1.484-2.233z"/></svg>
-                        <span class="tooltip">Golang</span>
-                    </div>
-                    
-                    <!-- Terraform (Simple Icons) -->
-                    <div class="tech-item" title="Terraform Integration">
-                        <svg viewBox="0 0 24 24" fill="currentColor" class="tech-logo"><path d="M1.44 0v7.575l6.561 3.79V3.787zm21.12 4.227l-6.561 3.791v7.574l6.56-3.787zM8.72 4.23v7.575l6.561 3.787V8.018zm0 8.405v7.575L15.28 24v-7.578z"/></svg>
-                        <span class="tooltip">Terraform</span>
-                    </div>
-
-                    <!-- AWS (FontAwesome Brands - Re-verified) -->
-                    <div class="tech-item" title="AWS Native">
-                        <svg viewBox="0 0 640 512" fill="currentColor" class="tech-logo"><path d="M180.41 203.01c-.72 22.65 10.6 32.68 10.88 39.05a8.164 8.164 0 0 1-4.1 6.27l-12.8 8.96a10.66 10.66 0 0 1-5.63 1.92c-.43-.02-8.19 1.83-20.48-25.61a78.608 78.608 0 0 1-62.61 29.45c-16.28.89-60.4-9.24-58.13-56.21-1.59-38.28 34.06-62.06 70.93-60.05 7.1.02 21.6.37 46.99 6.27v-15.62c2.69-26.46-14.7-46.99-44.81-43.91-2.4.01-19.4-.5-45.84 10.11-7.36 3.38-8.3 2.82-10.75 2.82-7.41 0-4.36-21.48-2.94-24.2 5.21-6.4 35.86-18.35 65.94-18.18a76.857 76.857 0 0 1 55.69 17.28 70.285 70.285 0 0 1 17.67 52.36l-.01 69.29zM93.99 235.4c32.43-.47 46.16-19.97 49.29-30.47 2.46-10.05 2.05-16.41 2.05-27.4-9.67-2.32-23.59-4.85-39.56-4.87-15.15-1.14-42.82 5.63-41.74 32.26-1.24 16.79 11.12 31.4 29.96 30.48zm170.92 23.05c-7.86.72-11.52-4.86-12.68-10.37l-49.8-164.65c-.97-2.78-1.61-5.65-1.92-8.58a4.61 4.61 0 0 1 3.86-5.25c.24-.04-2.13 0 22.25 0 8.78-.88 11.64 6.03 12.55 10.37l35.72 140.83 33.16-140.83c.53-3.22 2.94-11.07 12.8-10.24h17.16c2.17-.18 11.11-.5 12.68 10.37l33.42 142.63L420.98 80.1c.48-2.18 2.72-11.37 12.68-10.37h19.72c.85-.13 6.15-.81 5.25 8.58-.43 1.85 3.41-10.66-52.75 169.9-1.15 5.51-4.82 11.09-12.68 10.37h-18.69c-10.94 1.15-12.51-9.66-12.68-10.75L328.67 110.7l-32.78 136.99c-.16 1.09-1.73 11.9-12.68 10.75h-18.3zm273.48 5.63c-5.88.01-33.92-.3-57.36-12.29a12.802 12.802 0 0 1-7.81-11.91v-10.75c0-8.45 6.2-6.9 8.83-5.89 10.04 4.06 16.48 7.14 28.81 9.6 36.65 7.53 52.77-2.3 56.72-4.48 13.15-7.81 14.19-25.68 5.25-34.95-10.48-8.79-15.48-9.12-53.13-21-4.64-1.29-43.7-13.61-43.79-52.36-.61-28.24 25.05-56.18 69.52-55.95 12.67-.01 46.43 4.13 55.57 15.62 1.35 2.09 2.02 4.55 1.92 7.04v10.11c0 4.44-1.62 6.66-4.87 6.66-7.71-.86-21.39-11.17-49.16-10.75-6.89-.36-39.89.91-38.41 24.97-.43 18.96 26.61 26.07 29.7 26.89 36.46 10.97 48.65 12.79 63.12 29.58 17.14 22.25 7.9 48.3 4.35 55.44-19.08 37.49-68.42 34.44-69.26 34.42zm40.2 104.86c-70.03 51.72-171.69 79.25-258.49 79.25A469.127 469.127 0 0 1 2.83 327.46c-6.53-5.89-.77-13.96 7.17-9.47a637.37 637.37 0 0 0 316.88 84.12 630.22 630.22 0 0 0 241.59-49.55c11.78-5 21.77 7.8 10.12 16.38zm29.19-33.29c-8.96-11.52-59.28-5.38-81.81-2.69-6.79.77-7.94-5.12-1.79-9.47 40.07-28.17 105.88-20.1 113.44-10.63 7.55 9.47-2.05 75.41-39.56 106.91-5.76 4.87-11.27 2.3-8.71-4.1 8.44-21.25 27.39-68.49 18.43-80.02z"/></svg>
-                        <span class="tooltip">AWS</span>
-                    </div>
-
-                    <!-- Linux (Simple Icons) -->
-                    <div class="tech-item" title="Linux Compatible">
-                        <svg viewBox="0 0 24 24" fill="currentColor" class="tech-logo"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.043c-.06-.003-.12 0-.18 0h-.016c.151-.467-.182-.825-1.065-1.224-.915-.4-1.646-.336-1.77.465-.008.043-.013.066-.018.135-.068.023-.139.053-.209.064-.43.268-.662.669-.793 1.187-.13.533-.17 1.156-.205 1.869v.003c-.02.334-.17.838-.319 1.35-1.5 1.072-3.58 1.538-5.348.334a2.645 2.645 0 00-.402-.533 1.45 1.45 0 00-.275-.333c.182 0 .338-.03.465-.067a.615.615 0 00.314-.334c.108-.267 0-.697-.345-1.163-.345-.467-.931-.995-1.788-1.521-.63-.4-.986-.87-1.15-1.396-.165-.534-.143-1.085-.015-1.645.245-1.07.873-2.11 1.274-2.763.107-.065.037.135-.408.974-.396.751-1.14 2.497-.122 3.854a8.123 8.123 0 01.647-2.876c.564-1.278 1.743-3.504 1.836-5.268.048.036.217.135.289.202.218.133.38.333.59.465.21.201.477.335.876.335.039.003.075.006.11.006.412 0 .73-.134.997-.268.29-.134.52-.334.74-.4h.005c.467-.135.835-.402 1.044-.7zm2.185 8.958c.037.6.343 1.245.882 1.377.588.134 1.434-.333 1.791-.765l.211-.01c.315-.007.577.01.847.268l.003.003c.208.199.305.53.391.876.085.4.154.78.409 1.066.486.527.645.906.636 1.14l.003-.007v.018l-.003-.012c-.015.262-.185.396-.498.595-.63.401-1.746.712-2.457 1.57-.618.737-1.37 1.14-2.036 1.191-.664.053-1.237-.2-1.574-.898l-.005-.003c-.21-.4-.12-1.025.056-1.69.176-.668.428-1.344.463-1.897.037-.714.076-1.335.195-1.814.12-.465.308-.797.641-.984l.045-.022zm-10.814.049h.01c.053 0 .105.005.157.014.376.055.706.333 1.023.752l.91 1.664.003.003c.243.533.754 1.064 1.189 1.637.434.598.77 1.131.729 1.57v.006c-.057.744-.48 1.148-1.125 1.294-.645.135-1.52.002-2.395-.464-.968-.536-2.118-.469-2.857-.602-.369-.066-.61-.2-.723-.4-.11-.2-.113-.602.123-1.23v-.004l.002-.003c.117-.334.03-.752-.027-1.118-.055-.401-.083-.71.043-.94.16-.334.396-.4.69-.533.294-.135.64-.202.915-.47h.002v-.002c.256-.268.445-.601.668-.838.19-.201.38-.336.663-.336zm7.159-9.074c-.435.201-.945.535-1.488.535-.542 0-.97-.267-1.28-.466-.154-.134-.28-.268-.373-.335-.164-.134-.144-.333-.074-.333.109.016.129.134.199.2.096.066.215.2.36.333.292.2.68.467 1.167.467.485 0 1.053-.267 1.398-.466.195-.135.445-.334.648-.467.156-.136.149-.267.279-.267.128.016.034.134-.147.332a8.097 8.097 0 01-.69.468zm-1.082-1.583V5.64c-.006-.02.013-.042.029-.05.074-.043.18-.027.26.004.063 0 .16.067.15.135-.006.049-.085.066-.135.066-.055 0-.092-.043-.141-.068-.052-.018-.146-.008-.163-.065zm-.551 0c-.02.058-.113.049-.166.066-.047.025-.086.068-.14.068-.05 0-.13-.02-.136-.068-.01-.066.088-.133.15-.133.08-.031.184-.047.259-.005.019.009.036.03.05v.02h.003z"/></svg>
-                        <span class="tooltip">Linux</span>
-                    </div>
+          </div>
+          <div class="hero-visual">
+            <div class="terminal-window glass-panel">
+              <div class="terminal-header">
+                <div class="dots">
+                  <span class="dot red"></span>
+                  <span class="dot yellow"></span>
+                  <span class="dot green"></span>
                 </div>
+                <span class="title">user@cloudslash: ~</span>
+              </div>
+              <div class="terminal-body" id="term-body">
+                <!-- Typewriter effect will inject content here -->
+              </div>
             </div>
-        </section>
+          </div>
+        </div>
+      </section>
 
-        <section id="features" class="features">
-            <div class="container">
-                <h2 class="section-title">Built for Builders, Not Bureaucrats</h2>
-                <div class="grid">
-                    <div class="card glass-panel">
-                        <div class="icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2-9-2 9-6-12-6 12"/></svg>
-                        </div>
-                        <h3>Deep-Scan Forensics</h3>
-                        <p>We trace resource lineage to find what others miss. <strong>Zombie EBS</strong> volumes, hidden snapshots, and orphaned resources are detected instantly.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        </div>
-                        <h3>DNS Safety Lock</h3>
-                        <p>Essential Release Protection. Cross-references <strong>Route53</strong> A-Records before releasing Elastic IPs to prevent Subdomain Takeover attacks.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                        </div>
-                        <h3>Terraform Bridge</h3>
-                        <p><strong>The State Doctor.</strong> Maps AWS Reality to Terraform Fantasy. Generates module-aware <code>terraform state rm</code> commands to surgically sync your state.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                        </div>
-                        <h3>Ghost Clusters</h3>
-                        <p>Identifies EKS & ECS clusters running zero tasks but costing <strong>thousands</strong> in idle EC2 capacity. Detects "Hollow" usage patterns.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                        </div>
-                        <h3>Fossil Snapshots</h3>
-                        <p>Find old RDS snapshots (90+ days) that are detached from any active cluster. Clean up the digital dust.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </div>
-                        <h3>The Blame Game</h3>
-                        <p><strong>Owner Forensics.</strong> Who spun up that xlarge instance? CloudSlash traces CloudTrail events to identify the IAM User responsible.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                        </div>
-                        <h3>Lambda Pruner</h3>
-                        <p>Identifies <strong>Stagnant Functions</strong> with 0 invocations in 90 days. Clears out abandoned serverless code cluttering your account.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                        </div>
-                        <h3>Log Hoarders</h3>
-                        <p>Detects CloudWatch groups set to <strong>"Never Expire"</strong> that are rapidly accumulating storage costs. Enforces retention policies.</p>
-                    </div>
-                    <div class="card glass-panel">
-                        <div class="icon">
-                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><polyline points="14 2 14 8 20 8"/><path d="M3 15h6"/><path d="M3 18h6"/><path d="M3 12h6"/></svg>
-                        </div>
-                        <h3>ECR Digital Janitor</h3>
-                        <p>Locates Container Repositories with <strong>missing Lifecycle Policies</strong>. Flags large, untagged images that are costing you money for no reason.</p>
-                    </div>
-                </div>
+      <!-- Trust Battery / Tech Stack -->
+      <section class="tech-stack">
+        <div class="container">
+          <p class="tech-label">POWERED BY MODERN INFRASTRUCTURE</p>
+          <div class="tech-logos">
+            <!-- Go Logo (Simple Icons) -->
+            <div class="tech-item" title="Built with Go">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="tech-logo">
+                <path
+                  d="M1.811 10.231c-.047 0-.058-.023-.035-.059l.246-.315c.023-.035.081-.058.128-.058h4.172c.046 0 .058.035.035.07l-.199.303c-.023.036-.082.07-.117.07zM.047 11.306c-.047 0-.059-.023-.035-.058l.245-.316c.023-.035.082-.058.129-.058h5.328c.047 0 .07.035.058.07l-.093.28c-.012.047-.058.07-.105.07zm2.828 1.075c-.047 0-.059-.035-.035-.07l.163-.292c.023-.035.07-.07.117-.07h2.337c.047 0 .07.035.07.082l-.023.28c0 .047-.047.082-.082.082zm12.129-2.36c-.736.187-1.239.327-1.963.514-.176.046-.187.058-.34-.117-.174-.199-.303-.327-.548-.444-.737-.362-1.45-.257-2.115.175-.795.514-1.204 1.274-1.192 2.22.011.935.654 1.706 1.577 1.835.795.105 1.46-.175 1.987-.77.105-.13.198-.27.315-.434H10.47c-.245 0-.304-.152-.222-.35.152-.362.432-.97.596-1.274a.315.315 0 01.292-.187h4.253c-.023.316-.023.631-.07.947a4.983 4.983 0 01-.958 2.29c-.841 1.11-1.94 1.8-3.33 1.986-1.145.152-2.209-.07-3.143-.77-.865-.655-1.356-1.52-1.484-2.595-.152-1.274.222-2.419.993-3.424.83-1.086 1.928-1.776 3.272-2.02 1.098-.2 2.15-.07 3.096.571.62.41 1.063.97 1.356 1.648.07.105.023.164-.117.2m3.868 6.461c-1.064-.024-2.034-.328-2.852-1.029a3.665 3.665 0 01-1.262-2.255c-.21-1.32.152-2.489.947-3.529.853-1.122 1.881-1.706 3.272-1.95 1.192-.21 2.314-.095 3.33.595.923.63 1.496 1.484 1.648 2.605.198 1.578-.257 2.863-1.344 3.962-.771.783-1.718 1.273-2.805 1.495-.315.06-.63.07-.934.106zm2.78-4.72c-.011-.153-.011-.27-.034-.387-.21-1.157-1.274-1.81-2.384-1.554-1.087.245-1.788.935-2.045 2.033-.21.912.234 1.835 1.075 2.21.643.28 1.285.244 1.905-.07.923-.48 1.425-1.228 1.484-2.233z"
+                />
+              </svg>
+              <span class="tooltip">Golang</span>
             </div>
-        </section>
 
-        <section id="support" class="support-section">
-            <div class="container">
-                <h2 class="section-title">Support the Project</h2>
-                <div class="support-grid" style="display: flex; justify-content: center; gap: 40px; padding: 40px 0;">
-                    
-                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 350px;">
-                        <h3>Supporter</h3>
-                        <div class="price" style="font-size: 2rem; font-weight: 800; color: #00FF99; margin: 10px 0;">$9.99<span style="font-size: 1rem; color: #94A3B8;">/mo</span></div>
-                        <ul class="features-list">
-                            <li>Priority Email Support</li>
-                            <li><strong>Directly Funds Development</strong></li>
-                        </ul>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37525/" class="btn-secondary-full" style="margin-top: auto; border-color: #00FF99; color: #00FF99;">Support Now</a>
-                    </div>
-
-                    <div class="price-card glass-panel" style="border: 1px solid #334155; max-width: 350px;">
-                        <h3>Super Supporter</h3>
-                        <div class="price" style="font-size: 2rem; font-weight: 800; color: #00FF99; margin: 10px 0;">$19.99<span style="font-size: 1rem; color: #94A3B8;">/mo</span></div>
-                        <ul class="features-list">
-                             <li><strong>Prioritized Requests</strong></li>
-                            <li><strong>Sponsor Recognition</strong></li>
-                        </ul>
-                        <a href="https://checkout.freemius.com/app/22411/plan/37513/" class="btn-primary-full" style="margin-top: auto;">Super Support</a>
-                    </div>
-
-                    <div class="price-card glass-panel" style="border: 1px dashed #334155; max-width: 350px; opacity: 0.8;">
-                        <h3>Enterprise</h3>
-                        <div class="price" style="font-size: 1.5rem; font-weight: 800; color: #94A3B8; margin: 10px 0;">Exemption</div>
-                        <p style="color: #94A3B8; font-size: 0.9rem; margin-bottom: 24px;">
-                            Requires AGPLv3 compliance exemption?<br>Contact us.
-                        </p>
-                        <a href="mailto:drskyle8000@gmail.com" class="btn-secondary-full" style="margin-top: auto;">Contact</a>
-                    </div>
-
-                </div>
-                 <div class="pricing-footer" style="text-align: center; margin-top: 30px; opacity: 0.7;">
-                    <p style="font-size: 0.9rem; color: #94A3B8;">
-                        We donate a portion of proceeds to <strong>cats and orphanages in developing communities</strong>.
-                    </p>
-                </div>
+            <!-- Terraform (Simple Icons) -->
+            <div class="tech-item" title="Terraform Integration">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="tech-logo">
+                <path
+                  d="M1.44 0v7.575l6.561 3.79V3.787zm21.12 4.227l-6.561 3.791v7.574l6.56-3.787zM8.72 4.23v7.575l6.561 3.787V8.018zm0 8.405v7.575L15.28 24v-7.578z"
+                />
+              </svg>
+              <span class="tooltip">Terraform</span>
             </div>
-        </section>
-        <section id="download" class="cta-section">
-            <div class="container">
-                <div class="glass-panel centered-panel">
-                    <h2>Open Source & Powerful.</h2>
-                    <p>Run the <strong>Community Edition</strong> locally. Audit your infrastructure for free.</p>
-                   <div class="install-widget">
-                    <div class="os-tabs">
-                        <button class="os-tab active" onclick="setOS('unix')">macOS / Linux</button>
-                        <button class="os-tab" onclick="setOS('win')">Windows</button>
-                    </div>
-                    <div class="code-block" onclick="copyInstall()">
-                        <span class="prompt">$</span>
-                        <code id="install-cmd">curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash</code>
-                        <span class="copy-icon">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        </span>
-                    </div>
-                </div>
-                
-                <div class="os-icons">
-                    <i class="fab fa-apple"></i>
-                    <i class="fab fa-linux"></i>
-                    <i class="fab fa-windows"></i>
-                </div>
 
-                <script>
-                    function setOS(os) {
-                        const cmd = document.getElementById('install-cmd');
-                        const tabs = document.querySelectorAll('.os-tab');
-                        
-                        tabs.forEach(t => t.classList.remove('active'));
-                        
-                        if (os === 'unix') {
-                            cmd.innerText = 'curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash';
-                            tabs[0].classList.add('active');
-                        } else {
-                            cmd.innerText = 'irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex';
-                            tabs[1].classList.add('active');
-                        }
-                    }
-
-                    function copyInstall() {
-                        const text = document.getElementById('install-cmd').innerText;
-                        navigator.clipboard.writeText(text);
-                        const icon = document.querySelector('.copy-icon');
-                        // Store original SVG
-                        if (!icon.dataset.original) icon.dataset.original = icon.innerHTML;
-                        
-                        // Swap to Check Icon SVG
-                        icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00FF99" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-                        
-                        setTimeout(() => {
-                            icon.innerHTML = icon.dataset.original;
-                        }, 2000);
-                    }
-                </script>
-
-                </div>
+            <!-- AWS (FontAwesome Brands - Re-verified) -->
+            <div class="tech-item" title="AWS Native">
+              <svg viewBox="0 0 640 512" fill="currentColor" class="tech-logo">
+                <path
+                  d="M180.41 203.01c-.72 22.65 10.6 32.68 10.88 39.05a8.164 8.164 0 0 1-4.1 6.27l-12.8 8.96a10.66 10.66 0 0 1-5.63 1.92c-.43-.02-8.19 1.83-20.48-25.61a78.608 78.608 0 0 1-62.61 29.45c-16.28.89-60.4-9.24-58.13-56.21-1.59-38.28 34.06-62.06 70.93-60.05 7.1.02 21.6.37 46.99 6.27v-15.62c2.69-26.46-14.7-46.99-44.81-43.91-2.4.01-19.4-.5-45.84 10.11-7.36 3.38-8.3 2.82-10.75 2.82-7.41 0-4.36-21.48-2.94-24.2 5.21-6.4 35.86-18.35 65.94-18.18a76.857 76.857 0 0 1 55.69 17.28 70.285 70.285 0 0 1 17.67 52.36l-.01 69.29zM93.99 235.4c32.43-.47 46.16-19.97 49.29-30.47 2.46-10.05 2.05-16.41 2.05-27.4-9.67-2.32-23.59-4.85-39.56-4.87-15.15-1.14-42.82 5.63-41.74 32.26-1.24 16.79 11.12 31.4 29.96 30.48zm170.92 23.05c-7.86.72-11.52-4.86-12.68-10.37l-49.8-164.65c-.97-2.78-1.61-5.65-1.92-8.58a4.61 4.61 0 0 1 3.86-5.25c.24-.04-2.13 0 22.25 0 8.78-.88 11.64 6.03 12.55 10.37l35.72 140.83 33.16-140.83c.53-3.22 2.94-11.07 12.8-10.24h17.16c2.17-.18 11.11-.5 12.68 10.37l33.42 142.63L420.98 80.1c.48-2.18 2.72-11.37 12.68-10.37h19.72c.85-.13 6.15-.81 5.25 8.58-.43 1.85 3.41-10.66-52.75 169.9-1.15 5.51-4.82 11.09-12.68 10.37h-18.69c-10.94 1.15-12.51-9.66-12.68-10.75L328.67 110.7l-32.78 136.99c-.16 1.09-1.73 11.9-12.68 10.75h-18.3zm273.48 5.63c-5.88.01-33.92-.3-57.36-12.29a12.802 12.802 0 0 1-7.81-11.91v-10.75c0-8.45 6.2-6.9 8.83-5.89 10.04 4.06 16.48 7.14 28.81 9.6 36.65 7.53 52.77-2.3 56.72-4.48 13.15-7.81 14.19-25.68 5.25-34.95-10.48-8.79-15.48-9.12-53.13-21-4.64-1.29-43.7-13.61-43.79-52.36-.61-28.24 25.05-56.18 69.52-55.95 12.67-.01 46.43 4.13 55.57 15.62 1.35 2.09 2.02 4.55 1.92 7.04v10.11c0 4.44-1.62 6.66-4.87 6.66-7.71-.86-21.39-11.17-49.16-10.75-6.89-.36-39.89.91-38.41 24.97-.43 18.96 26.61 26.07 29.7 26.89 36.46 10.97 48.65 12.79 63.12 29.58 17.14 22.25 7.9 48.3 4.35 55.44-19.08 37.49-68.42 34.44-69.26 34.42zm40.2 104.86c-70.03 51.72-171.69 79.25-258.49 79.25A469.127 469.127 0 0 1 2.83 327.46c-6.53-5.89-.77-13.96 7.17-9.47a637.37 637.37 0 0 0 316.88 84.12 630.22 630.22 0 0 0 241.59-49.55c11.78-5 21.77 7.8 10.12 16.38zm29.19-33.29c-8.96-11.52-59.28-5.38-81.81-2.69-6.79.77-7.94-5.12-1.79-9.47 40.07-28.17 105.88-20.1 113.44-10.63 7.55 9.47-2.05 75.41-39.56 106.91-5.76 4.87-11.27 2.3-8.71-4.1 8.44-21.25 27.39-68.49 18.43-80.02z"
+                />
+              </svg>
+              <span class="tooltip">AWS</span>
             </div>
-        </section>
 
+            <!-- Linux (Simple Icons) -->
+            <div class="tech-item" title="Linux Compatible">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="tech-logo">
+                <path
+                  d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.043c-.06-.003-.12 0-.18 0h-.016c.151-.467-.182-.825-1.065-1.224-.915-.4-1.646-.336-1.77.465-.008.043-.013.066-.018.135-.068.023-.139.053-.209.064-.43.268-.662.669-.793 1.187-.13.533-.17 1.156-.205 1.869v.003c-.02.334-.17.838-.319 1.35-1.5 1.072-3.58 1.538-5.348.334a2.645 2.645 0 00-.402-.533 1.45 1.45 0 00-.275-.333c.182 0 .338-.03.465-.067a.615.615 0 00.314-.334c.108-.267 0-.697-.345-1.163-.345-.467-.931-.995-1.788-1.521-.63-.4-.986-.87-1.15-1.396-.165-.534-.143-1.085-.015-1.645.245-1.07.873-2.11 1.274-2.763.107-.065.037.135-.408.974-.396.751-1.14 2.497-.122 3.854a8.123 8.123 0 01.647-2.876c.564-1.278 1.743-3.504 1.836-5.268.048.036.217.135.289.202.218.133.38.333.59.465.21.201.477.335.876.335.039.003.075.006.11.006.412 0 .73-.134.997-.268.29-.134.52-.334.74-.4h.005c.467-.135.835-.402 1.044-.7zm2.185 8.958c.037.6.343 1.245.882 1.377.588.134 1.434-.333 1.791-.765l.211-.01c.315-.007.577.01.847.268l.003.003c.208.199.305.53.391.876.085.4.154.78.409 1.066.486.527.645.906.636 1.14l.003-.007v.018l-.003-.012c-.015.262-.185.396-.498.595-.63.401-1.746.712-2.457 1.57-.618.737-1.37 1.14-2.036 1.191-.664.053-1.237-.2-1.574-.898l-.005-.003c-.21-.4-.12-1.025.056-1.69.176-.668.428-1.344.463-1.897.037-.714.076-1.335.195-1.814.12-.465.308-.797.641-.984l.045-.022zm-10.814.049h.01c.053 0 .105.005.157.014.376.055.706.333 1.023.752l.91 1.664.003.003c.243.533.754 1.064 1.189 1.637.434.598.77 1.131.729 1.57v.006c-.057.744-.48 1.148-1.125 1.294-.645.135-1.52.002-2.395-.464-.968-.536-2.118-.469-2.857-.602-.369-.066-.61-.2-.723-.4-.11-.2-.113-.602.123-1.23v-.004l.002-.003c.117-.334.03-.752-.027-1.118-.055-.401-.083-.71.043-.94.16-.334.396-.4.69-.533.294-.135.64-.202.915-.47h.002v-.002c.256-.268.445-.601.668-.838.19-.201.38-.336.663-.336zm7.159-9.074c-.435.201-.945.535-1.488.535-.542 0-.97-.267-1.28-.466-.154-.134-.28-.268-.373-.335-.164-.134-.144-.333-.074-.333.109.016.129.134.199.2.096.066.215.2.36.333.292.2.68.467 1.167.467.485 0 1.053-.267 1.398-.466.195-.135.445-.334.648-.467.156-.136.149-.267.279-.267.128.016.034.134-.147.332a8.097 8.097 0 01-.69.468zm-1.082-1.583V5.64c-.006-.02.013-.042.029-.05.074-.043.18-.027.26.004.063 0 .16.067.15.135-.006.049-.085.066-.135.066-.055 0-.092-.043-.141-.068-.052-.018-.146-.008-.163-.065zm-.551 0c-.02.058-.113.049-.166.066-.047.025-.086.068-.14.068-.05 0-.13-.02-.136-.068-.01-.066.088-.133.15-.133.08-.031.184-.047.259-.005.019.009.036.03.05v.02h.003z"
+                />
+              </svg>
+              <span class="tooltip">Linux</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
+      <section id="features" class="features">
+        <div class="container">
+          <h2 class="section-title">Built for Builders, Not Bureaucrats</h2>
+          <div class="grid">
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M22 12h-6l-2-9-2 9-6-12-6 12" />
+                </svg>
+              </div>
+              <h3>Deep-Scan Analysis</h3>
+              <p>
+                We trace resource lineage to find what others miss.
+                <strong>Unused EBS</strong> volumes, hidden snapshots, and
+                orphaned resources are detected instantly.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <h3>DNS Safety Lock</h3>
+              <p>
+                Essential Release Protection. Cross-references
+                <strong>Route53</strong> A-Records before releasing Elastic IPs
+                to prevent Subdomain Takeover attacks.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+                  />
+                </svg>
+              </div>
+              <h3>Terraform Bridge</h3>
+              <p>
+                <strong>The State Doctor.</strong> Maps AWS Reality to Terraform
+                Fantasy. Generates module-aware
+                <code>terraform state rm</code> commands to surgically sync your
+                state.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </div>
+              <h3>Ghost Clusters</h3>
+              <p>
+                Identifies EKS & ECS clusters running zero tasks but costing
+                <strong>thousands</strong> in idle EC2 capacity. Detects
+                "Hollow" usage patterns.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                  />
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                  <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+              </div>
+              <h3>Fossil Snapshots</h3>
+              <p>
+                Find old RDS snapshots (90+ days) that are detached from any
+                active cluster. Clean up the digital dust.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </div>
+              <h3>Resource Attribution</h3>
+              <p>
+                <strong>Owner Identification.</strong> Who provisioned that
+                xlarge instance? CloudSlash correlates CloudTrail events to
+                identify the responsible IAM User.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"
+                  />
+                  <polyline points="13 2 13 9 20 9" />
+                </svg>
+              </div>
+              <h3>Lambda Pruner</h3>
+              <p>
+                Identifies <strong>Stagnant Functions</strong> with 0
+                invocations in 90 days. Clears out abandoned serverless code
+                cluttering your account.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                  />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+              </div>
+              <h3>Log Hoarders</h3>
+              <p>
+                Detects CloudWatch groups set to
+                <strong>"Never Expire"</strong> that are rapidly accumulating
+                storage costs. Enforces retention policies.
+              </p>
+            </div>
+            <div class="card glass-panel">
+              <div class="icon">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"
+                  />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M3 15h6" />
+                  <path d="M3 18h6" />
+                  <path d="M3 12h6" />
+                </svg>
+              </div>
+              <h3>ECR Digital Janitor</h3>
+              <p>
+                Locates Container Repositories with
+                <strong>missing Lifecycle Policies</strong>. Flags large,
+                untagged images that are costing you money for no reason.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="support" class="support-section">
+        <div class="container">
+          <h2 class="section-title">Support the Project</h2>
+          <div
+            class="support-grid"
+            style="
+              display: flex;
+              justify-content: center;
+              gap: 40px;
+              padding: 40px 0;
+            "
+          >
+            <div
+              class="price-card glass-panel"
+              style="border: 1px solid #334155; max-width: 350px"
+            >
+              <h3>Supporter</h3>
+              <div
+                class="price"
+                style="
+                  font-size: 2rem;
+                  font-weight: 800;
+                  color: #00ff99;
+                  margin: 10px 0;
+                "
+              >
+                $9.99<span style="font-size: 1rem; color: #94a3b8">/mo</span>
+              </div>
+              <ul class="features-list">
+                <li>Priority Email Support</li>
+                <li><strong>Directly Funds Development</strong></li>
+              </ul>
+              <a
+                href="https://checkout.freemius.com/app/22411/plan/37525/"
+                class="btn-secondary-full"
+                style="margin-top: auto; border-color: #00ff99; color: #00ff99"
+                >Support Now</a
+              >
+            </div>
+
+            <div
+              class="price-card glass-panel"
+              style="border: 1px solid #334155; max-width: 350px"
+            >
+              <h3>Super Supporter</h3>
+              <div
+                class="price"
+                style="
+                  font-size: 2rem;
+                  font-weight: 800;
+                  color: #00ff99;
+                  margin: 10px 0;
+                "
+              >
+                $19.99<span style="font-size: 1rem; color: #94a3b8">/mo</span>
+              </div>
+              <ul class="features-list">
+                <li><strong>Prioritized Requests</strong></li>
+                <li><strong>Sponsor Recognition</strong></li>
+              </ul>
+              <a
+                href="https://checkout.freemius.com/app/22411/plan/37513/"
+                class="btn-primary-full"
+                style="margin-top: auto"
+                >Super Support</a
+              >
+            </div>
+
+            <div
+              class="price-card glass-panel"
+              style="border: 1px dashed #334155; max-width: 350px; opacity: 0.8"
+            >
+              <h3>Enterprise</h3>
+              <div
+                class="price"
+                style="
+                  font-size: 1.5rem;
+                  font-weight: 800;
+                  color: #94a3b8;
+                  margin: 10px 0;
+                "
+              >
+                Exemption
+              </div>
+              <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 24px">
+                Requires AGPLv3 compliance exemption?<br />Contact us.
+              </p>
+              <a
+                href="mailto:drskyle8000@gmail.com"
+                class="btn-secondary-full"
+                style="margin-top: auto"
+                >Contact</a
+              >
+            </div>
+          </div>
+          <div
+            class="pricing-footer"
+            style="text-align: center; margin-top: 30px; opacity: 0.7"
+          >
+            <p style="font-size: 0.9rem; color: #94a3b8">
+              We donate a portion of proceeds to
+              <strong>cats and orphanages in developing communities</strong>.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section id="download" class="cta-section">
+        <div class="container">
+          <div class="glass-panel centered-panel">
+            <h2>Open Source & Powerful.</h2>
+            <p>
+              Run the <strong>Community Edition</strong> locally. Audit your
+              infrastructure for free.
+            </p>
+            <div class="install-widget">
+              <div class="os-tabs">
+                <button class="os-tab active" onclick="setOS('unix')">
+                  macOS / Linux
+                </button>
+                <button class="os-tab" onclick="setOS('win')">Windows</button>
+              </div>
+              <div class="code-block" onclick="copyInstall()">
+                <span class="prompt">$</span>
+                <code id="install-cmd"
+                  >curl -sL
+                  https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh
+                  | bash</code
+                >
+                <span class="copy-icon">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path
+                      d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                    />
+                  </svg>
+                </span>
+              </div>
+            </div>
+
+            <div class="os-icons">
+              <i class="fab fa-apple"></i>
+              <i class="fab fa-linux"></i>
+              <i class="fab fa-windows"></i>
+            </div>
+
+            <script>
+              function setOS(os) {
+                const cmd = document.getElementById("install-cmd");
+                const tabs = document.querySelectorAll(".os-tab");
+
+                tabs.forEach((t) => t.classList.remove("active"));
+
+                if (os === "unix") {
+                  cmd.innerText =
+                    "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash";
+                  tabs[0].classList.add("active");
+                } else {
+                  cmd.innerText =
+                    "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex";
+                  tabs[1].classList.add("active");
+                }
+              }
+
+              function copyInstall() {
+                const text = document.getElementById("install-cmd").innerText;
+                navigator.clipboard.writeText(text);
+                const icon = document.querySelector(".copy-icon");
+                // Store original SVG
+                if (!icon.dataset.original)
+                  icon.dataset.original = icon.innerHTML;
+
+                // Swap to Check Icon SVG
+                icon.innerHTML =
+                  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00FF99" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+                setTimeout(() => {
+                  icon.innerHTML = icon.dataset.original;
+                }, 2000);
+              }
+            </script>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer>
-        <div class="container">
-            <p>Made with ❤️ by DrSkyle.</p>
-            <div class="footer-links" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">
-                <a href="privacy.html" style="color: inherit; margin-right: 15px; text-decoration: none;">Privacy Policy</a>
-                <a href="terms.html" style="color: inherit; text-decoration: none;">Terms of Service</a>
-            </div>
+      <div class="container">
+        <p>Made with ❤️ by DrSkyle.</p>
+        <div
+          class="footer-links"
+          style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7"
+        >
+          <a
+            href="privacy.html"
+            style="color: inherit; margin-right: 15px; text-decoration: none"
+            >Privacy Policy</a
+          >
+          <a href="terms.html" style="color: inherit; text-decoration: none"
+            >Terms of Service</a
+          >
         </div>
+      </div>
     </footer>
 
-
     <div class="mobile-sticky-cta">
-        <a href="#download" class="btn-primary">Download</a>
+      <a href="#download" class="btn-primary">Download</a>
     </div>
     <script src="terminal.js"></script>
     <script src="https://checkout.freemius.com/checkout.min.js"></script>
     <script>
-        // Initialize Freemius
-        var handler = FS.Checkout.configure({
-            plugin_id: '22411',
-            public_key: 'pk_b5689104084666063628359419106',
-            image: 'https://drskyle.github.io/CloudSlash/favicon.svg'
-        });
+      // Initialize Freemius
+      var handler = FS.Checkout.configure({
+        plugin_id: "22411",
+        public_key: "pk_b5689104084666063628359419106",
+        image: "https://drskyle.github.io/CloudSlash/favicon.svg",
+      });
 
-        // Intercept all Freemius Links
-        document.addEventListener('DOMContentLoaded', function() {
-            var links = document.querySelectorAll('a[href*="checkout.freemius.com"]');
-            links.forEach(function(link) {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    var href = link.href;
-                    // Extract Plan ID
-                     var planId = href.match(/plan\/(\d+)/)[1];
-                     
-                     handler.open({
-                        plan_id: planId
-                     });
-                });
+      // Intercept all Freemius Links
+      document.addEventListener("DOMContentLoaded", function () {
+        var links = document.querySelectorAll(
+          'a[href*="checkout.freemius.com"]'
+        );
+        links.forEach(function (link) {
+          link.addEventListener("click", function (e) {
+            e.preventDefault();
+            var href = link.href;
+            // Extract Plan ID
+            var planId = href.match(/plan\/(\d+)/)[1];
+
+            handler.open({
+              plan_id: planId,
             });
+          });
         });
+      });
     </script>
-</body>
+  </body>
 </html>

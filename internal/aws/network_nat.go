@@ -27,7 +27,7 @@ func NewNATScanner(cfg aws.Config, g *graph.Graph) *NATScanner {
 	}
 }
 
-// ScanNATGateways implements the "Hollow NAT" detection.
+// ScanNATGateways implements the "Idle NAT" detection.
 func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 	paginator := ec2.NewDescribeNatGatewaysPaginator(s.Client, &ec2.DescribeNatGatewaysInput{})
 
@@ -58,7 +58,7 @@ func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 			// 1. Metric Truth: ConnectionEstablishedCount
 			go s.checkTraffic(ctx, id, props)
 			
-			// 2. The Forensic Map ("Empty Room" Check)
+			// 2. Network Topology ("Empty Room" Check)
 			go s.checkEmptyRoom(ctx, id, vpcId)
 		}
 	}

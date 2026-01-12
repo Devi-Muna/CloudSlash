@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
@@ -19,7 +20,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	// Simulate network delay
 	time.Sleep(100 * time.Millisecond) // Faster for demo
 
-	// 1. Stopped Instance (Zombie)
+	// 1. Stopped Instance (Unused)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:instance/i-0mock1234567890", "AWS::EC2::Instance", map[string]interface{}{
 		"State":      "stopped",
 		"LaunchTime": time.Now().Add(-60 * 24 * time.Hour), // 60 days old
@@ -38,15 +39,15 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// 3. Zombie Volume (Attached to stopped instance)
+	// 3. Unused Volume (Attached to stopped instance)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockZombie", "AWS::EC2::Volume", map[string]interface{}{
 		"State":               "in-use",
 		"AttachedInstanceId":  "i-0mock1234567890",
 		"DeleteOnTermination": false,
 	})
 
-	// 4. Hollow NAT Gateway
-	// Triggers NetworkForensicsHeuristic
+	// 4. Idle NAT Gateway
+	// Triggers NetworkAnalysisHeuristic
 	natArn := "arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"
 	s.Graph.AddNode(natArn, "aws_nat_gateway", map[string]interface{}{
 		"State":            "available",
@@ -65,7 +66,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 
 	// 5b. Safe-Release Elastic IP
-	// Triggers NetworkForensicsHeuristic
+	// Triggers NetworkAnalysisHeuristic
 	eipArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mock123"
 	s.Graph.AddNode(eipArn, "aws_eip", map[string]interface{}{
 		"PublicIp":      "203.0.113.10",
@@ -74,7 +75,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"FoundInDNS":    false, // Safe
 	})
 
-	// 5c. Dangerous Zombie EIP
+	// 5c. Unattached EIP
 	eipDangerArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger"
 	s.Graph.AddNode(eipDangerArn, "aws_eip", map[string]interface{}{
 		"PublicIp":      "203.0.113.99",
@@ -84,7 +85,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"DNSZone":       "production.com",
 	})
 
-	// 5d. S3 Iceberg
+	// 5d. S3 Lifecycle Gap
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket-iceberg", "AWS::S3::Bucket", map[string]interface{}{
 		"Name":              "mock-bucket-iceberg",
 		"HasAbortLifecycle": false,
@@ -94,7 +95,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Bucket":    "mock-bucket-iceberg",
 	})
 
-	// 5e. EBS Modernizer
+	// 5e. Legacy EBS
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockGp2", "AWS::EC2::Volume", map[string]interface{}{
 		"State":       "in-use",
 		"Size":        int32(500), // 500GB
@@ -111,8 +112,8 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 
 	// 5c. Orphaned ELB (Graph-based)
 	// Needs to be tagged with a cluster that is also waste (or missing?)
-	// ZombieEKS heuristic checks for cluster existence.
-	// Let's create a Zombie Cluster first.
+	// UnusedEKS heuristic checks for cluster existence.
+	// Let's create an Unused Cluster first.
 	zombieClusterArn := "arn:aws:eks:us-east-1:123456789012:cluster/legacy-dev-cluster"
 	s.Graph.AddNode(zombieClusterArn, "AWS::EKS::Cluster", map[string]interface{}{
 		"Name":                "legacy-dev-cluster",
@@ -289,6 +290,44 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	// So heuristics won't set cost. We must pre-set it here and ensuring heuristics don't overwrite with 0 if Pricing is nil.
 
 	// Let's set costs here on the graph nodes directly.
+
+	// 10. [v2.0 AUTONOMY MOCK] Inefficient Monolith Fleet
+	// Scenario: 5x m5.large instances running a legacy app.
+	// Solver should recommend migrating to c6g.large (Cheaper/Better).
+	for i := 0; i < 5; i++ {
+		arn := fmt.Sprintf("arn:aws:ec2:us-east-1:123456789012:instance/i-0mockMonolith-%d", i)
+		s.Graph.AddNode(arn, "AWS::EC2::Instance", map[string]interface{}{
+			"InstanceType": "m5.large", // $0.096/hr
+			"State":        "running",
+			"Region":       "us-east-1",
+			"Zone":         "us-east-1a",
+			"Tags": map[string]string{
+				"Name": "legacy-monolith-worker",
+				"Role": "worker",
+			},
+		})
+		// Manually set cost for reporting
+		node := s.Graph.GetNode(arn)
+		s.Graph.Mu.Lock()
+		node.Cost = 70.08 // roughly monthly
+		s.Graph.Mu.Unlock()
+	}
+
+	// 11. [v2.0 AUTONOMY MOCK] High Performance Compute (HPC)
+	// Scenario: 2x c5.4xlarge instances
+	for i := 0; i < 2; i++ {
+		arn := fmt.Sprintf("arn:aws:ec2:us-east-1:123456789012:instance/i-0mockHPC-%d", i)
+		s.Graph.AddNode(arn, "AWS::EC2::Instance", map[string]interface{}{
+			"InstanceType": "c5.4xlarge",
+			"State":        "running",
+			"Region":       "us-east-1",
+			"Zone":         "us-east-1b", // Safer zone
+		})
+		node := s.Graph.GetNode(arn)
+		s.Graph.Mu.Lock()
+		node.Cost = 600.00
+		s.Graph.Mu.Unlock()
+	}
 
 	return nil
 }

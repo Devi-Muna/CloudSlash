@@ -41,3 +41,30 @@ func ParseState(jsonBytes []byte) (*TerraformState, error) {
 	}
 	return &state, nil
 }
+// FindAddressByID searches the state for a resource with the matching cloud ID (or ARN).
+func FindAddressByID(state *TerraformState, cloudID string) (string, error) {
+	for _, res := range state.Resources {
+		if res.Mode != "managed" {
+			continue
+		}
+
+		base := fmt.Sprintf("%s.%s", res.Type, res.Name)
+		if res.Module != "" {
+			base = fmt.Sprintf("%s.%s", res.Module, base)
+		}
+
+		for i, inst := range res.Instances {
+			var attrs ParsedAttribute
+			if err := json.Unmarshal(inst.Attributes, &attrs); err != nil {
+				continue
+			}
+			if attrs.ID == cloudID || attrs.ARN == cloudID {
+				if len(res.Instances) > 1 {
+					return fmt.Sprintf("%s[%d]", base, i), nil
+				}
+				return base, nil
+			}
+		}
+	}
+	return "", nil
+}

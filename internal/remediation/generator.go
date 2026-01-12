@@ -48,28 +48,32 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 		resourceID := extractResourceID(node.ID)
 
 		switch node.Type {
+		case "AWS::EC2::Instance":
+			fmt.Fprintf(f, "echo \"Stopping EC2 Instance: %s\"\n", resourceID)
+			// Soft Delete: Stop the instance to stop compute billing, but keep storage.
+			fmt.Fprintf(f, "aws ec2 stop-instances --instance-ids %s\n\n", resourceID)
+			wasteCount++
+
 		case "AWS::EC2::Volume":
 			fmt.Fprintf(f, "echo \"Processing Volume: %s\"\n", resourceID)
 			// Safety Snapshot
 			desc := fmt.Sprintf("CloudSlash-Archive-%s", resourceID)
 			fmt.Fprintf(f, "aws ec2 create-snapshot --volume-id %s --description \"%s\" --tag-specifications 'ResourceType=snapshot,Tags=[{Key=CloudSlash,Value=Archive}]'\n", resourceID, desc)
-			// Delete
+			// Detach if attached? Script logic implies unused, so just delete/archive.
+			// Ideally we DetachVolume but for 'Waste' volumes they are usually unattached.
 			fmt.Fprintf(f, "aws ec2 delete-volume --volume-id %s\n\n", resourceID)
 			wasteCount++
 
 		case "AWS::RDS::DBInstance":
-			fmt.Fprintf(f, "echo \"Processing RDS: %s\"\n", resourceID)
-			// Safety Snapshot
-			snapID := fmt.Sprintf("cloudslash-snap-%s-%d", resourceID, time.Now().Unix())
-			fmt.Fprintf(f, "aws rds create-db-snapshot --db-instance-identifier %s --db-snapshot-identifier %s\n", resourceID, snapID)
-			// Delete (Skip final snapshot since we just took one, or force skip)
-			fmt.Fprintf(f, "aws rds delete-db-instance --db-instance-identifier %s --skip-final-snapshot\n\n", resourceID)
+			fmt.Fprintf(f, "echo \"Stopping RDS: %s\"\n", resourceID)
+			// Soft Delete: Stop the DB
+			fmt.Fprintf(f, "aws rds stop-db-instance --db-instance-identifier %s\n\n", resourceID)
 			wasteCount++
 
 		case "AWS::EC2::NatGateway":
 			fmt.Fprintf(f, "echo \"Processing NAT Gateway: %s\"\n", resourceID)
-			// NAT Gateways don't have snapshots, but maybe log it?
-			// Just delete.
+			// Hard Delete as Stop is not supported.
+			// Restoration logic will handle re-creation.
 			fmt.Fprintf(f, "aws ec2 delete-nat-gateway --nat-gateway-id %s\n\n", resourceID)
 			wasteCount++
 

@@ -3,7 +3,7 @@ const commands = [
     { text: "Initializing Zero-Trust Graph...", type: "info", delay: 400 },
     { text: "Scanning Region: us-east-1", type: "info", delay: 200 },
     { text: "Analyzing 452 Resources...", type: "info", delay: 600 },
-    { text: "⚠ DETECTED: 12 Zombie EBS Volumes (stopped > 30d)", type: "warn", delay: 300 },
+    { text: "⚠ DETECTED: 12 Unused EBS Volumes (stopped > 30d)", type: "warn", delay: 300 },
     { text: "⚠ DETECTED: 5 NAT Gateways (Traffic < 1GB)", type: "warn", delay: 300 },
     { text: "⚠ DETECTED: 2 Abandoned ELBs", type: "warn", delay: 300 },
     { text: "Calculating Waste...", type: "info", delay: 500 },

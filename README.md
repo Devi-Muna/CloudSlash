@@ -1,41 +1,41 @@
-# CloudSlash
+# CloudSlash v2.0
 
-![Version](https://img.shields.io/badge/version-v1.3.5-00FF99?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-blue?style=flat-square) ![Status](https://img.shields.io/badge/status-production-green?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg) ![Go](https://img.shields.io/badge/go-1.21-00ADD8.svg)
 
-**The Forensic Cloud Accountant for AWS.**
+**Autonomous Cloud Infrastructure Optimization.**
 
-CloudSlash is a **local-first, open-source** command line tool that bridges the gap between FinOps (Cost) and SecOps (Risk). It correlates CloudWatch metrics with network topology to identify "Zombie" infrastructure that standard tools miss—reducing both your AWS bill and your attack surface.
+CloudSlash is a **local-first, open-source** command line tool that identifies unused, misconfigured, and costly infrastructure. It correlates CloudWatch metrics with network topology to detect waste that standard cost tools often miss—reducing both AWS spend and attack surface.
 
-## The Architecture: Graph-Based Heuristics
+## Architecture: Graph-Based Analysis
 
-Most cloud tools simply list resources via API calls (e.g., `aws ec2 describe-instances`). CloudSlash takes a fundamentally different approach. It builds a **Directed Acyclic Graph (DAG)** of your entire AWS infrastructure in memory.
+CloudSlash builds an in-memory **Directed Acyclic Graph (DAG)** of your AWS environment to perform deep topological analysis.
 
-By mapping the edges between resources (Safety Groups -> ENIs -> Instances -> Subnets), CloudSlash can mathematically prove isolation. If a NAT Gateway has an **In-Degree of 0** (no active subnets or instances routing to it), it is hollow. This topological analysis prevents false positives that occur when relying solely on CloudWatch metrics.
+Unlike tools that rely solely on list APIs (e.g., `aws ec2 describe-instances`), CloudSlash maps dependencies between resources (e.g., `Subnet -> RouteTable -> NAT Gateway`). This allows it to mathematically prove resource isolation. For example, a NAT Gateway is only flagged as waste if it has **zero active dependencies**, eliminating false positives common with simple metric-based thresholds.
 
 <img src="assets/cloudslashmap.png" width="100%" alt="Architecture Diagram">
 
-### The Heuristic Swarm
+### Detection Capabilities
 
-An autonomous swarm of detection engines crawls this graph to identify specific patterns of waste and risk:
+CloudSlash employs multiple heuristic engines to identify specific patterns of inefficiency:
 
-- **The Vampire Hunter:** Identifies NAT Gateways that are idle. These are often the most expensive accidental costs in AWS.
-- **The Ghost Buster:** Detects EKS/ECS control planes that are running but have 0 nodes or 0 pods scheduled.
-- **The Time Traveler:** Finds RDS Snapshots > 90 days old that are detached from any active cluster.
-- **The Safety Lock:** preventing "Subdomain Takeover" by cross-referencing Elastic IPs against Route53 A-Records before release.
+- **Idle NAT Gateways:** Identifies gateways with low throughput and no active upstream dependencies.
+- **Orphaned Control Planes:** Detects EKS/ECS clusters that are active but have zero nodes or scheduled tasks.
+- **Detached Snapshots:** Identifies RDS/EBS snapshots older than 90 days that are not linked to any active AMI or cluster.
+- **Unattached Elastic IPs:** Cross-references available EIPs against Route53 A-Records to prevent subdomain takeovers before release.
 
-## Terraform Bridge
+## Terraform Integration
 
-**The State Doctor.**
+**State-Aware Remediation**
 
-If you find a zombie resource in the AWS Console and delete it manually, you break your Terraform State. The next `terraform apply` will fail because the remote resource is missing.
+Deleting resources manually in the AWS Console causes drift in Terraform state. CloudSlash addresses this by mapping AWS Resource IDs to their corresponding Terraform State addresses.
 
-CloudSlash solves this by reverse-mapping AWS IDs (`i-12345`) to Terraform State addresses (`module.vpc.aws_instance.main`). It generates a surgical shell script (`fix_terraform.sh`) to remove _just_ the identified waste from your state file:
+It generates a surgical script (`fix_terraform.sh`) to safely remove identified waste from your state file:
 
 ```bash
 terraform state rm module.vpc.aws_nat_gateway.main
 ```
 
-This allows engineers to clean up waste safely without corrupting their Infrastructure as Code.
+This ensures that cleanup operations do not corrupt your Infrastructure as Code state.
 
 ## Quick Start
 
@@ -57,78 +57,66 @@ irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 |
 cloudslash
 ```
 
-## Intelligence (New in v1.3.5)
+## Features (v1.3.6)
 
-CloudSlash now includes **"The Derivative"**, a signal processing engine that tracks the _velocity_ of your spend, not just the total.
+- **Spend Velocity Tracking**: Calculates the rate of spend change (`$/hr`) to predict budget overruns.
+- **Anomaly Detection**: Identifies abnormal cost spikes using historical baselines.
+- **Local Data Privacy**: All analysis runs locally; credentials and data never leave your machine.
 
-- **Time-to-Bankrupt (TTB)**: Predicts exactly when your runway will hit zero based on current acceleration.
-- **Anomaly Detection**: Uses vector embeddings to detect abnormal spending spikes (e.g., "Why did NAT Gateway cost double in 1 hour?").
-- **Local Ledger**: Tracks historical performance in `~/.cloudslash/ledger.jsonl`. Your data never leaves your machine.
-
-## Key Capabilities
+## Heuristics Catalog
 
 <details>
-<summary><strong>View Heuristics Catalog (Deep Dive)</strong></summary>
+<summary><strong>View Detailed Detection Logic</strong></summary>
 
 ### Compute & Serverless
 
-| Detection                  | Logic                                                           | Remediation                               |
-| :------------------------- | :-------------------------------------------------------------- | :---------------------------------------- |
-| **Lambda Code Stagnation** | 0 Invocations (90d) AND Last Modified > 90d.                    | Delete function or archive code to S3.    |
-| **ECS Idle Cluster**       | EC2 instances running for >1h but Cluster has 0 Tasks/Services. | Scale ASG to 0 or delete Cluster.         |
-| **ECS Crash Loop**         | Service Desired Count > 0 but Running Count == 0.               | Check Task Definitions / ECR Image pulls. |
+| Detection                  | Logic                                             | Remediation                       |
+| :------------------------- | :------------------------------------------------ | :-------------------------------- |
+| **Stale Lambda Functions** | 0 Invocations (90d) AND Last Modified > 90d.      | Delete function or archive.       |
+| **Idle ECS Clusters**      | Active EC2 instances but 0 Tasks/Services.        | Scale ASG to 0 or delete Cluster. |
+| **ECS Crash Loops**        | Service Desired Count > 0 but Running Count == 0. | Inspect Task Definitions/Image.   |
 
 ### Storage & Database
 
-| Detection            | Logic                                                   | Remediation                                    |
-| :------------------- | :------------------------------------------------------ | :--------------------------------------------- |
-| **Zombie EBS**       | Volume state is `available` (unattached) for > 14 days. | Snapshot (optional) then Delete.               |
-| **Legacy EBS (gp2)** | Volume is `gp2`. `gp3` is 20% cheaper and decoupled.    | Modify Volume to `gp3` (No downtime).          |
-| **Fossil Snapshots** | RDS/EBS Snapshot > 90 days old, not attached to AMI.    | Delete old snapshots.                          |
-| **RDS Idle**         | 0 Connections (7d) AND CPU < 5%.                        | Stop instance or take final snapshot & delete. |
+| Detection                  | Logic                               | Remediation                     |
+| :------------------------- | :---------------------------------- | :------------------------------ |
+| **Unattached EBS Volumes** | State is `available` for > 14 days. | Snapshot and Delete.            |
+| **Legacy Storage (gp2)**   | Volume type is `gp2`.               | Migrate to `gp3` (20% savings). |
+| **Old Snapshots**          | Snapshot > 90 days old, unattached. | Delete.                         |
+| **Idle RDS Instances**     | 0 Connections (7d) AND CPU < 5%.    | Stop or Snapshot & Delete.      |
 
 ### Network & Security
 
-| Detection                   | Logic                                                              | Remediation                                     |
-| :-------------------------- | :----------------------------------------------------------------- | :---------------------------------------------- |
-| **Hollow NAT Gateway**      | Traffic < 1GB (30d) OR Connected Subnets have 0 Running Instances. | Delete NAT Gateway.                             |
-| **Dangling EIP (Critical)** | EIP unattached but matches an A-Record in Route53.                 | **URGENT**: Update DNS first, then release EIP. |
-| **Orphaned ELB**            | Load Balancer has 0 registered/healthy targets.                    | Delete ELB.                                     |
+| Detection                   | Logic                                         | Remediation               |
+| :-------------------------- | :-------------------------------------------- | :------------------------ |
+| **Unused NAT Gateways**     | Traffic < 1GB (30d) OR 0 connected instances. | Delete NAT Gateway.       |
+| **Unattached EIPs**         | Unattached IP matching a Route53 Record.      | Update DNS, then Release. |
+| **Orphaned Load Balancers** | ELB with 0 healthy targets.                   | Delete ELB.               |
 
 ### Containers
 
-| Detection                 | Logic                                               | Remediation                                     |
-| :------------------------ | :-------------------------------------------------- | :---------------------------------------------- |
-| **ECR Lifecycle Missing** | Repo has images > 90d old but no expiration policy. | Add Lifecycle Policy to expire untagged images. |
-| **Log Retention Missing** | CloudWatch Group set to "Never Expire" (>1GB size). | Set retention to 30d/90d.                       |
+| Detection                 | Logic                                     | Remediation                |
+| :------------------------ | :---------------------------------------- | :------------------------- |
+| **ECR Lifecycle Missing** | Repo > 90d old without expiration policy. | Add Lifecycle Policy.      |
+| **Log Retention Missing** | CloudWatch Group set to "Never Expire".   | Set retention (e.g., 90d). |
 
 </details>
 
-## Reporting & Output
+## Reporting
 
-- **Dashboard (HTML)**: Interactive report with charts (`cloudslash-out/dashboard.html`).
-- **Data Export**: Raw `waste_report.csv` and `waste_report.json`.
-- **Executive Summary**: Markdown audit brief (`executive_summary.md`).
+- **Dashboard**: HTML report with visualization charts (`cloudslash-out/dashboard.html`).
+- **Data Export**: CSV and JSON formats (`waste_report.csv`, `waste_report.json`).
+- **Executive Summary**: High-level audit brief (`executive_summary.md`).
 
-## Support the Project
+## Support
 
-CloudSlash is open source and free. If you'd like to support development or need priority help:
+For priority support or feature requests:
 
-[**Support ($9.99/mo)**](https://checkout.freemius.com/app/22411/plan/37525/) - Priority Support & Gratitude.
+- [**Commercial Support**](https://checkout.freemius.com/app/22411/plan/37525/)
 
-[**Super Support ($19.99/mo)**](https://checkout.freemius.com/app/22411/plan/37513/) - Prioritized Feature Requests & Sponsor Recognition.
+## License
 
-## License & Commercial Use
+**AGPLv3**
 
-**CloudSlash is AGPLv3.**
-
-You are free to use it, modify it, and run it internally for your business.
-_If you modify CloudSlash and provide it as a service/product to others, you must open-source your changes._
-
-**Enterprise Exemption**:
-If your organization requires a commercial license for AGPL compliance (e.g., embedding CloudSlash in proprietary software without releasing source code), exemptions are available.
-Contact: `drskyle8000@gmail.com`
-
----
-
-Made with ❤️ by DrSkyle
+Free for internal use. Modification and redistribution as a service requires open-sourcing changes.
+Commercial exemptions available for enterprise embedding. Contact: `drskyle8000@gmail.com`

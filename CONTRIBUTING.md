@@ -35,7 +35,7 @@ go run ./cmd/cloudslash --mock
 ## Standards
 
 - **Error Handling**: Wrap errors with context. No silent failures.
-- **AWS Safety**: Always validate region/identity. Read-only by default unless `--nuke` is set.
+- **AWS Safety**: Always validate region/identity. Read-only by default unless `--delete` is set.
 - **No Fluff**: Keep comments and UI text direct and technical. Avoid emojis and "AI-like" operational phrases.
 
 ## License

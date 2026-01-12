@@ -25,7 +25,7 @@ func NewLambdaScanner(cfg aws.Config, g *graph.Graph) *LambdaScanner {
 	}
 }
 
-// ScanFunctions handles Lambda forensics (Code Rot + Version Bloat).
+// ScanFunctions handles Lambda analysis (Stale Code + Version Accumulation).
 // Window: 90 Days.
 func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 	paginator := lambda.NewListFunctionsPaginator(s.Client, &lambda.ListFunctionsInput{})
@@ -52,10 +52,10 @@ func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 			// Graph ID = Name, ID in ARN sense = ARN. Should store ARN property or ID?
 			// Using Name as ID for TUI readability.
 			
-			// 1. Check for Code Rot (Invocations)
+			// 1. Check for Stale Functions (Invocations)
 			go s.checkCodeRot(ctx, name, props)
 
-			// 2. Check for Version Bloat (Pruner)
+			// 2. Check for Version Accumulation (Pruner)
 			go s.scanVersionsAndAliases(ctx, name, arn)
 		}
 	}
