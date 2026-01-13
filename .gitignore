@@ -1,7 +1,7 @@
 # Binaries
 dist/
-cloudslash
-cloudslash.exe
+/cloudslash
+/cloudslash.exe
 *.test
 keygen.exe
 
