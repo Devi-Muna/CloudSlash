@@ -249,6 +249,23 @@ If your organization requires a commercial license for AGPL compliance (e.g., em
 
 ---
 
+## Uninstallation
+
+To remove CloudSlash from your system:
+
+```bash
+# 1. Remove binary
+sudo rm /usr/local/bin/cloudslash
+
+# 2. Remove configuration
+rm ~/.cloudslash.yaml
+
+# 3. Remove reports (optional)
+rm -rf cloudslash-out/
+```
+
+---
+
 ## Acknowledgments
 
 CloudSlash v2.0 was developed with a philosophy of "Zero Waste." We acknowledge the open-source community for the robust libraries that make this engine possible.
