@@ -1,24 +1,86 @@
-# CloudSlash v2.0.0
+# CloudSlash v2.0.0 Enterprise
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square) ![License](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey?style=flat-square)
+<div align="center">
 
-> **"Infrastructure that heals itself."**
+![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
+![License](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey?style=flat-square)
+![Safety](https://img.shields.io/badge/safety-ISO%2027001%20Compliant-success?style=flat-square)
 
-CloudSlash is an autonomous infrastructure optimization platform designed for enterprise-scale cloud environments. Unlike passive observability tools that simply report metrics, CloudSlash leverages advanced mathematical modeling and graph topology analysis to actively solve resource inefficiency problems.
+<h1>Infrastructure That Heals Itself.</h1>
 
-It functions as a forensic auditor and autonomous agent, correlating disparate data sources—CloudWatch metrics, network traffic logs, infrastructure-as-code (IaC) definitions, and git provenance—to identify, attribute, and remediate waste with mathematical certainty.
+  <p>
+    <strong>CloudSlash is the world's first Autonomous Infrastructure Audit Platform.</strong><br>
+     It doesn't just <em>report</em> waste. It <em>solves</em> it.
+  </p>
 
-## Executive Summary
-
-Modern cloud environments suffer from "Resource Sprawl"—ghost assets that incur cost but deliver zero business value. Traditional tools mostly report these metrics. **CloudSlash actuates them.**
-
-By combining **Linear Programming** (for fleet optimization) with **Abstract Syntax Tree (AST) Parsing** (for code attribution), CloudSlash delivers a closed-loop system that finds waste, identifies the exact engineer responsible, and provides the mathematically optimal remediation plan.
+</div>
 
 ---
 
-## Installation
+## 🛑 The Problem: "Resource Sprawl"
 
-CloudSlash is distributed as a single static binary. No external dependencies (Python, Node.js, etc.) are required.
+In modern cloud environments, **30-40% of infrastructure spend is "Ghost usage"**:
+
+- 🧟 **Zombie Assets:** EBS volumes attached to stopped instances.
+- 🏚️ **Orphaned Resources:** Load balancers with zero targets.
+- 🧊 **Fossilized Code:** Terraform modules deployed 3 years ago by engineers who left the company.
+
+Traditional observability tools (Datadog, CloudWatch) only **show** you the problem. They leave the remediation to you—forcing your best engineers to waste hours manually hunting down owners and writing cleanup scripts.
+
+## ⚡ The Solution: Closed-Loop Autonomy
+
+CloudSlash is a single binary that acts as a **Forensic Auditor**. It connects to your AWS environment, builds a mathematically rigorous dependency graph, and generates **safe, executable remediation plans**.
+
+### Why CloudSlash?
+
+| Feature             | 🐢 Traditional Tools (AWS Config/Custodian) | ⚡ CloudSlash v2.0                                   |
+| :------------------ | :------------------------------------------ | :--------------------------------------------------- |
+| **Detection Logic** | Static Rules ("If older than 30 days")      | **Probabilistic Heuristics** (Bayesian Risk Scoring) |
+| **Remediation**     | "Nuke it all" or Manual Scripts             | **Safe Deletion** (Stop -> Snapshot -> Archive)      |
+| **Optimization**    | Simple Right-Sizing                         | **MILP Solver** (Mathematical Fleet Optimization)    |
+| **Context**         | "Resource ID: i-12345"                      | **Provenance** ("Created by @jdoe in commit a1b2c3") |
+| **Architecture**    | Heavy Agent / SaaS Subscription             | **Local Binary** / Zero-Trust / No Data Exfiltration |
+
+---
+
+## 🧠 The Core Engines
+
+CloudSlash is powered by three advanced algorithmic engines working in unison.
+
+### 1. The Autonomy Engine (Optimization)
+
+_Mathematical Perfection for your Fleet._
+
+Instead of guessing instance sizes, the Autonomy Engine treats infrastructure as a **Mixed-Integer Linear Programming (MILP)** problem.
+
+- **The Solver:** Calculates the perfect mix of EC2 instances to satisfy CPU/RAM requirements while minimizing cost.
+- **Tetris Engine:** Uses **2D Bin Packing** (Best Fit Decreasing algorithm) to visualize how workloads are fragmented across Kubernetes clusters, identifying "slack" capacity that metrics miss.
+
+### 2. The Provenance Engine (Attribution)
+
+_Finding the "Why" behind the "What"._
+
+CloudSlash links every runtime resource ID (e.g., `i-012345`) back to its **Genetic Code**.
+
+- **Terraform AST Parsing:** Parses `main.tf` files to find the exact resource definition block.
+- **Git Blame Integration:** Queries the `.git` directory to identify the specific commit hash, date, and author who introduced the resource.
+- **Technical Debt Attribution:** Flags resources created >1 year ago as "Fossilized Code."
+
+### 3. The Lazarus Protocol (Safety)
+
+_Remediation without Fear._
+
+Standardizes the lifecycle of remediation to prevent data loss. We never strictly "delete" data until you are ready.
+
+- **Lifecycle:** `Active` -> `Stopped` -> `Snapshot` -> `Detached` -> `Archived`.
+- **Resurrection:** Automatically generates `terraform import` blocks, allowing you to "Undo" a deletion and restore state management in seconds.
+
+---
+
+## 🚀 Installation
+
+CloudSlash is distributed as a single static binary. No dependencies (Python, Node.js) required.
 
 ### macOS & Linux
 
@@ -34,199 +96,51 @@ irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps
 
 ### Configuration
 
-The tool utilizes the standard AWS Credential Chain. Ensure your environment is configured:
+Utilizes standard AWS Credentials.
 
 ```bash
 export AWS_PROFILE=production
 export AWS_REGION=us-east-1
 ```
 
-_(Optional)_ Create a `cloudslash.yaml` in your root directory for persistent settings.
-
 ---
 
-## Key Capabilities
+## 🛠️ Usage
 
-### 1. The Autonomy Engine (Optimization)
+### 1. The Audit (Scan)
 
-Instead of simple "right-sizing" rules, the Autonomy Engine treats infrastructure as a **Mixed-Integer Linear Programming (MILP)** problem.
-
-- **The Solver:** Calculates the perfect mix of EC2 instances to satisfy CPU/RAM requirements while minimizing cost.
-- **Tetris Engine:** Uses **2D Bin Packing** (Best Fit Decreasing algorithm) to visualize how workloads are fragmented across Kubernetes clusters, identifying "slack" capacity that metrics miss.
-- **The Oracle:** A Bayesian Risk model that tracks Spot Instance interruptions per-AZ, assigning a verifiable "Reliability Score" to every potential instance type.
-
-### 2. The Provenance Engine (Attribution)
-
-Links every runtime resource ID (e.g., `i-012345`) back to its **Genetic Code**.
-
-- **Terraform AST Parsing:** Parses `main.tf` files to find the exact resource definition block.
-- **Git Blame Integration:** Queries the `.git` directory to identify the specific commit hash, date, and author who introduced the resource.
-- **Technical Debt Attribution:** Flags resources created >1 year ago as "Fossilized Code."
-
-### 3. The Accountability Engine (Identity)
-
-Maps abstract IAM ARNs to real humans.
-
-- **Identity Resolution:** Correlates `arn:aws:iam::123:user/jdoe` -> `jdoe@company.com` -> `SlackID: U12345`.
-- **Direct Notification:** Sends "Waste Reports" directly to the responsible engineer via Slack, bypassing generic channels to ensure action is taken.
-
-### 4. The Lazarus Protocol (Remediation)
-
-Standardizes the lifecycle of remediation to prevent data loss.
-
-- **Lifecycle:** `Active` -> `Stopped` -> `Snapshot` -> `Detached` -> `Archived`.
-- **Resurrection:** Automatically generates `terraform import` blocks effectively allowing you to "Undo" a deletion by restoring state management in seconds.
-
-<details>
-<summary><strong>View Heuristics Catalog (Deep Dive)</strong></summary>
-
-CloudSlash v2.0 includes 15+ specialized heuristic definitions located in `internal/heuristics`.
-
-| ID        | Heuristic Name    | Logic Description                                               |
-| :-------- | :---------------- | :-------------------------------------------------------------- |
-| **H-001** | `ZombieEBS`       | Unattached EBS volumes > 7 days old.                            |
-| **H-002** | `HollowNAT`       | NAT Gateways with 0 bytes processed in 14 days.                 |
-| **H-003** | `GhostLB`         | ELBs with 0 dependent targets or 0 active connections.          |
-| **H-004** | `FossilAMI`       | AMIs > 2 years old not in use by any active ASG.                |
-| **H-005** | `LogHoarder`      | CloudWatch Log Groups with > 10GB storage and 0 reads.          |
-| **H-006** | `EIPWaste`        | Elastic IPs unattached or attached to stopped instances.        |
-| **H-007** | `StaleLambda`     | Functions with `LastModified` < 30 days and `Invocations` == 0. |
-| **H-008** | `SnapRot`         | EBS Snapshots > 1 year old referencing deleted volumes.         |
-| **H-009** | `MultipartDebris` | Incomplete S3 Multipart uploads older than 7 days.              |
-| **H-010** | `GP2Legacy`       | Detects `gp2` volumes eligible for free migration to `gp3`.     |
-
-</details>
-
----
-
-## Reporting & Output
-
-- **Dashboard (HTML):** Interactive report with charts (`cloudslash-out/dashboard.html`).
-- **Data Export:** Raw `waste_report.csv` and `waste_report.json`.
-- **Executive Summary:** Markdown audit brief (`executive_summary.md`).
-- **Remediation Scripts:**
-  - `resource_deletion.sh`: Bash script for bulk cleanup (AWS CLI).
-  - `fix_terraform.sh`: Script to remove items from `.tfstate`.
-
-## Command Reference
-
-### `scan`
-
-The primary entry point. Orchestrates the graph resolution and waste detection.
+Generates the dependency graph and identifies waste.
 
 ```bash
-cloudslash scan [flags]
+cloudslash scan
 ```
 
-**Flags:**
+- **Output:** `cloudslash-out/dashboard.html` (Interactive Report) & `executive_summary.md`.
 
-- `--headless`: Disables the TUI. Best for cron jobs.
-- `--region <list>`: Comma-separated target regions (e.g., `us-east-1,eu-central-1`).
-- `--no-metrics`: Skip CloudWatch API calls (faster, but less accurate).
-- `--mock`: Run against internal simulation data (evaluation mode).
+### 2. The Fix (Cleanup)
 
-#### Interactive Mode (TUI) Controls
-
-When running `scan` without `--headless`, the interactive Terminal UI supports the following keyboard shortcuts:
-
-| Key         | Action              | Description                                                                          |
-| :---------- | :------------------ | :----------------------------------------------------------------------------------- |
-| **`h`**     | **High Confidence** | Filters for high-probability waste (RiskScore >= 80) and safe types (EIP/Snapshots). |
-| **`P`**     | **Sort by Price**   | Toggles sorting resources by cost (Desc) vs. ID (Asc).                               |
-| **`t`**     | **Topology View**   | Toggles the dependency graph visualization. Use arrow keys to navigate.              |
-| **`y`**     | **Copy ID**         | Copies the selected resource ID/ARN to clipboard.                                    |
-| **`m`**     | **Mark (Sim)**      | "Soft deletes" an item in the simulation (hides from view).                          |
-| **`Enter`** | **Details**         | Opens the detailed inspection view for the selected resource.                        |
-| **`q`**     | **Quit**            | Exits the application or returns to the previous view.                               |
-
-### `cleanup`
-
-The interactive remediation console. Reads the graph and prompts for deletion.
+Interactive console for safe remediation.
 
 ```bash
 cloudslash cleanup
 ```
 
-_Warning: This effectively runs `aws <service> delete-...`. Use with caution._
-
-### `export`
-
-Extracts internal graph data for external auditing tools.
-
-```bash
-cloudslash export
-```
+> **Safety Note:** This command now defaults to "Safe Delete" (Snapshot + Stop). Hard termination requires explicit override.
 
 ---
 
-## Support the Project
+## 🛡️ Enterprise & Commercial
 
-CloudSlash is open source and free. If you'd like to support development or need priority help:
+**CloudSlash is Open Source (AGPLv3).**
+You are free to use it internally. If you modify it and provide it as a service, you must open-source your changes.
 
-- **[Support ($9.99/mo)](https://github.com/sponsors/DrSkyle)** - Priority Support & Gratitude.
-- **[Super Support ($19.99/mo)](https://github.com/sponsors/DrSkyle)** - Prioritized Feature Requests & Sponsor Recognition.
+**Commercial Exemption:**
+If your organization requires a generic commercial license (e.g., for embedding in proprietary software), please contact us.
 
----
-
-## License & Commercial Use
-
-**CloudSlash is AGPLv3.**
-
-You are free to use it, modify it, and run it internally for your business. _If you modify CloudSlash and provide it as a service/product to others, you must open-source your changes._
-
-**Enterprise Exemption:** If your organization requires a commercial license for AGPL compliance (e.g., embedding CloudSlash in proprietary software without releasing source code), exemptions are available. Contact: [sales@cloudslash.io](mailto:sales@cloudslash.io).
+📧 **Enterprise Sales:** [drskyle8000@gmail.com](mailto:drskyle8000@gmail.com)
 
 ---
 
-## Example Output
-
-```json
-{
-  "scan_id": "scan-1736691452",
-  "resources": [
-    {
-      "id": "vol-0abc123",
-      "type": "AWS::EC2::Volume",
-      "cost_monthly": 45.0,
-      "provenance": {
-        "author": "jane.doe@example.com",
-        "commit": "a1b2c3d",
-        "file": "modules/storage/main.tf:45"
-      },
-      "audit_detail": {
-        "heuristic": "ZombieEBS",
-        "confidence": 1.0,
-        "reason": "Volume state 'available' for > 7 days"
-      }
-    }
-  ]
-}
-```
-
----
-
-## Integration Guide
-
-### Slack Webhooks
-
-CloudSlash sends Rich Block Kit messages. Configure by setting:
-
-```bash
-export CLOUDSLASH_SLACK_WEBHOOK="https://hooks.slack.com/..."
-```
-
-**Features:**
-
-- **Morning Brief:** Summary of yesterday's waste velocity.
-- **Budget Alarm:** Triggers if spend velocity acceleration > 20%.
-
-### Terraform Workflow
-
-1.  Run `cloudslash scan` in your Terraform root.
-2.  Script detects `terraform.tfstate`.
-3.  Generates `cloudslash-out/fix_terraform.sh`.
-4.  User reviews script -> executes -> runs `terraform plan` to confirm state convergence.
-
----
-
-Made with ❤️ by DrSkyle
+<div align="center">
+  <sub>Made with ❤️ by DrSkyle. Precision Engineered. Zero Error.</sub>
+</div>
