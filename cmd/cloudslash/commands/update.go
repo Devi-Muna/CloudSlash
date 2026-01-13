@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const VersionURL = "https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/version.txt"
+const VersionURL = "https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/version.txt"
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
@@ -73,9 +73,9 @@ func doUpdate() error {
 	// 1. Determine download URL based on OS specific command
 	// The simplest "Auto-Update" is actually just re-running the install script!
 
-	cmd := exec.Command("sh", "-c", "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash")
+	cmd := exec.Command("sh", "-c", "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash")
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("powershell", "-Command", "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex")
+		cmd = exec.Command("powershell", "-Command", "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex")
 	}
 
 	cmd.Stdout = os.Stdout
