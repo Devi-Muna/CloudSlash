@@ -44,7 +44,9 @@ Example:
 			config.DisableCWMetrics = true
 		}
 
-		config.Headless = true
+		if headless, _ := cmd.Flags().GetBool("headless"); headless {
+			config.Headless = true
+		}
 		_, g, err := app.Run(config)
 		if err != nil {
 			fmt.Printf("Error running scan: %v\n", err)
