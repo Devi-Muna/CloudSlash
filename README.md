@@ -146,6 +146,43 @@ Standardizes the lifecycle of remediation to prevent catastrophic data loss.
 - **Resurrection Capability:** Automatically generates `terraform import` blocks, effectively allowing you to "Undo" a deletion by restoring state management in seconds.
 - **Interactive Confirmation:** All destructive actions require explicit CLI confirmation and are blocked if specific safety heuristics (e.g., "Database Production") are triggered.
 
+<details>
+<summary><strong>View Heuristics Catalog (Deep Dive)</strong></summary>
+
+### Compute & Serverless
+
+| Detection                  | Logic                                                           | Remediation                               |
+| :------------------------- | :-------------------------------------------------------------- | :---------------------------------------- |
+| **Lambda Code Stagnation** | 0 Invocations (90d) AND Last Modified > 90d.                    | Delete function or archive code to S3.    |
+| **ECS Idle Cluster**       | EC2 instances running for >1h but Cluster has 0 Tasks/Services. | Scale ASG to 0 or delete Cluster.         |
+| **ECS Crash Loop**         | Service Desired Count > 0 but Running Count == 0.               | Check Task Definitions / ECR Image pulls. |
+
+### Storage & Database
+
+| Detection            | Logic                                                   | Remediation                                    |
+| :------------------- | :------------------------------------------------------ | :--------------------------------------------- |
+| **Zombie EBS**       | Volume state is `available` (unattached) for > 14 days. | Snapshot (optional) then Delete.               |
+| **Legacy EBS (gp2)** | Volume is `gp2`. `gp3` is 20% cheaper and decoupled.    | Modify Volume to `gp3` (No downtime).          |
+| **Fossil Snapshots** | RDS/EBS Snapshot > 90 days old, not attached to AMI.    | Delete old snapshots.                          |
+| **RDS Idle**         | 0 Connections (7d) AND CPU < 5%.                        | Stop instance or take final snapshot & delete. |
+
+### Network & Security
+
+| Detection              | Logic                                                              | Remediation                                     |
+| :--------------------- | :----------------------------------------------------------------- | :---------------------------------------------- |
+| **Hollow NAT Gateway** | Traffic < 1GB (30d) OR Connected Subnets have 0 Running Instances. | Delete NAT Gateway.                             |
+| **Dangling EIP**       | EIP unattached but matches an A-Record in Route53.                 | **URGENT:** Update DNS first, then release EIP. |
+| **Orphaned ELB**       | Load Balancer has 0 registered/healthy targets.                    | Delete ELB.                                     |
+
+### Containers
+
+| Detection                 | Logic                                               | Remediation                                     |
+| :------------------------ | :-------------------------------------------------- | :---------------------------------------------- |
+| **ECR Lifecycle Missing** | Repo has images > 90d old but no expiration policy. | Add Lifecycle Policy to expire untagged images. |
+| **Log Retention Missing** | CloudWatch Group set to "Never Expire" (>1GB size). | Set retention to 30d/90d.                       |
+
+</details>
+
 ---
 
 ## Competitive Analysis
