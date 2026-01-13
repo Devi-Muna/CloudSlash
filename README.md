@@ -28,6 +28,89 @@ CloudSlash bridges this gap by combining **Linear Programming** (for fleet optim
 
 CloudSlash is engineered around four distinct intelligence engines:
 
+```mermaid
+graph LR
+    %% --- STYLING ---
+    classDef aws fill:#FF9900,color:white,stroke:#232F3E,stroke-width:2px;
+    classDef input fill:#0f172a,color:#38bdf8,stroke:#38bdf8,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef logic fill:#0F172A,color:#fff,stroke:#3B82F6,stroke-width:2px;
+    classDef core fill:#1e293b,color:#fff,stroke:#94a3b8,stroke-width:2px;
+    classDef risk fill:#450a0a,color:#FCA5A5,stroke:#EF4444,stroke-width:2px;
+    classDef safety fill:#064e3b,color:#6EE7B7,stroke:#10B981,stroke-width:2px;
+    classDef output fill:#222,color:#fff,stroke:#fff,stroke-width:2px;
+
+    %% --- 1. DATA INGESTION ---
+    subgraph INPUT ["DATA SOURCES"]
+        direction TB
+        AWS[("AWS API<br/>(Live State)")]:::aws
+        TF[("Terraform State<br/>(Infrastructure as Code)")]:::input
+        Git[("Git History<br/>(Provenance)")]:::input
+    end
+
+    %% --- 2. THE BRAIN ---
+    subgraph CORE ["AUTONOMY ENGINE"]
+        Builder["Graph Builder<br/>(Topology Resolution)"]:::logic
+
+        subgraph MEMORY ["IN-MEMORY DAG"]
+            direction LR
+            Graph[("Dependency Graph")]:::core
+
+            %% Simulation Nodes
+            EC2((EC2)):::core --> ENI((ENI)):::core
+            ENI --> SG((SG)):::core
+            NAT((NAT)):::risk -.->|Dependency| Graph
+            Vol((EBS)):::risk -.->|Attached| EC2
+        end
+
+        Solver["MILP Solver<br/>(Optimization)"]:::logic
+    end
+
+    %% --- 3. HEURISTICS ---
+    subgraph CHECKS ["FORENSIC AUDIT"]
+        direction TB
+        Check1{"H-001<br/>Zombie Volume?"}:::logic
+        Check2{"H-002<br/>EIP Wasted?"}:::logic
+        Check3{"H-006<br/>NAT Hollow?"}:::logic
+    end
+
+    %% --- 4. SAFETY ---
+    subgraph SAFETY ["LAZARUS PROTOCOL"]
+        Verify{"Safety Check"}:::safety
+        Block["BLOCK<br/>(Production DB)"]:::risk
+        Safe["SAFE<br/>(Dev Resource)"]:::safety
+    end
+
+    %% --- 5. OUTPUT ---
+    subgraph OUT ["REMEDIATION"]
+        Script["safe_cleanup.sh<br/>(Soft Delete)"]:::output
+        Fix["fix_terraform.sh<br/>(State Sync)"]:::output
+        Dash["Dashboard v2.0<br/>(Executive Report)"]:::output
+    end
+
+    %% --- CONNECTIONS ---
+    AWS ==> Builder
+    TF ==> Builder
+    Git -.->|Blame Info| Builder
+
+    Builder ==> Graph
+    Graph --> Solver
+
+    Solver --> Check1
+    Solver --> Check2
+    Solver --> Check3
+
+    Check1 -->|True| Verify
+    Check2 -->|True| Verify
+    Check3 -->|True| Verify
+
+    Verify -->|Risk High| Block
+    Verify -->|Risk Low| Safe
+
+    Safe ==> Script
+    Safe ==> Fix
+    Safe ==> Dash
+```
+
 ### 1. The Autonomy Engine (Optimization)
 
 Instead of simple "right-sizing" rules, the Autonomy Engine treats infrastructure as a **Mixed-Integer Linear Programming (MILP)** problem.
