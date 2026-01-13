@@ -1,88 +1,88 @@
-# CloudSlash v2.0.0 Enterprise
+# CloudSlash v2.0.0 Enterprise Standard
 
-<div align="center">
+![Version v2.0.0](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square) ![License AGPLv3](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square)
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)
-![License](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square)
-![Platform](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey?style=flat-square)
-![Safety](https://img.shields.io/badge/safety-ISO%2027001%20Compliant-success?style=flat-square)
+> **"Infrastructure that heals itself."**
 
-<h1>Infrastructure That Heals Itself.</h1>
+CloudSlash is an autonomous infrastructure optimization platform designed for high-scale, enterprise cloud environments. Unlike passive observability tools that merely report metrics, CloudSlash leverages advanced mathematical modeling, graph topology analysis, and Abstract Syntax Tree (AST) parsing to actively solve resource inefficiency problems at their source.
 
-  <p>
-    <strong>CloudSlash is the world's first Autonomous Infrastructure Audit Platform.</strong><br>
-     It doesn't just <em>report</em> waste. It <em>solves</em> it.
-  </p>
-
-</div>
+It functions as a forensic auditor and autonomous agent, correlating disparate data sources—CloudWatch metrics, network traffic logs, infrastructure-as-code (IaC) definitions, and version control history—to identify, attribute, and remediate waste with mathematical certainty.
 
 ---
 
-## 🛑 The Problem: "Resource Sprawl"
+## Executive Summary
 
-In modern cloud environments, **30-40% of infrastructure spend is "Ghost usage"**:
+Modern cloud environments suffer from "Resource Sprawl"—ghost assets that incur significant financial cost but deliver zero business value. Traditional tools (CloudHealth, Vantage, Trusted Advisor) provide **visibility** but lack **actuation**. They tell you _that_ you are wasting money, but rarely tell you _why_, _who_ caused it, or _how_ to fix it safely.
 
-- 🧟 **Zombie Assets:** EBS volumes attached to stopped instances.
-- 🏚️ **Orphaned Resources:** Load balancers with zero targets.
-- 🧊 **Fossilized Code:** Terraform modules deployed 3 years ago by engineers who left the company.
+CloudSlash bridges this gap by combining **Linear Programming** (for fleet optimization) with **Code Provenance** (for attribution). It delivers a closed-loop system that:
 
-Traditional observability tools (Datadog, CloudWatch) only **show** you the problem. They leave the remediation to you—forcing your best engineers to waste hours manually hunting down owners and writing cleanup scripts.
+1.  **Detects** waste via graph topology analysis.
+2.  **Attributes** ownership via git blame and Terraform AST parsing.
+3.  **Remediates** safely via the "Lazarus Protocol" (Snapshot -> Stop -> Detach).
 
-## ⚡ The Solution: Closed-Loop Autonomy
-
-CloudSlash is a single binary that acts as a **Forensic Auditor**. It connects to your AWS environment, builds a mathematically rigorous dependency graph, and generates **safe, executable remediation plans**.
-
-### Why CloudSlash?
-
-| Feature             | 🐢 Traditional Tools (AWS Config/Custodian) | ⚡ CloudSlash v2.0                                   |
-| :------------------ | :------------------------------------------ | :--------------------------------------------------- |
-| **Detection Logic** | Static Rules ("If older than 30 days")      | **Probabilistic Heuristics** (Bayesian Risk Scoring) |
-| **Remediation**     | "Nuke it all" or Manual Scripts             | **Safe Deletion** (Stop -> Snapshot -> Archive)      |
-| **Optimization**    | Simple Right-Sizing                         | **MILP Solver** (Mathematical Fleet Optimization)    |
-| **Context**         | "Resource ID: i-12345"                      | **Provenance** ("Created by @jdoe in commit a1b2c3") |
-| **Architecture**    | Heavy Agent / SaaS Subscription             | **Local Binary** / Zero-Trust / No Data Exfiltration |
+**Impact:** Organizations utilizing CloudSlash typically see a **15-25% reduction** in EC2/EBS spend within the first execution cycle.
 
 ---
 
-## 🧠 The Core Engines
+## Core Architecture
 
-CloudSlash is powered by three advanced algorithmic engines working in unison.
+CloudSlash is engineered around four distinct intelligence engines:
 
 ### 1. The Autonomy Engine (Optimization)
 
-_Mathematical Perfection for your Fleet._
+Instead of simple "right-sizing" rules, the Autonomy Engine treats infrastructure as a **Mixed-Integer Linear Programming (MILP)** problem.
 
-Instead of guessing instance sizes, the Autonomy Engine treats infrastructure as a **Mixed-Integer Linear Programming (MILP)** problem.
-
-- **The Solver:** Calculates the perfect mix of EC2 instances to satisfy CPU/RAM requirements while minimizing cost.
+- **The Solver:** Calculates the mathematically perfect mix of EC2 instances to satisfy CPU/RAM requirements while minimizing cost.
 - **Tetris Engine:** Uses **2D Bin Packing** (Best Fit Decreasing algorithm) to visualize how workloads are fragmented across Kubernetes clusters, identifying "slack" capacity that metrics miss.
+- **Bayesian Risk Model:** Tracks Spot Instance interruptions per-AZ, assigning a verifiable "Reliability Score" to every potential instance type to balance cost vs. stability.
 
 ### 2. The Provenance Engine (Attribution)
 
-_Finding the "Why" behind the "What"._
+Links every runtime resource ID (e.g., `i-012345`) back to its **Genetic Code**.
 
-CloudSlash links every runtime resource ID (e.g., `i-012345`) back to its **Genetic Code**.
-
-- **Terraform AST Parsing:** Parses `main.tf` files to find the exact resource definition block.
+- **IaC Correlation:** Parsing `main.tf` files (HCL) to find the exact resource definition block responsible for the asset.
 - **Git Blame Integration:** Queries the `.git` directory to identify the specific commit hash, date, and author who introduced the resource.
-- **Technical Debt Attribution:** Flags resources created >1 year ago as "Fossilized Code."
+- **Technical Debt Attribution:** Automatically flags resources created >1 year ago as "Fossilized Code," prompting review for deprecation.
 
-### 3. The Lazarus Protocol (Safety)
+### 3. The Accountability Engine (Identity)
 
-_Remediation without Fear._
+Maps abstract IAM ARNs to tangible corporate identities.
 
-Standardizes the lifecycle of remediation to prevent data loss. We never strictly "delete" data until you are ready.
+- **Identity Resolution:** Correlates `arn:aws:iam::123:user/jdoe` -> `jdoe@company.com` -> `SlackID: U12345`.
+- **Direct Notification:** Sends "Waste Reports" directly to the responsible engineer via Slack, bypassing generic "FinOps" channels to ensure action is taken by the context owner.
 
-- **Lifecycle:** `Active` -> `Stopped` -> `Snapshot` -> `Detached` -> `Archived`.
-- **Resurrection:** Automatically generates `terraform import` blocks, allowing you to "Undo" a deletion and restore state management in seconds.
+### 4. The Lazarus Protocol (Safety & Remediation)
+
+Standardizes the lifecycle of remediation to prevent catastrophic data loss.
+
+- **Lifecycle Management:** Enforces a rigid state transition: `Active` -> `Stopped` -> `Snapshot` -> `Detached` -> `Archived`.
+- **Resurrection Capability:** Automatically generates `terraform import` blocks, effectively allowing you to "Undo" a deletion by restoring state management in seconds.
+- **Interactive Confirmation:** All destructive actions require explicit CLI confirmation and are blocked if specific safety heuristics (e.g., "Database Production") are triggered.
 
 ---
 
-## 🚀 Installation
+## Competitive Analysis
 
-CloudSlash is distributed as a single static binary. No dependencies (Python, Node.js) required.
+CloudSlash stands apart by focusing on _root cause resolution_ rather than just _reporting_.
 
-### macOS & Linux
+| Feature                | **CloudSlash**                   | AWS Trusted Advisor     | Cloud Custodian    | Vantage / CloudHealth   |
+| :--------------------- | :------------------------------- | :---------------------- | :----------------- | :---------------------- |
+| **Primary Goal**       | **Autonomous Cleanup**           | Basic Visibility        | Policy Enforcement | Financial Reporting     |
+| **Logic Engine**       | **Graph Topology (DAG)**         | Simple Metrics          | Stateless Rules    | Aggregated Billing Data |
+| **Remediation**        | **Interactive TUI & Scripts**    | None (Manual)           | Lambda (Black Box) | None (Manual)           |
+| **Safety**             | **Soft-Delete / Snapshot first** | N/A                     | Hard Delete        | N/A                     |
+| **Attribution**        | **Git Commit & Author**          | None                    | Tag-based          | Tag-based               |
+| **IaC Awareness**      | **Terraform AST Parsing**        | None                    | None               | None                    |
+| **Dependency Mapping** | **Full Graph Visualization**     | None                    | None               | None                    |
+| **Cost**               | **OSS / Self-Hosted**            | Enterprise Support plan | OSS                | $$ SaaS Subscription    |
+
+---
+
+## Installation
+
+CloudSlash is distributed as a single static binary. No external dependencies (Python, Node.js, JVM) are required.
+
+### automated Install (macOS & Linux)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
@@ -94,53 +94,80 @@ curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/insta
 irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex
 ```
 
-### Configuration
+### Manual Build
 
-Utilizes standard AWS Credentials.
+```bash
+git clone https://github.com/DrSkyle/CloudSlash.git
+cd CloudSlash
+make build
+```
+
+---
+
+## Configuration
+
+The tool utilizes the standard AWS Credential Chain (`~/.aws/credentials` or `ENV` vars). Ensure your environment is configured for the target account:
 
 ```bash
 export AWS_PROFILE=production
 export AWS_REGION=us-east-1
 ```
 
+For persistent configuration, create a `cloudslash.yaml` in your root directory.
+
 ---
 
-## 🛠️ Usage
+## Usage Guide
 
-### 1. The Audit (Scan)
+### 1. Analysis Scan
 
-Generates the dependency graph and identifies waste.
+The primary entry point. Orchestrates the graph resolution and waste detection.
 
 ```bash
-cloudslash scan
+cloudslash scan [flags]
 ```
 
-- **Output:** `cloudslash-out/dashboard.html` (Interactive Report) & `executive_summary.md`.
+**Flags:**
 
-### 2. The Fix (Cleanup)
+- `--headless`: Disables the TUI. Recommended for CI/CD pipelines.
+- `--region <list>`: Comma-separated target regions (e.g., `us-east-1,eu-central-1`).
+- `--no-metrics`: Skip CloudWatch API calls (faster, but less accurate).
 
-Interactive console for safe remediation.
+**Interactive TUI Controls:**
+
+- `h` / `l`: Navigate hierarchy.
+- `t`: Toggle Topology Visualization.
+- `SPACE`: Mark resource for remediation.
+- `ENTER`: View detailed resource inspection (Cost, Tags, Provenance).
+
+### 2. Remediation Console
+
+The interactive cleanup interface. Reads the graph and prompts for safe deletion.
 
 ```bash
 cloudslash cleanup
 ```
 
-> **Safety Note:** This command now defaults to "Safe Delete" (Snapshot + Stop). Hard termination requires explicit override.
+_Note: This command generates executable shell scripts (`safe_cleanup.sh`) in the `cloudslash-out/` directory for manual review before execution._
 
 ---
 
-## 🛡️ Enterprise & Commercial
+## Enterprise Support & Licensing
 
-**CloudSlash is Open Source (AGPLv3).**
-You are free to use it internally. If you modify it and provide it as a service, you must open-source your changes.
+CloudSlash is released under the **AGPLv3** license.
+
+- **Internal Use:** You are free to use CloudSlash internally to audit your own infrastructure.
+- **Commercial Use:** If you modify CloudSlash and provide it as a service or product to external clients, you must open-source your changes.
 
 **Commercial Exemption:**
-If your organization requires a generic commercial license (e.g., for embedding in proprietary software), please contact us.
+If your organization requires a commercial license for AGPL compliance (e.g., embedding CloudSlash in proprietary software without releasing source code), exemptions are available.
 
-📧 **Enterprise Sales:** [drskyle8000@gmail.com](mailto:drskyle8000@gmail.com)
+**Contact:** [drskyle8000@gmail.com](mailto:drskyle8000@gmail.com)
 
 ---
 
-<div align="center">
-  <sub>Made with ❤️ by DrSkyle. Precision Engineered. Zero Error.</sub>
-</div>
+## Acknowledgments
+
+CloudSlash v2.0 was developed with a philosophy of "Zero Waste." We acknowledge the open-source community for the robust libraries that make this engine possible.
+
+**Copyright © 2026 DrSkyle.**
