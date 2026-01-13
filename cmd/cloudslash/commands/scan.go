@@ -21,11 +21,14 @@ import (
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
-	Short: "Run a headless scan (no TUI)",
-	Long: `Run CloudSlash in headless mode. Useful for CI/CD pipelines or automated auditing.
+	Short: "Launch interactive infrastructure audit (TUI)",
+	Long: `Starts the CloudSlash interactive terminal interface for real-time infrastructure auditing.
     
+Use --headless for CI/CD pipelines or non-interactive environments.
+
 Example:
-  cloudslash scan --region us-west-2`,
+  cloudslash scan
+  cloudslash scan --headless --region us-east-1`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if !cmd.Flags().Changed("region") && !config.MockMode {
 			regions, err := PromptForRegions()
@@ -205,7 +208,7 @@ func generateFixScript(report *tf.AnalysisReport) {
 }
 
 func runSolver(g *graph.Graph) {
-	fmt.Println("\n[ v1.4.0 OPTIMIZATION ENGINE ]")
+	fmt.Printf("\n[ %s OPTIMIZATION ENGINE ]\n", version.Current)
 	fmt.Println("Initializing Solver...")
 
 	// 1. Build Workloads from Graph
@@ -231,7 +234,7 @@ func runSolver(g *graph.Graph) {
 	g.Mu.RUnlock()
 
 	if len(workloads) == 0 {
-		fmt.Println("No workloads detected for optimization.")
+		fmt.Println("No active compute workloads detected. Optimization skipped (requires running EC2 instances).")
 		return
 	}
 
