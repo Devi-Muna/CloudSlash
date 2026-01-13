@@ -150,7 +150,7 @@ CloudSlash stands apart by focusing on _root cause resolution_ rather than just 
 
 | Feature                | **CloudSlash**                   | AWS Trusted Advisor     | Cloud Custodian    | Vantage / CloudHealth   |
 | :--------------------- | :------------------------------- | :---------------------- | :----------------- | :---------------------- |
-| **Primary Goal**       | **Autonomous Cleanup**           | Basic Visibility        | Policy Enforcement | Financial Reporting     |
+| **Primary Goal**       | **Automated Remediation**        | Basic Visibility        | Policy Enforcement | Financial Reporting     |
 | **Logic Engine**       | **Graph Topology (DAG)**         | Simple Metrics          | Stateless Rules    | Aggregated Billing Data |
 | **Remediation**        | **Interactive TUI & Scripts**    | None (Manual)           | Lambda (Black Box) | None (Manual)           |
 | **Safety**             | **Soft-Delete / Snapshot first** | N/A                     | Hard Delete        | N/A                     |
