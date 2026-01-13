@@ -98,6 +98,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					audit.LogAction("SOFT_DELETE", id, "MARKED", 0, "Marked for later collision")
 					m.ignoreNode(id)
 				}
+			case "i":
+				// Ignore from List View
+				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
+					id := m.wasteItems[m.cursor].ID
+					m.ignoreNode(id)
+					// Stay in list view, but maybe adjust cursor if items shrink?
+					// The refreshData() call in the main loop or logic might shift things, 
+					// but m.ignoreNode changes the underlying graph. 
+					// m.refreshData() needs to be called to hide it.
+					m.refreshData()
+				}
 			case "y":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
 					txt := m.wasteItems[m.cursor].ID
