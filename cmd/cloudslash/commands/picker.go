@@ -1,9 +1,14 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	internalaws "github.com/DrSkyle/cloudslash/internal/aws"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -138,6 +143,23 @@ func (m regionModel) GetSelectedRegions() []string {
 }
 
 func PromptForRegions() ([]string, error) {
+	// 1. Try Dynamic Fetch (Smart Discovery)
+	dynamicRegions, err := fetchDynamicRegions()
+	if err == nil && len(dynamicRegions) > 0 {
+		// Use dynamic list!
+		p := tea.NewProgram(regionModel {
+			choices: dynamicRegions,
+			selected: make(map[int]struct{}),
+		})
+		m, err := p.Run()
+		if err != nil { return nil, err }
+		if regionModel, ok := m.(regionModel); ok {
+			return regionModel.GetSelectedRegions(), nil
+		}
+		return []string{"us-east-1"}, nil
+	}
+
+	// 2. Fallback to Static List
 	p := tea.NewProgram(initialRegionModel())
 	m, err := p.Run()
 	if err != nil {
@@ -148,4 +170,34 @@ func PromptForRegions() ([]string, error) {
 		return regionModel.GetSelectedRegions(), nil
 	}
 	return []string{"us-east-1"}, nil
+}
+
+func fetchDynamicRegions() ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// Initialize robust AWS client (using default profile)
+	client, err := internalaws.NewClient(ctx, "us-east-1", "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create EC2 Client
+	ec2Client := ec2.NewFromConfig(client.Config)
+	
+	// Describe Regions
+	resp, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{
+		AllRegions: aws.Bool(true), // Fetch Opt-In Regions too if enabled
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var regions []string
+	for _, r := range resp.Regions {
+		if r.RegionName != nil {
+			regions = append(regions, *r.RegionName)
+		}
+	}
+	return regions, nil
 }
