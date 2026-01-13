@@ -16,7 +16,7 @@ func (m Model) viewTopology() string {
 	// Header
 	headerTxt := fmt.Sprintf("   %-60s | %-10s | %s", "TOPOLOGY HIERARCHY (Cluster -> Service -> Task)", "STATUS", "INFO")
 	s.WriteString(dimStyle.Render(headerTxt) + "\n")
-	s.WriteString(dimStyle.Render("   "+strings.Repeat("─", 80)+"\n"))
+	s.WriteString(dimStyle.Render("   "+strings.Repeat("─", 60)) + "\n")
 
 	if len(m.topologyLines) == 0 {
 		if m.scanning {

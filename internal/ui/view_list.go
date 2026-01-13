@@ -37,7 +37,7 @@ func (m Model) viewList() string {
 	if filterStatus != "" {
 		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("   " + filterStatus) + "\n")
 	} else {
-		s.WriteString(dimStyle.Render("  " + strings.Repeat("─", 60) + "\n"))
+		s.WriteString(dimStyle.Render("  " + strings.Repeat("─", 60)) + "\n")
 	}
 
 	for i := start; i < end; i++ {
