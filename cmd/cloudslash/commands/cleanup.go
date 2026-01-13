@@ -15,12 +15,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var NukeCmd = &cobra.Command{
-	Use:   "nuke",
-	Short: "Interactive cleanup (The 'Safety Brake')",
-	Long:  `Iteratively reviews identified waste and performs real deletion with confirmation.`,
+var CleanupCmd = &cobra.Command{
+	Use:   "cleanup",
+	Short: "Interactive resource remediation",
+	Long:  `Iteratively reviews identified unused resources and performs real deletion with confirmation.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[WARNING] DESTRUCTIVE MODE INITIATED")
+		fmt.Println("[CRITICAL] DESTRUCTIVE OPERATION INITIATED")
 		fmt.Println("This operation will permanently DELETE resources from your AWS account.")
 		fmt.Print("Confirm execution? [y/N]: ")
 
@@ -52,11 +52,10 @@ var NukeCmd = &cobra.Command{
 
 		// Setup minimal heuristics
 		hEngine := heuristics.NewEngine()
-		hEngine.Register(&heuristics.ZombieEBSHeuristic{Pricing: nil}) // Pricing optional for nuke
-		// ... (Add others if needed, focusing on EBS for safety demo)
+		hEngine.Register(&heuristics.UnattachedVolumeHeuristic{Pricing: nil})
+		// ... (Add others if needed)
 
-		// RUN SCAN (Simplified for Nuke - just EBS for now to prove concept safely)
-		// Full scan is heavy. Let's just do EBS Nuke for v1.2
+		// RUN SCAN (Simplified for Cleanup - just EBS for now)
 		ec2 := aws.NewEC2Scanner(client.Config, g)
 		ec2.ScanVolumes(ctx)
 		hEngine.Run(ctx, g)
@@ -72,11 +71,11 @@ var NukeCmd = &cobra.Command{
 		g.Mu.RUnlock()
 
 		if len(waste) == 0 {
-			fmt.Println("No waste detected. Infrastructure is optimized.")
+			fmt.Println("No unused resources detected. Infrastructure is optimized.")
 			return
 		}
 
-		fmt.Printf("\nFound %d waste items.\n", len(waste))
+		fmt.Printf("\nFound %d unused resources.\n", len(waste))
 
 		deleter := aws.NewDeleter(client.Config) // Need to implement this or just use client directly
 
@@ -84,7 +83,7 @@ var NukeCmd = &cobra.Command{
 			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
 
-			// BLAST RADIUS CHECK
+			// DEPENDENCY IMPACT CHECK
 			dependents := g.GetUpstream(item.ID)
 			if len(dependents) > 0 {
 				activeDeps := 0
@@ -101,7 +100,7 @@ var NukeCmd = &cobra.Command{
 				g.Mu.RUnlock()
 
 				if activeDeps > 0 {
-					fmt.Printf("\n ⚠️  BLAST RADIUS WARNING: Used by %d ACTIVE resources (e.g. %s)\n", activeDeps, exampleDep)
+					fmt.Printf("\n [WARNING] DEPENDENCY IMPACT: Used by %d ACTIVE resources (e.g. %s)\n", activeDeps, exampleDep)
 					fmt.Printf("    Deleting this may break them.\n")
 				}
 			}
@@ -111,13 +110,13 @@ var NukeCmd = &cobra.Command{
 			if scanner.Scan() {
 				ans := strings.ToLower(strings.TrimSpace(scanner.Text()))
 				if ans == "y" {
-					fmt.Printf("    Destroying %s... ", item.ID)
+					fmt.Printf("    Deleting %s... ", item.ID)
 					// Verify implementation of Delete
 					err := deleter.DeleteVolume(ctx, item.ID)
 					if err != nil {
 						fmt.Printf("FAILED: %v\n", err)
 					} else {
-						fmt.Printf("GONE.\n")
+						fmt.Printf("Successfully deleted.\n")
 						audit.LogAction("DELETED", item.ID, item.Type, item.Cost, fmt.Sprintf("%v", item.Properties["Reason"]))
 					}
 				} else {
@@ -126,6 +125,6 @@ var NukeCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println("\nNuke complete.")
+		fmt.Println("\nCleanup complete.")
 	},
 }

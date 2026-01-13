@@ -70,17 +70,17 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 
 	// Velocity Alert (Massive Spike > $1000/mo added in 1 hour)
 	if velocity > 1000 {
-		alerts = append(alerts, fmt.Sprintf("🚨 SPIKE DETECTED: Spending velocity +$%.0f/mo per hour", velocity))
+		alerts = append(alerts, fmt.Sprintf("[CRITICAL] SPEND SPIKE: Spending velocity +$%.0f/mo per hour", velocity))
 	}
 
 	// Acceleration Alert (The "Runway Killer")
 	if acceleration > 500 {
-		alerts = append(alerts, fmt.Sprintf("☢️ ACCELERATION WARNING: Spending suggests exponential leak (+%.0f/h²)", acceleration))
+		alerts = append(alerts, fmt.Sprintf("[WARNING] SPEND ACCELERATION: Spending suggests exponential leak (+%.0f/h²)", acceleration))
 	}
 	
 	// TTB Alert
 	if ttb > 0 && ttb < 24*time.Hour {
-		alerts = append(alerts, fmt.Sprintf("💀 RUNWAY CRITICAL: Budget exhaustion predicted in %s", ttb.Round(time.Minute)))
+		alerts = append(alerts, fmt.Sprintf("[CRITICAL] BUDGET EXHAUSTION: Budget exhaustion predicted in %s", ttb.Round(time.Minute)))
 	}
 
 	return AnalysisResult{

@@ -85,11 +85,18 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 
 	if !cfg.Headless {
 		model := ui.NewModel(engine, g, cfg.MockMode, cfg.Region)
+		startTime := time.Now()
 		p := tea.NewProgram(model)
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Alas, there's been an error: %v", err)
 			os.Exit(1)
 		}
+		
+		// Render Exit Screen (Cleanly after TUI exit)
+		g.Mu.RLock()
+		count := len(g.Nodes)
+		g.Mu.RUnlock()
+		ui.PrintExitSummary(startTime, count)
 	} else {
 		if doneChan != nil {
 			<-doneChan
@@ -109,11 +116,11 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 
 	// Demo Heuristics
 	heuristicEngine := heuristics.NewEngine()
-	heuristicEngine.Register(&heuristics.ZombieEBSHeuristic{Config: internalconfig.DefaultHeuristicConfig().ZombieEBS})
+	heuristicEngine.Register(&heuristics.UnattachedVolumeHeuristic{Config: internalconfig.DefaultHeuristicConfig().UnattachedVolume})
 	heuristicEngine.Register(&heuristics.S3MultipartHeuristic{Config: internalconfig.DefaultHeuristicConfig().S3Multipart})
 	heuristicEngine.Register(&heuristics.IdleClusterHeuristic{Config: internalconfig.DefaultHeuristicConfig().IdleCluster})
 	heuristicEngine.Register(&heuristics.EmptyServiceHeuristic{})
-	heuristicEngine.Register(&heuristics.ZombieEKSHeuristic{})
+	heuristicEngine.Register(&heuristics.IdleEKSClusterHeuristic{})
 	heuristicEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
 	heuristicEngine.Register(&heuristics.ElasticIPHeuristic{})
 	heuristicEngine.Register(&heuristics.RDSHeuristic{})
@@ -146,6 +153,18 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	gen := tf.NewGenerator(g, nil)
 	gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
 	os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
+
+	// v1.4: Enable Full Artifact Suite for Mock Mode
+	gen.GenerateWasteTF("cloudslash-out/waste.tf")
+	gen.GenerateImportScript("cloudslash-out/import.sh")
+	gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
+
+	remGen := remediation.NewGenerator(g)
+	remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
+	os.Chmod("cloudslash-out/safe_cleanup.sh", 0755)
+
+	remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
+	os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
 
 	// Executive Summary
 	report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
@@ -285,9 +304,9 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		}
 
 		if pricingClient != nil {
-			hEngine.Register(&heuristics.ZombieEBSHeuristic{Pricing: pricingClient, Config: cfg.Heuristics.ZombieEBS})
+			hEngine.Register(&heuristics.UnattachedVolumeHeuristic{Pricing: pricingClient, Config: cfg.Heuristics.UnattachedVolume})
 		} else {
-			hEngine.Register(&heuristics.ZombieEBSHeuristic{Config: cfg.Heuristics.ZombieEBS})
+			hEngine.Register(&heuristics.UnattachedVolumeHeuristic{Config: cfg.Heuristics.UnattachedVolume})
 		}
 
 		if cfg.RequiredTags != "" {

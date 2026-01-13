@@ -37,7 +37,7 @@ func TestZombieEBSHeuristic(t *testing.T) {
 	})
 
 	// 3. Run Heuristic
-	h := &ZombieEBSHeuristic{}
+	h := &UnattachedVolumeHeuristic{}
 	if err := h.Run(ctx, g); err != nil {
 		t.Fatalf("Heuristic run failed: %v", err)
 	}

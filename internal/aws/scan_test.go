@@ -66,10 +66,8 @@ func TestScanVolumes(t *testing.T) {
 			},
 			wantNodeCount: 1,
 			checkNode: func(t *testing.T, g *graph.Graph) {
-				g.Mu.RLock()
-				defer g.Mu.RUnlock()
-				node, ok := g.Nodes["arn:aws:ec2:region:account:volume/vol-zombie"]
-				if !ok {
+				node := g.GetNode("arn:aws:ec2:region:account:volume/vol-zombie")
+				if node == nil {
 					t.Fatal("Zombie volume not found in graph")
 				}
 				if node.Properties["State"] != "available" {
@@ -96,23 +94,24 @@ func TestScanVolumes(t *testing.T) {
 			},
 			wantNodeCount: 2, // Volume + attached Instance placeholder
 			checkNode: func(t *testing.T, g *graph.Graph) {
-				g.Mu.RLock()
-				defer g.Mu.RUnlock()
-				node, ok := g.Nodes["arn:aws:ec2:region:account:volume/vol-inuse"]
-				if !ok {
+				nodeID := "arn:aws:ec2:region:account:volume/vol-inuse"
+				node := g.GetNode(nodeID)
+				if node == nil {
 					t.Fatal("Clean volume not found in graph")
 				}
+				
 				// Verify edge to instance exists
+				downstream := g.GetDownstream(nodeID)
 				foundEdge := false
-				edges, _ := g.Edges[node.ID]
-				for _, edge := range edges {
-					if edge.TargetID == "arn:aws:ec2:region:account:instance/i-12345" {
+				targetID := "arn:aws:ec2:region:account:instance/i-12345"
+				for _, dID := range downstream {
+					if dID == targetID {
 						foundEdge = true
 						break
 					}
 				}
 				if !foundEdge {
-					t.Error("Expected edge to instance i-12345")
+					t.Errorf("Expected edge to instance %s, got downstream: %v", targetID, downstream)
 				}
 			},
 		},

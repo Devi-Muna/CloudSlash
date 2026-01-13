@@ -74,7 +74,7 @@ func init() {
 		}
 	}
 
-	rootCmd.AddCommand(NukeCmd)
+	rootCmd.AddCommand(CleanupCmd)
 	rootCmd.AddCommand(ExportCmd)
 }
 

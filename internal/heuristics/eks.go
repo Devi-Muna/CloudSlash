@@ -9,11 +9,11 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-type ZombieEKSHeuristic struct{}
+type IdleEKSClusterHeuristic struct{}
 
-func (h *ZombieEKSHeuristic) Name() string { return "ZombieEKSHeuristic" }
+func (h *IdleEKSClusterHeuristic) Name() string { return "IdleEKSClusterHeuristic" }
 
-func (h *ZombieEKSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
@@ -62,12 +62,12 @@ func (h *ZombieEKSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		hasSelf, _ := node.Properties["HasSelfManagedNodes"].(bool)
 
 		if !hasManaged && !hasFargate && !hasSelf {
-			// ZOMBIE IDENTIFIED
+			// IDLE CLUSTER IDENTIFIED
 			node.IsWaste = true
-			node.RiskScore = 90    // High confidence, pure waste
+			node.RiskScore = 90    // High confidence, pure unused
 			node.Cost = 0.10 * 730 // ~$73.00/month
 
-			reason := "Zombie Control Plane: Active EKS cluster with zero compute nodes for > 7 days."
+			reason := "Idle Control Plane: Active EKS cluster with zero compute nodes for > 7 days."
 
 			// 5. Orphaned ELB Check
 			clusterName := ""

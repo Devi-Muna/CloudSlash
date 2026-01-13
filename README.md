@@ -125,12 +125,26 @@ cloudslash scan [flags]
 - `--no-metrics`: Skip CloudWatch API calls (faster, but less accurate).
 - `--mock`: Run against internal simulation data (evaluation mode).
 
-### `nuke`
+#### Interactive Mode (TUI) Controls
+
+When running `scan` without `--headless`, the interactive Terminal UI supports the following keyboard shortcuts:
+
+| Key         | Action              | Description                                                                          |
+| :---------- | :------------------ | :----------------------------------------------------------------------------------- |
+| **`h`**     | **High Confidence** | Filters for high-probability waste (RiskScore >= 80) and safe types (EIP/Snapshots). |
+| **`P`**     | **Sort by Price**   | Toggles sorting resources by cost (Desc) vs. ID (Asc).                               |
+| **`t`**     | **Topology View**   | Toggles the dependency graph visualization. Use arrow keys to navigate.              |
+| **`y`**     | **Copy ID**         | Copies the selected resource ID/ARN to clipboard.                                    |
+| **`m`**     | **Mark (Sim)**      | "Soft deletes" an item in the simulation (hides from view).                          |
+| **`Enter`** | **Details**         | Opens the detailed inspection view for the selected resource.                        |
+| **`q`**     | **Quit**            | Exits the application or returns to the previous view.                               |
+
+### `cleanup`
 
 The interactive remediation console. Reads the graph and prompts for deletion.
 
 ```bash
-cloudslash nuke
+cloudslash cleanup
 ```
 
 _Warning: This effectively runs `aws <service> delete-...`. Use with caution._
@@ -162,4 +176,57 @@ You are free to use it, modify it, and run it internally for your business. _If 
 
 **Enterprise Exemption:** If your organization requires a commercial license for AGPL compliance (e.g., embedding CloudSlash in proprietary software without releasing source code), exemptions are available. Contact: [sales@cloudslash.io](mailto:sales@cloudslash.io).
 
-_Copyright © 2026 Dr. Skyle & The CloudSlash Authors._
+---
+
+## Example Output
+
+```json
+{
+  "scan_id": "scan-1736691452",
+  "resources": [
+    {
+      "id": "vol-0abc123",
+      "type": "AWS::EC2::Volume",
+      "cost_monthly": 45.0,
+      "provenance": {
+        "author": "jane.doe@example.com",
+        "commit": "a1b2c3d",
+        "file": "modules/storage/main.tf:45"
+      },
+      "audit_detail": {
+        "heuristic": "ZombieEBS",
+        "confidence": 1.0,
+        "reason": "Volume state 'available' for > 7 days"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Integration Guide
+
+### Slack Webhooks
+
+CloudSlash sends Rich Block Kit messages. Configure by setting:
+
+```bash
+export CLOUDSLASH_SLACK_WEBHOOK="https://hooks.slack.com/..."
+```
+
+**Features:**
+
+- **Morning Brief:** Summary of yesterday's waste velocity.
+- **Budget Alarm:** Triggers if spend velocity acceleration > 20%.
+
+### Terraform Workflow
+
+1.  Run `cloudslash scan` in your Terraform root.
+2.  Script detects `terraform.tfstate`.
+3.  Generates `cloudslash-out/fix_terraform.sh`.
+4.  User reviews script -> executes -> runs `terraform plan` to confirm state convergence.
+
+---
+
+Made with ❤️ by DrSkyle

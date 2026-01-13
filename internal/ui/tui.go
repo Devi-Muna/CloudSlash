@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"encoding/base64"
 	"os"
 	"os/exec"
 	"runtime"
@@ -59,9 +60,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.topologyCursor < len(m.topologyLines)-1 {
 					m.topologyCursor++
 				}
-			case "enter", " ":
-				// Toggle expansion? For now, maybe select/copy ID
-				// Future: m.toggleExpansion(m.topologyCursor)
+			case "enter", " ", "y":
+				// Copy ID
+				if m.topologyCursor < len(m.topologyLines) {
+					txt := m.topologyLines[m.topologyCursor].ID
+					err := copyToClipboard(txt)
+					if err != nil {
+						copyToClipboardOSC52(txt)
+						m.setStatus(fmt.Sprintf("Copied (OSC52): %s", txt))
+					} else {
+						m.setStatus(fmt.Sprintf("Copied: %s", txt))
+					}
+				}
 			}
 		} else if m.state == ViewStateList {
 			switch msg.String() {
@@ -90,7 +100,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "y":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
-					copyToClipboard(m.wasteItems[m.cursor].ID)
+					txt := m.wasteItems[m.cursor].ID
+					err := copyToClipboard(txt)
+					if err != nil {
+						copyToClipboardOSC52(txt)
+						m.setStatus(fmt.Sprintf("Copied (OSC52): %s", txt))
+					} else {
+						m.setStatus(fmt.Sprintf("Copied: %s", txt))
+					}
 				}
 			case "Y":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
@@ -110,11 +127,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.SortMode = "Price"
 				}
 				m.refreshData()
-			case "E", "e":
-				if m.FilterMode == "Easy" {
+			case "H", "h":
+				if m.FilterMode == "High Confidence" {
 					m.FilterMode = ""
 				} else {
-					m.FilterMode = "Easy"
+					m.FilterMode = "High Confidence"
 				}
 				m.refreshData()
 			case "R", "r":
@@ -220,32 +237,7 @@ func (m Model) View() string {
 		return m.err.Error()
 	}
 	if m.quitting {
-		// Performance Flex
-		duration := time.Since(m.startTime).Seconds()
-		var mem runtime.MemStats
-		runtime.ReadMemStats(&mem)
-		memMB := mem.Alloc / 1024 / 1024
-
-		nodeCount := 0
-		if m.Graph != nil {
-			m.Graph.Mu.RLock()
-			nodeCount = len(m.Graph.Nodes)
-			m.Graph.Mu.RUnlock()
-		}
-
-		stats := fmt.Sprintf("\n[SUCCESS] Scan Complete. Audited %d resources in %.2fs. (Memory: %dMB)\n", nodeCount, duration, memMB)
-		// Exit View
-		s := "\n" +
-			lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#00FF99")).
-				Bold(true).
-				Render(fmt.Sprintf("%s %s [%s]", version.AppName, version.Current, version.License)) + "\n" +
-			`Open Source Infrastructure Forensics
-Maintained by DrSkyle | github.com/drskyle/cloudslash
-
-License: AGPLv3. For commercial use without open-source obligations, please acquire a Commercial Exemption.
-`
-		return stats + s
+		return ""
 	}
 
 	// 1. Render HUD
@@ -262,8 +254,11 @@ License: AGPLv3. For commercial use without open-source obligations, please acqu
 		body = m.viewTopology()
 	}
 
-	// 3. Render Footer (Help)
+	// 3. Render Footer (Help + Status)
 	footer := quickHelp(m.state)
+	if m.statusMsg != "" && time.Since(m.statusTime) < 3*time.Second {
+		footer = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF99")).Render(" " + m.statusMsg)
+	}
 
 	return fmt.Sprintf("%s\n%s\n\n%s", hud, body, footer)
 }
@@ -279,15 +274,17 @@ func (m *Model) refreshData() {
 
 	for _, n := range m.Graph.Nodes {
 		if n.IsWaste && !n.Ignored {
-			if m.FilterMode == "Easy" {
-				isEasy := false
+			if m.FilterMode == "High Confidence" {
+				isSafe := false
+				// 1. Safe Types (EIPs, Snapshots are usually standalone)
 				if n.Type == "AWS::EC2::EIP" || n.Type == "AWS::EC2::Snapshot" {
-					isEasy = true
+					isSafe = true
 				}
-				if n.RiskScore < 20 {
-					isEasy = true
+				// 2. High Confidence Scores (RiskScore represents specific probability of waste)
+				if n.RiskScore >= 80 {
+					isSafe = true
 				}
-				if !isEasy {
+				if !isSafe {
 					continue
 				}
 			} else if m.FilterMode != "" {
@@ -323,15 +320,15 @@ func (m *Model) refreshData() {
 }
 
 func quickHelp(state ViewState) string {
-	base := subtle.Render(" [q] Quit/Back ")
+	base := subtle.Render(" [q] Quit  [t] View ")
 	if state == ViewStateList {
-		return base + subtle.Render(" [↑/↓] Nav  [Enter] Details  [i] Ign  [m] Mark  [y] Copy  [P]rice  [E]asy")
+		return base + subtle.Render(" [↑/↓] Nav  [Enter] Details  [i] Ign  [m] Mark  [y] Copy  [P]rice  [h] High Confidence")
 	}
 	if state == ViewStateDetail {
 		return base + subtle.Render(" [o] Open Browser  [i] Ign  [m] Mark  [y] Copy")
 	}
 	if state == ViewStateTopology {
-		return base + subtle.Render(" [↑/↓] Nav  [Enter] Action(WIP)")
+		return base + subtle.Render(" [↑/↓] Nav  [y] Copy ID")
 	}
 	return base
 }
@@ -374,7 +371,7 @@ func getConsoleURL(node *graph.Node) string {
 	return "https://console.aws.amazon.com"
 }
 
-func copyToClipboard(text string) {
+func copyToClipboard(text string) error {
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
@@ -384,18 +381,31 @@ func copyToClipboard(text string) {
 		// check for wl-copy (wayland) or xclip (x11)
 		if _, err := exec.LookPath("wl-copy"); err == nil {
 			cmd = exec.Command("wl-copy")
-		} else {
+		} else if _, err := exec.LookPath("xclip"); err == nil {
 			cmd = exec.Command("xclip", "-selection", "clipboard")
+		} else {
+			return fmt.Errorf("no clipboard tool found")
 		}
 	case "windows":
 		cmd = exec.Command("clip")
 	default:
-		return
+		return fmt.Errorf("unsupported os")
 	}
 
 	cmd.Stdin = strings.NewReader(text)
-	cmd.Start()
-	// Don't wait, just fire and forget for UI responsiveness
+	return cmd.Run()
+}
+
+// OSC 52 Fallback (for remote/headless terminals like OrbStack)
+func copyToClipboardOSC52(text string) {
+	// Format: \x1b]52;c;<base64>\x07
+	b64 := base64.StdEncoding.EncodeToString([]byte(text))
+	fmt.Printf("\x1b]52;c;%s\x07", b64)
+}
+
+func (m *Model) setStatus(msg string) {
+	m.statusMsg = msg
+	m.statusTime = time.Now()
 }
 
 func openBrowser(url string) {
@@ -437,8 +447,28 @@ func (m Model) getUniqueRegions() []string {
 	return list
 }
 
-func (m Model) getKthWasteNodeID(k int) string {
-	// Not used in new logic, but kept for compatibility if needed?
-	// New logic uses m.wasteItems list.
-	return ""
+
+
+// PrintExitSummary renders the final status screen after the TUI has exited.
+// This prevents rendering artifacts/overlap with the TUI buffer.
+func PrintExitSummary(startTime time.Time, nodeCount int) {
+	duration := time.Since(startTime).Seconds()
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	memMB := mem.Alloc / 1024 / 1024
+
+	stats := fmt.Sprintf("\n[SUCCESS] Scan Complete. Audited %d resources in %.2fs. (Memory: %dMB)\n", nodeCount, duration, memMB)
+	
+	// Exit View
+	s := "\n" +
+		lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FF99")).
+			Bold(true).
+			Render(fmt.Sprintf("%s %s [%s]", version.AppName, version.Current, version.License)) + "\n" +
+		`Open Source Infrastructure Forensics
+Maintained by DrSkyle | github.com/drskyle/cloudslash
+
+	License: AGPLv3. For commercial use without open-source obligations, please acquire a Commercial Exemption at drskyle8000@gmail.com.
+`
+	fmt.Println(stats + s)
 }

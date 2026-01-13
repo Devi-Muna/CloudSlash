@@ -9,7 +9,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/version"
 )
 
-// GenerateExecutiveSummary creates an audit report in Markdown.
+// GenerateExecutiveSummary creates a strategic audit report in Markdown.
 func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accountID string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -22,8 +22,12 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 
 	totalWasteCost := 0.0
 	totalWasteCount := 0
-	computeWaste := 0.0
-	storageWaste := 0.0
+	
+	// Categories
+	catCompute := 0.0
+	catStorage := 0.0
+	catNetwork := 0.0
+	catDatabase := 0.0
 
 	// Aggregate Data
 	for _, node := range g.Nodes {
@@ -32,42 +36,93 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 			totalWasteCost += node.Cost
 
 			if isCompute(node.Type) {
-				computeWaste += node.Cost
-			}
-			if isStorage(node.Type) {
-				storageWaste += node.Cost
+				catCompute += node.Cost
+			} else if isStorage(node.Type) {
+				catStorage += node.Cost
+			} else if isNetwork(node.Type) {
+				catNetwork += node.Cost
+			} else if isDatabase(node.Type) {
+				catDatabase += node.Cost
 			}
 		}
 	}
 
-	projectedSavings := totalWasteCost * 12
+	annualSavings := totalWasteCost * 12
 
 	// Template
-	fmt.Fprintf(f, "# CloudSlash Audit Report\n")
-	fmt.Fprintf(f, "**Date:** %s\n", time.Now().Format("2006-01-02"))
-	if accountID != "" {
-		fmt.Fprintf(f, "**Account:** %s\n", accountID)
-	} else {
-		fmt.Fprintf(f, "**Account:** Unknown (Mock/Local)\n")
+	fmt.Fprintf(f, "# CloudSlash Strategic Infrastructure Audit\n\n")
+	
+	// Meta Block
+	fmt.Fprintf(f, "| **Scan Metadata** | |\n")
+	fmt.Fprintf(f, "| :--- | :--- |\n")
+	fmt.Fprintf(f, "| **Date** | %s |\n", time.Now().Format("Jan 02, 2006"))
+	fmt.Fprintf(f, "| **Account ID** | `%s` |\n", accountID)
+	fmt.Fprintf(f, "| **Scan Ref** | `%s` |\n\n", scanID)
+
+	// Section 1: Executive Overview
+	fmt.Fprintf(f, "## 1. Executive Overview\n\n")
+	fmt.Fprintf(f, "CloudSlash has completed a comprehensive analysis of the AWS infrastructure. The audit identified **%d unattached or idle resources** contributing to unnecessary operational overhead.\n\n", totalWasteCount)
+	
+	fmt.Fprintf(f, "### Key Financial Findings\n")
+	fmt.Fprintf(f, "- **Monthly Burn Rate:** $%.2f / mo\n", totalWasteCost)
+	fmt.Fprintf(f, "- **projected Annual Savings:** $%.2f / yr\n\n", annualSavings)
+	
+	fmt.Fprintf(f, "> ** Strategic Insight:** Immediate remediation of these resources will reduce the cloud billing baseline by approximately **$%.0f** annually without impacting active workloads.\n\n", annualSavings)
+
+	// Section 2: Waste Distribution
+	fmt.Fprintf(f, "## 2. Cost Inefficiency Breakdown\n\n")
+	fmt.Fprintf(f, " inefficiency is distributed across the following core infrastructure vectors:\n\n")
+	
+	fmt.Fprintf(f, "| Infrastructure Vector | Monthly Cost | Annual Impact | Optimization Focus |\n")
+	fmt.Fprintf(f, "| :--- | :--- | :--- | :--- |\n")
+	if catCompute > 0 {
+		fmt.Fprintf(f, "| **Compute** (EC2, Lambda) | $%.2f | $%.2f | Terminate idle instances |\n", catCompute, catCompute*12)
 	}
-	fmt.Fprintf(f, "**Scan ID:** %s\n\n", scanID)
+	if catStorage > 0 {
+		fmt.Fprintf(f, "| **Storage** (EBS, S3) | $%.2f | $%.2f | Delete unattached volumes |\n", catStorage, catStorage*12)
+	}
+	if catNetwork > 0 {
+		fmt.Fprintf(f, "| **Network** (NAT, EIP) | $%.2f | $%.2f | Release unused IPs/Gateways |\n", catNetwork, catNetwork*12)
+	}
+	if catDatabase > 0 {
+		fmt.Fprintf(f, "| **Database** (RDS) | $%.2f | $%.2f | Snapshot and terminate |\n", catDatabase, catDatabase*12)
+	}
+	fmt.Fprintf(f, "\n")
 
-	fmt.Fprintf(f, "## Executive Summary\n")
-	fmt.Fprintf(f, "CloudSlash identified **%d unused resources** with a total projected annual waste of **$%.2f**.\n\n", totalWasteCount, projectedSavings)
+	// Section 3: Action Plan
+	fmt.Fprintf(f, "## 3. Recommended Remediation Strategy\n\n")
+	fmt.Fprintf(f, "> [!CAUTION]\n")
+	fmt.Fprintf(f, "> **CRITICAL: VALIDATION REQUIRED.**\n")
+	fmt.Fprintf(f, "> These scripts execute **irreversible infrastructure changes**. Manual auditing of the generated code is mandatory before execution.\n\n")
+	
+	fmt.Fprintf(f, "To realize these savings while maintaining operational stability, the following phased approach is recommended:\n\n")
 
-	fmt.Fprintf(f, "### Top Waste Categories\n")
-	fmt.Fprintf(f, "1. **Compute (NAT/EIP/EC2):** $%.2f/yr\n", computeWaste*12)
-	fmt.Fprintf(f, "   - *Impact:* Paying for idle CPU and allocated but unused IP addresses.\n")
-	fmt.Fprintf(f, "2. **Storage (EBS/S3):** $%.2f/yr\n", storageWaste*12)
-	fmt.Fprintf(f, "   - *Impact:* Paying for detached volumes and old snapshots.\n\n")
+	fmt.Fprintf(f, "### Phase 1: State Reconciliation (Low Risk)\n")
+	fmt.Fprintf(f, "Execute the state fix script to decouple these resources from Terraform management, preventing state drift.\n")
+	fmt.Fprintf(f, "```bash\n")
+	fmt.Fprintf(f, "# REVIEW FIRST: cat cloudslash-out/fix_terraform.sh\n")
+	fmt.Fprintf(f, "bash cloudslash-out/fix_terraform.sh\n")
+	fmt.Fprintf(f, "```\n\n")
 
-	fmt.Fprintf(f, "### Recommended Action Plan\n")
-	fmt.Fprintf(f, "1. **Immediate:** Run `fix_terraform.sh` to remove unused resources from state.\n")
-	fmt.Fprintf(f, "2. **Cleanup:** Execute `cloudslash delete-script` to remove confirmed waste.\n")
-	fmt.Fprintf(f, "3. **Safety:** Update Route53 records for any flagged Elastic IPs.\n\n")
+	// Phase 2: Action
+	fmt.Fprintf(f, "### Phase 2: Remediation Options\n\n")
 
+	fmt.Fprintf(f, "#### Option A: Safe Deletion (Recommended)\n")
+	fmt.Fprintf(f, "Performs 'Soft Delete' where possible (Stop Instance, Snapshot Volume).\n")
+	fmt.Fprintf(f, "```bash\n")
+	fmt.Fprintf(f, "# REVIEW FIRST: cat cloudslash-out/safe_cleanup.sh\n")
+	fmt.Fprintf(f, "bash cloudslash-out/safe_cleanup.sh\n")
+	fmt.Fprintf(f, "```\n\n")
+	
+	fmt.Fprintf(f, "#### Option B: Hard Termination (Use with Caution)\n")
+	fmt.Fprintf(f, "Permanently destroys resources. **No snapshots.**\n")
+	fmt.Fprintf(f, "```bash\n")
+	fmt.Fprintf(f, "# REVIEW FIRST: cat cloudslash-out/resource_deletion.sh\n")
+	fmt.Fprintf(f, "bash cloudslash-out/resource_deletion.sh\n")
+	fmt.Fprintf(f, "```\n\n")
+	
 	fmt.Fprintf(f, "---\n")
-	fmt.Fprintf(f, "*Generated by CloudSlash %s*\n", version.Current)
+	fmt.Fprintf(f, "*Report generated by CloudSlash Audit Engine v%s.*\n", version.Current)
 
 	return nil
 }
@@ -81,9 +136,17 @@ type Summary struct {
 }
 
 func isCompute(t string) bool {
-	return t == "AWS::EC2::Instance" || t == "AWS::EC2::NatGateway" || t == "AWS::EC2::EIP" || t == "AWS::Lambda::Function"
+	return t == "AWS::EC2::Instance" || t == "AWS::Lambda::Function"
 }
 
 func isStorage(t string) bool {
 	return t == "AWS::EC2::Volume" || t == "AWS::S3::Bucket" || t == "AWS::EC2::Snapshot"
+}
+
+func isNetwork(t string) bool {
+	return t == "AWS::EC2::NatGateway" || t == "AWS::EC2::EIP" || t == "AWS::EC2::NetworkInterface"
+}
+
+func isDatabase(t string) bool {
+	return t == "AWS::RDS::DBInstance"
 }

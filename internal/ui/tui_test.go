@@ -121,7 +121,13 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			g := graph.NewGraph()
-			g.Nodes[tc.mockNode.ID] = tc.mockNode
+			g.AddNode(tc.mockNode.ID, tc.mockNode.Type, tc.mockNode.Properties)
+			if n := g.GetNode(tc.mockNode.ID); n != nil {
+				n.IsWaste = tc.mockNode.IsWaste
+				n.Cost = tc.mockNode.Cost
+				n.RiskScore = tc.mockNode.RiskScore
+				n.SourceLocation = tc.mockNode.SourceLocation
+			}
 
 			eng := swarm.NewEngine()
 			model := NewModel(eng, g, false, "us-east-1")
@@ -155,7 +161,11 @@ func TestTUI_TerraformIndicator(t *testing.T) {
 		IsWaste:        true,
 		SourceLocation: "main.tf:12",
 	}
-	g.Nodes[node.ID] = node
+	g.AddNode(node.ID, node.Type, node.Properties)
+	if n := g.GetNode(node.ID); n != nil {
+		n.IsWaste = node.IsWaste
+		n.SourceLocation = node.SourceLocation
+	}
 
 	eng := swarm.NewEngine()
 	model := NewModel(eng, g, false, "us-east-1")

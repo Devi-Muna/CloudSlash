@@ -57,6 +57,10 @@ type Model struct {
 	// filters
 	SortMode   string
 	FilterMode string
+	
+	// feedback
+	statusMsg  string
+	statusTime time.Time
 
 	// navigation
 	cursor       int // main list cursor

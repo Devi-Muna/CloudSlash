@@ -85,7 +85,7 @@ func TestAnalyze_ModuleAwareness(t *testing.T) {
 	}
 
 	// Check Total Zombies
-	if report.TotalZombiesFound != 3 {
-		t.Errorf("Expected 3 zombies found, got %d", report.TotalZombiesFound)
+	if report.TotalUnused != 3 {
+		t.Errorf("Expected 3 zombies found, got %d", report.TotalUnused)
 	}
 }

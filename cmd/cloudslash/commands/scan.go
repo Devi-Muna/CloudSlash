@@ -22,7 +22,7 @@ import (
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Run a headless scan (no TUI)",
-	Long: `Run CloudSlash in headless mode. Useful for CI/CD pipelines or cron jobs.
+	Long: `Run CloudSlash in headless mode. Useful for CI/CD pipelines or automated auditing.
     
 Example:
   cloudslash scan --region us-west-2`,
@@ -48,21 +48,21 @@ Example:
 			os.Exit(1)
 		}
 
-		// Optimize (v1.4.0 Autonomy)
+		// Optimize (v1.4.0 Optimization Engine)
 		runSolver(g)
 
 		// Resource Deletion Script
-		nukePath := "cloudslash-out/resource_deletion.sh"
+		cleanupPath := "cloudslash-out/resource_deletion.sh"
 		// Ensure output dir exists
 		if _, err := os.Stat("cloudslash-out"); os.IsNotExist(err) {
 			_ = os.Mkdir("cloudslash-out", 0755)
 		}
 		gen := script.NewGenerator(g, nil)
-		if err := gen.GenerateDeletionScript(nukePath); err != nil {
+		if err := gen.GenerateDeletionScript(cleanupPath); err != nil {
 			fmt.Printf("[WARN] Failed to generate deletion script: %v\n", err)
 		} else {
-			fmt.Printf("\n[SUCCESS] Resource deletion script generated: %s\n", nukePath)
-			_ = os.Chmod(nukePath, 0755)
+			fmt.Printf("\n[SUCCESS] Resource deletion script generated: %s\n", cleanupPath)
+			_ = os.Chmod(cleanupPath, 0755)
 		}
 
 		// Terraform Integration
@@ -80,11 +80,11 @@ Example:
 				if err != nil {
 					fmt.Printf("[ERROR] Failed to parse Terraform state: %v\n", err)
 				} else {
-					var zombies []*graph.Node
+					var unused []*graph.Node
 					g.Mu.RLock()
 					for _, n := range g.Nodes {
 						if n.IsWaste && !n.Ignored {
-							zombies = append(zombies, n)
+							unused = append(unused, n)
 						}
 					}
 					g.Mu.RUnlock()
@@ -94,14 +94,14 @@ Example:
 					provMap := make(map[string]*provenance.ProvenanceRecord)
 
 					// Attribute all unused resources
-					for _, z := range zombies {
+					for _, z := range unused {
 						rec, err := provEngine.Attribute(z.ID, state)
 						if err == nil && rec != nil {
 							provMap[rec.TFAddress] = rec
 						}
 					}
 
-					report := tf.Analyze(zombies, state)
+					report := tf.Analyze(unused, state)
 
 					printTerraformReport(report, provMap)
 					generateFixScript(report)
@@ -113,7 +113,7 @@ Example:
 
 func init() {
 	rootCmd.AddCommand(scanCmd)
-	scanCmd.Flags().Bool("no-metrics", false, "Disable CloudWatch Metric calls (Saves money)")
+	scanCmd.Flags().Bool("no-metrics", false, "Disable CloudWatch Metrics (Optimizes API costs)")
 	scanCmd.Flags().Bool("fast", false, "Alias for --no-metrics (Fast scan)")
 	scanCmd.Flags().Bool("headless", false, "Run without TUI (for CI/CD)")
 	scanCmd.Flags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL for Reporting")
@@ -121,19 +121,19 @@ func init() {
 }
 
 func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provenance.ProvenanceRecord) {
-	if report.TotalZombiesFound == 0 {
+	if report.TotalUnused == 0 {
 		fmt.Println("\n[Success] No Terraform-managed unused resources found.")
 		return
 	}
 
-	fmt.Printf("\n[ Analysis Complete ]\nFound %d unused resources managed by Terraform.\n", report.TotalZombiesFound)
+	fmt.Printf("\n[ Analysis Complete ]\nFound %d unused resources managed by Terraform.\n", report.TotalUnused)
 	fmt.Println("\n-------------------------------------------------------------")
 	fmt.Println("RECOMMENDED ACTION:")
 	fmt.Println("-------------------------------------------------------------")
 
 	for _, mod := range report.ModulesToDelete {
 		fmt.Printf("# 1. Remove the '%s' module entirely\n", mod)
-		fmt.Println("#    (Logic: All resources in this module are dead)")
+		fmt.Println("#    (Logic: All resources in this module are unused)")
 		fmt.Printf("terraform state rm %s\n\n", mod)
 	}
 
@@ -161,7 +161,7 @@ func printProvenanceBox(rec *provenance.ProvenanceRecord) {
 	fmt.Printf("  │ File:    %s:%d\n", rec.FilePath, rec.LineStart)
 	
 	if rec.IsLegacy {
-		fmt.Println("  │ Status:  [LEGACY DEBT] (> 1 year old)")
+		fmt.Println("  │ Status:  [LEGACY] (> 1 year old)")
 	} else {
 		fmt.Println("  │ Status:  [ACTIVE COMMIT] (Recent change)")
 	}
@@ -169,7 +169,7 @@ func printProvenanceBox(rec *provenance.ProvenanceRecord) {
 }
 
 func generateFixScript(report *tf.AnalysisReport) {
-	if report.TotalZombiesFound == 0 {
+	if report.TotalUnused == 0 {
 		return
 	}
 
@@ -186,7 +186,7 @@ func generateFixScript(report *tf.AnalysisReport) {
 	defer f.Close()
 
 	fmt.Fprintf(f, "#!/bin/bash\n")
-	fmt.Fprintf(f, "# CloudSlash %s - Terraform Surgical Fix Script\n", version.Current)
+	fmt.Fprintf(f, "# CloudSlash %s - Terraform Remediation Script\n", version.Current)
 	fmt.Fprintf(f, "# Generated based on AWS Scan vs Terraform State Analysis\n\n")
 
 	for _, mod := range report.ModulesToDelete {
@@ -205,7 +205,7 @@ func generateFixScript(report *tf.AnalysisReport) {
 }
 
 func runSolver(g *graph.Graph) {
-	fmt.Println("\n[ v1.4.0 AUTONOMY ENGINE ]")
+	fmt.Println("\n[ v1.4.0 OPTIMIZATION ENGINE ]")
 	fmt.Println("Initializing Solver...")
 
 	// 1. Build Workloads from Graph

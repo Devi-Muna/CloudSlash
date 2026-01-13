@@ -13,7 +13,7 @@ func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
 	// 1. Setup Graph
 	g := graph.NewGraph()
 	ctx := context.Background()
-	heuristic := &ZombieEKSHeuristic{}
+	heuristic := &IdleEKSClusterHeuristic{}
 
 	// Create Zombie EKS Cluster
 	clusterArn := "arn:aws:eks:us-east-1:123456789012:cluster/ZombieCluster"

@@ -7,3 +7,5 @@ ignored:
 - arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild
 - arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890
 - arn:aws:rds:us-east-1:123456789012:db:legacy-postgres
+- arn:aws:eks:us-east-1:123456789012:cluster/legacy-dev-cluster
+- arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger

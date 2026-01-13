@@ -77,15 +77,15 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	return nil
 }
 
-// ZombieEBSHeuristic checks for unattached or zombie volumes.
-type ZombieEBSHeuristic struct {
+// UnattachedVolumeHeuristic checks for unattached or idle volumes.
+type UnattachedVolumeHeuristic struct {
 	Pricing *pricing.Client
-	Config  internalconfig.ZombieEBSConfig
+	Config  internalconfig.UnattachedVolumeConfig
 }
 
-func (h *ZombieEBSHeuristic) Name() string { return "ZombieEBSHeuristic" }
+func (h *UnattachedVolumeHeuristic) Name() string { return "UnattachedVolumeHeuristic" }
 
-func (h *ZombieEBSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	g.Mu.RLock()
 	type volumeData struct {
 		Node             *graph.Node
@@ -157,7 +157,7 @@ func (h *ZombieEBSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				if instanceState == "stopped" && time.Since(launchTime) > time.Duration(thresholdDays)*24*time.Hour && !vol.DeleteOnTerm {
 					isWaste = true
 					score = 70
-					reason = fmt.Sprintf("Zombie EBS: Attached to stopped instance > %d days", thresholdDays)
+					reason = fmt.Sprintf("Idle EBS: Attached to stopped instance > %d days", thresholdDays)
 				}
 			}
 		}
@@ -555,9 +555,9 @@ func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) err
 		}
 
 		if wasteVolumes[volID] {
-			// It's a snapshot of a zombie volume!
+			// It's a snapshot of an unused volume!
 			g.MarkWaste(snap.ID, 90) // High confidence
-			snap.Properties["Reason"] = fmt.Sprintf("Snapshot of Waste Volume (%s)", volID)
+			snap.Properties["Reason"] = fmt.Sprintf("Snapshot of Unused Volume (%s)", volID)
 
 			// Calculate Cost
 			// Snapshot pricing is complex (incremental), but $0.05/GB is a safe standard upper bound for standard tier.

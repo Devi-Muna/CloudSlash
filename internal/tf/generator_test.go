@@ -28,9 +28,9 @@ func TestGenerateDeletionScript(t *testing.T) {
 	g.AddEdge("sub-1", "vpc-1")
 
 	// Mark as Waste so they are included
-	g.Nodes["vpc-1"].IsWaste = true
-	g.Nodes["sub-1"].IsWaste = true
-	g.Nodes["i-1"].IsWaste = true
+	g.GetNode("vpc-1").IsWaste = true
+	g.GetNode("sub-1").IsWaste = true
+	g.GetNode("i-1").IsWaste = true
 
 	// 2. Generate Script
 	gen := NewGenerator(g, nil)

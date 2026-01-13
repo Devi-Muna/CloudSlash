@@ -1,7 +1,8 @@
 # Binaries
-/cloudslash
-/cloudslash.exe
-# keygen
+dist/
+cloudslash
+cloudslash.exe
+*.test
 keygen.exe
 
 # Build Artifacts
@@ -50,8 +51,8 @@ internal/graph/mock_factory.go
 internal/heuristics/integration_test.go
 
 # Integration Tests (Dev Only)
-internal/aws/integration_test.go
-internal/aws/scan_test.go
+# internal/aws/integration_test.go
+# internal/aws/scan_test.go
 
 # Logs
 gift_licenses.log

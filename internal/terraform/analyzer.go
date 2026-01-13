@@ -11,33 +11,33 @@ import (
 type AnalysisReport struct {
 	ModulesToDelete   []string // e.g. "module.payments"
 	ResourcesToDelete []string // e.g. "module.shared.aws_s3_bucket.logs"
-	TotalZombiesFound int
+	TotalUnused       int
 }
 
-// Analyze correlates confirmed Zombie nodes from the scan with the Terraform state.
-// It implements the "Module Awareness" logic: if all resources in a module are zombies,
+// Analyze correlates confirmed unused nodes from the scan with the Terraform state.
+// It implements the "Module Awareness" logic: if all resources in a module are unused,
 // recommend deleting the module.
-func Analyze(zombies []*graph.Node, state *TerraformState) *AnalysisReport {
+func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 	report := &AnalysisReport{
 		ModulesToDelete:   []string{},
 		ResourcesToDelete: []string{},
 	}
 
-	// 1. Index Zombies for O(1) matching
+	// 1. Index Unused Resources for O(1) matching
 	// We match against ID (mostly) and ARN (fallback).
-	zombieMap := make(map[string]bool)
-	for _, z := range zombies {
-		zombieMap[z.ID] = true
+	unusedMap := make(map[string]bool)
+	for _, z := range unused {
+		unusedMap[z.ID] = true
 		// Additional ID forms? For now, we rely on the primary ID (i-xxx, vol-xxx).
 	}
 
 	// 2. Build Module Stats
 	// Map: ModulePath -> Total Resource Count
 	moduleTotal := make(map[string]int)
-	// Map: ModulePath -> Zombie Resource Count
-	moduleZombies := make(map[string]int)
-	// Map: ModulePath -> List of Zombie Resource Clean Addresses (for fallback)
-	moduleZombieAddrs := make(map[string][]string)
+	// Map: ModulePath -> Unused Resource Count
+	moduleUnused := make(map[string]int)
+	// Map: ModulePath -> List of Unused Resource Clean Addresses (for fallback)
+	moduleUnusedAddrs := make(map[string][]string)
 
 	// Traverse the State
 	for _, res := range state.Resources {
@@ -62,52 +62,52 @@ func Analyze(zombies []*graph.Node, state *TerraformState) *AnalysisReport {
 				continue
 			}
 
-			// DNA Match Logic
-			isZombie := false
-			if attrs.ID != "" && zombieMap[attrs.ID] {
-				isZombie = true
-			} else if attrs.ARN != "" && zombieMap[attrs.ARN] {
-				isZombie = true
+			// Match Logic
+			isUnused := false
+			if attrs.ID != "" && unusedMap[attrs.ID] {
+				isUnused = true
+			} else if attrs.ARN != "" && unusedMap[attrs.ARN] {
+				isUnused = true
 			}
 
-			if isZombie {
+			if isUnused {
 				// Construct the full address for this instance
 				fullAddr := addrBase
 				// If multiple instances allow index, usually we'd append [i],
 				// but simplistic approach: standard address matching
-				// Ideally we'd handle "aws_instance.web[0]", but for v1.2.8 "The State Doctor"
+				// Ideally we'd handle "aws_instance.web[0]", but for "State Analysis"
 				// we'll stick to base address if count=1.
 				if len(res.Instances) > 1 {
 					fullAddr = fmt.Sprintf("%s[%d]", addrBase, i)
 				}
 
 				if modulePath != "" {
-					moduleZombies[modulePath]++
-					moduleZombieAddrs[modulePath] = append(moduleZombieAddrs[modulePath], fullAddr)
+					moduleUnused[modulePath]++
+					moduleUnusedAddrs[modulePath] = append(moduleUnusedAddrs[modulePath], fullAddr)
 				} else {
 					// Root module resource -> Direct delete
 					report.ResourcesToDelete = append(report.ResourcesToDelete, fullAddr)
 				}
-				report.TotalZombiesFound++
+				report.TotalUnused++
 			}
 		}
 	}
 
 	// 3. The Verdict: Module Aggregation Logic
 	for mod, total := range moduleTotal {
-		zombieCount := moduleZombies[mod]
+		unusedCount := moduleUnused[mod]
 		
-		// If NO zombies in this module, skip
-		if zombieCount == 0 {
+		// If NO unused resources in this module, skip
+		if unusedCount == 0 {
 			continue
 		}
 
-		// Genius Logic: 100% Infection Rate?
-		if zombieCount == total {
+		// Logic: 100% Unused Rate?
+		if unusedCount == total {
 			report.ModulesToDelete = append(report.ModulesToDelete, mod)
 		} else {
-			// Partial infection: Fallback to individual resources
-			report.ResourcesToDelete = append(report.ResourcesToDelete, moduleZombieAddrs[mod]...)
+			// Partial unused: Fallback to individual resources
+			report.ResourcesToDelete = append(report.ResourcesToDelete, moduleUnusedAddrs[mod]...)
 		}
 	}
 

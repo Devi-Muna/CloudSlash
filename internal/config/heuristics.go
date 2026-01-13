@@ -5,7 +5,7 @@ import "time"
 // HeuristicConfig holds all heuristic-related configurations.
 type HeuristicConfig struct {
 	IdleCluster IdleClusterConfig `mapstructure:"idle_cluster"`
-	ZombieEBS   ZombieEBSConfig   `mapstructure:"zombie_ebs"`
+	UnattachedVolume   UnattachedVolumeConfig   `mapstructure:"unattached_volume"`
 	S3Multipart S3MultipartConfig `mapstructure:"s3_multipart"`
 }
 
@@ -14,7 +14,7 @@ type IdleClusterConfig struct {
 	UptimeThreshold time.Duration `mapstructure:"uptime_threshold"`
 }
 
-type ZombieEBSConfig struct {
+type UnattachedVolumeConfig struct {
 	UnusedDays int      `mapstructure:"unused_days"`
 	IgnoreTags []string `mapstructure:"ignore_tags"`
 }
@@ -30,7 +30,7 @@ func DefaultHeuristicConfig() HeuristicConfig {
 			CPUThreshold:    5.0,
 			UptimeThreshold: 1 * time.Hour,
 		},
-		ZombieEBS: ZombieEBSConfig{
+		UnattachedVolume: UnattachedVolumeConfig{
 			UnusedDays: 30,
 			IgnoreTags: []string{},
 		},

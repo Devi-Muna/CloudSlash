@@ -82,11 +82,11 @@ func TestIntegrationScanVolumes(t *testing.T) {
 	// arn := fmt.Sprintf("arn:aws:ec2:region:account:volume/%s", id)
 	targetARN := "arn:aws:ec2:region:account:volume/" + volID
 
-	node, ok := g.Nodes[targetARN]
-	if !ok {
+	node := g.GetNode(targetARN)
+	if node == nil {
 		// Debug dump
-		for k := range g.Nodes {
-			t.Logf("Found node: %s", k)
+		for _, n := range g.Nodes {
+			t.Logf("Found node: %s", n.ID)
 		}
 		t.Fatalf("Scanner failed to find volume %s in graph", volID)
 	}

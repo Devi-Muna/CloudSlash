@@ -23,7 +23,12 @@ func (m Model) viewList() string {
 	start, end := m.calculateWindow(len(nodes))
 
 	// Header
-	headerTxt := fmt.Sprintf("   %-20s | %-15s | %-10s | %s", "RESOURCE ID", "TYPE", "COST", "REASON")
+	// Items have PaddingLeft(2).
+	// Selection Indicator is 2 chars: "> " or "  ".
+	// ID starts after that. 
+	// Let's standardise: 
+	//  State | ID | Type | Cost | Reason
+	headerTxt := fmt.Sprintf("  %-20s | %-15s | %-10s | %s", "RESOURCE ID", "TYPE", "COST", "REASON") 
 	s.WriteString(dimStyle.Render(headerTxt) + "\n")
 	
 	filterStatus := ""
@@ -32,17 +37,18 @@ func (m Model) viewList() string {
 	if filterStatus != "" {
 		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render("   " + filterStatus) + "\n")
 	} else {
-		s.WriteString(dimStyle.Render("   " + strings.Repeat("─", 60) + "\n"))
+		s.WriteString(dimStyle.Render("  " + strings.Repeat("─", 60) + "\n"))
 	}
 
 	for i := start; i < end; i++ {
 		node := nodes[i]
 		isSelected := (i == m.cursor)
 		
-		// Icon based on cost/risk
-		icon := "[ ]"
-		if node.Cost > 50 { icon = "[!]" }
-		if node.RiskScore > 80 { icon = "[x]" }
+		// Selector
+		cursor := "  "
+		if isSelected {
+			cursor = "> "
+		}
 
 		// Truncate ID if too long
 		dispID := node.ID
@@ -57,15 +63,27 @@ func (m Model) viewList() string {
 		// Cost & Guilt Trip
 		dispCost := fmt.Sprintf("$%.2f", node.Cost)
 		if node.Cost > 0 {
-			yearly := node.Cost * 12
-			dispCost += lipgloss.NewStyle().Foreground(lipgloss.Color("#F05D5E")).Render(fmt.Sprintf(" ($%.0f/yr)", yearly))
+			// yearly := node.Cost * 12
+			// Removed yearly clutter to simplify
 		}
 
 		// Reason (cut off rest)
 		reason := fmt.Sprintf("%v", node.Properties["Reason"])
 		if len(reason) > 40 { reason = reason[:37] + "..." }
 
-		line := fmt.Sprintf("%s %-20s | %-15s | %-10s | %s", icon, dispID, dispType, dispCost, reason)
+		// Severity Coloring
+		var line string
+		baseLine := fmt.Sprintf("%-20s | %-15s | %-10s | %s", dispID, dispType, dispCost, reason)
+		
+		if node.RiskScore > 80 {
+			// Critical Risk
+			baseLine = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0055")).Render(baseLine)
+		} else if node.Cost > 50 {
+			// High Cost
+			baseLine = lipgloss.NewStyle().Foreground(lipgloss.Color("#F59E0B")).Render(baseLine)
+		}
+
+		line = cursor + baseLine
 
 		if isSelected {
 			s.WriteString(listSelectedStyle.Render(line) + "\n")
