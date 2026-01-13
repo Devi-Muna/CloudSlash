@@ -29,7 +29,7 @@ Default output directory: ./cloudslash-out/`,
 
 		fmt.Println("\n[SUCCESS] Export Complete.")
 		fmt.Println("   CSV:  ./cloudslash-out/waste_report.csv")
-		fmt.Println("   xxxxx JSON: ./cloudslash-out/waste_report.json")
+		fmt.Println("   JSON: ./cloudslash-out/waste_report.json")
 		fmt.Println("   HTML: ./cloudslash-out/dashboard.html")
 	},
 }
