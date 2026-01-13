@@ -52,11 +52,13 @@ var (
 			Foreground(colorTextMain).
 			Background(lipgloss.Color("#331832")). // Very subtle purple bg
 			Bold(true).
-			PaddingLeft(0) // Controlled manually in view (`> `)
+			Padding(0).
+			Margin(0)
 
 	listNormalStyle = lipgloss.NewStyle().
 			Foreground(colorTextSub).
-			PaddingLeft(0) // Controlled manually in view (`  `)
+			Padding(0).
+			Margin(0)
 
 	// Icon Styles (Text Based - No Emojis)
 	iconCritical = lipgloss.NewStyle().Foreground(colorDanger).SetString("[CRITICAL]")
