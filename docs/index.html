@@ -85,9 +85,8 @@
             <h1 class="glitch-text" data-text="Audit.">Audit.</h1>
             <h1 class="glitch-text highlight" data-text="Slash.">Slash.</h1>
             <p class="subtitle">
-              <strong>The Cloud Accountant for DevOps & Startups.</strong><br />
-              Stop bleeding cash. Discover accurate waste metrics and fix
-              Terraform state without the Enterprise sales calls or contracts.
+              <strong>Infrastructure that Heals Itself.</strong><br />
+              Stop bleeding cash. Identifying consumption anomalies and autonomously remediating waste with mathematical certainty.
             </p>
             <div class="cta-group">
               <a href="#download" class="btn-primary"> Download CLI </a>
@@ -109,6 +108,10 @@
             </div>
           </div>
         </div>
+      </section>
+      
+      <section class="container" style="margin-top: -40px; margin-bottom: 60px; text-align: center;">
+          <img src="img/tui.png" alt="CloudSlash TUI" style="width: 100%; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
       </section>
 
       <!-- Trust Battery / Tech Stack -->
@@ -178,7 +181,7 @@
                   <path d="M22 12h-6l-2-9-2 9-6-12-6 12" />
                 </svg>
               </div>
-              <h3>Deep-Scan Analysis</h3>
+              <h3>Autonomy Engine</h3>
               <p>
                 We trace resource lineage to find what others miss.
                 <strong>Unused EBS</strong> volumes, hidden snapshots, and
@@ -200,7 +203,7 @@
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
               </div>
-              <h3>DNS Safety Lock</h3>
+              <h3>Lazarus Protocol</h3>
               <p>
                 Essential Release Protection. Cross-references
                 <strong>Route53</strong> A-Records before releasing Elastic IPs
@@ -224,7 +227,7 @@
                   />
                 </svg>
               </div>
-              <h3>Terraform Bridge</h3>
+              <h3>Provenance Engine</h3>
               <p>
                 <strong>The State Doctor.</strong> Maps AWS Reality to Terraform
                 Fantasy. Generates module-aware
@@ -514,7 +517,7 @@
                 <span class="prompt">$</span>
                 <code id="install-cmd"
                   >curl -sL
-                  https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh
+                  https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh
                   | bash</code
                 >
                 <span class="copy-icon">
@@ -552,11 +555,11 @@
 
                 if (os === "unix") {
                   cmd.innerText =
-                    "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.sh | bash";
+                    "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash";
                   tabs[0].classList.add("active");
                 } else {
                   cmd.innerText =
-                    "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/dist/install.ps1 | iex";
+                    "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex";
                   tabs[1].classList.add("active");
                 }
               }
