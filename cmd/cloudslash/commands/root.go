@@ -110,6 +110,11 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 		}
 	}
 	fmt.Println("")
+	
+	fmt.Println(titleStyle.Render("EXAMPLES"))
+	fmt.Println("  cloudslash scan                          # Interactive Mode (TUI)")
+	fmt.Println("  cloudslash scan --headless --region ...  # CI/CD Mode (No TUI)")
+	fmt.Println("")
 
 	fmt.Println(titleStyle.Render("FLAGS"))
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
