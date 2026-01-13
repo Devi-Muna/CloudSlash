@@ -235,6 +235,15 @@ _Note: This command generates executable shell scripts (`safe_cleanup.sh`) in th
 
 ---
 
+## Support the Project
+
+CloudSlash is open source and free. If you'd like to support development or need priority help:
+
+- **[Support ($9.99/mo)](https://checkout.freemius.com/app/22411/plan/37525/)** - Priority Support & Gratitude.
+- **[Super Support ($19.99/mo)](https://checkout.freemius.com/app/22411/plan/37513/)** - Prioritized Feature Requests & Sponsor Recognition.
+
+---
+
 ## Enterprise Support & Licensing
 
 CloudSlash is released under the **AGPLv3** license.
