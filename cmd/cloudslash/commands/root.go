@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/DrSkyle/cloudslash/internal/app"
-	internalconfig "github.com/DrSkyle/cloudslash/internal/config"
 	"github.com/DrSkyle/cloudslash/internal/version"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
