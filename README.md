@@ -8,6 +8,8 @@ CloudSlash is an autonomous infrastructure optimization platform designed for hi
 
 It functions as a forensic auditor and autonomous agent, correlating disparate data sources—CloudWatch metrics, network traffic logs, infrastructure-as-code (IaC) definitions, and version control history—to identify, attribute, and remediate waste with mathematical certainty.
 
+![CloudSlash TUI](assets/cloudslashtui.png)
+
 ---
 
 ## Executive Summary
@@ -110,6 +112,8 @@ graph LR
     Safe ==> Fix
     Safe ==> Dash
 ```
+
+![Topology View](assets/topologyviewtui.png)
 
 ### 1. The Autonomy Engine (Optimization)
 
@@ -223,6 +227,8 @@ cloudslash scan [flags]
 - `SPACE`: Mark resource for remediation.
 - `ENTER`: View detailed resource inspection (Cost, Tags, Provenance).
 
+![Detailed Inspection](assets/cloudslashdetailview.png)
+
 ### 2. Remediation Console
 
 The interactive cleanup interface. Reads the graph and prompts for safe deletion.
@@ -232,6 +238,15 @@ cloudslash cleanup
 ```
 
 _Note: This command generates executable shell scripts (`safe_cleanup.sh`) in the `cloudslash-out/` directory for manual review before execution._
+
+![Optimization Engine](assets/cloudslashoptimization.png)
+
+### 3. Executive Reporting
+
+CloudSlash generates a self-contained HTML dashboard for stakeholders, featuring financial projections and Sankey cost flow diagrams.
+
+![Executive Dashboard](assets/dashboard.png)
+![Cost Flow](assets/sankey.png)
 
 ---
 

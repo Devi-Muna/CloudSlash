@@ -55,7 +55,7 @@ func (opt *Optimizer) Solve(req OptimizationRequest) (*AllocationPlan, error) {
 	minCost := req.CurrentSpend * 10.0 // Start high
 
 	// Strategy: Brute Force heuristic over "Allowed Families".
-	// Real MILP would solve this mathematically, but for v1.4.0 MVP,
+	// Real MILP would solve this mathematically, but for v2.0 Enterprise,
 	// we simulate packing the entire cluster into each allowed instance type
 	// and pick the winner. This works well for homogenous clusters.
 

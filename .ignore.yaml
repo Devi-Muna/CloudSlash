@@ -9,3 +9,7 @@ ignored:
 - arn:aws:rds:us-east-1:123456789012:db:legacy-postgres
 - arn:aws:eks:us-east-1:123456789012:cluster/legacy-dev-cluster
 - arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger
+- arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger
+- arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild
+- arn:aws:ecs:us-east-1:123456789012:service/frontend-cluster/payment-service-broken
+- arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345
