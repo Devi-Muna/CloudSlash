@@ -27,18 +27,8 @@ var rootCmd = &cobra.Command{
     
 Identify. Audit. Optimize.`,
 	Version: version.Current,
-	Run: func(cmd *cobra.Command, args []string) {
-
-
-		// Load Heuristics Config
-		config.Heuristics = internalconfig.DefaultHeuristicConfig()
-		if err := viper.UnmarshalKey("heuristics", &config.Heuristics); err != nil {
-			// Log error but continue with defaults? Or maybe fmt.Println
-		}
-
-		config.Headless = false
-		_, _, _ = app.Run(config)
-	},
+	// Run: nil - This forces Cobra to print Help if no subcommand is provided.
+	Run: nil,
 }
 
 func Execute() {
