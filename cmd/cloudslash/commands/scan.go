@@ -70,6 +70,14 @@ Example:
 			_ = os.Chmod(cleanupPath, 0755)
 		}
 
+		// Lazarus Protocol: Restoration Plan
+		restorePath := "cloudslash-out/restore.tf"
+		if err := gen.GenerateRestorationPlan(restorePath); err != nil {
+			fmt.Printf("[WARN] Failed to generate restoration plan: %v\n", err)
+		} else {
+			fmt.Printf("[SUCCESS] Lazarus Protocol Active: Restoration plan generated: %s\n", restorePath)
+		}
+
 		// Terraform Integration
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
