@@ -1,4 +1,4 @@
-# CloudSlash v2.0.0 Enterprise Standard
+# CloudSlash
 
 ![Version v2.0.0](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square) ![License AGPLv3](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square)
 
