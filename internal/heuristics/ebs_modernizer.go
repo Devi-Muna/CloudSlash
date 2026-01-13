@@ -80,6 +80,6 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 
 	n.Properties["Reason"] = rsn
 	// This connects to the Terraform Generator
-	n.Properties["FixRecommendation"] = "Run 'cloudslash fix' to generate gp3 upgrade code."
+	n.Properties["FixRecommendation"] = "Run 'cloudslash cleanup' to generate remediation scripts."
 	n.Properties["IsGP2"] = true
 }
