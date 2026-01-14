@@ -3,7 +3,7 @@ module github.com/DrSkyle/cloudslash
 go 1.25.4
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.41.0
+	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.2
 	github.com/aws/aws-sdk-go-v2/service/applicationautoscaling v1.41.9
 	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.4
