@@ -25,8 +25,8 @@ func NewLambdaScanner(cfg aws.Config, g *graph.Graph) *LambdaScanner {
 	}
 }
 
-// ScanFunctions handles Lambda analysis (Stale Code + Version Accumulation).
-// Window: 90 Days.
+// ScanFunctions discovers functions and usage metrics.
+// Analyzes metrics over a 90-day window.
 func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 	paginator := lambda.NewListFunctionsPaginator(s.Client, &lambda.ListFunctionsInput{})
 
@@ -49,13 +49,11 @@ func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 			}
 
 			s.Graph.AddNode(name, "aws_lambda_function", props)
-			// Graph ID = Name, ID in ARN sense = ARN. Should store ARN property or ID?
-			// Using Name as ID for TUI readability.
-			
-			// 1. Check for Stale Functions (Invocations)
+
+			// 1. Check for stale functions.
 			go s.checkCodeRot(ctx, name, props)
 
-			// 2. Check for Version Accumulation (Pruner)
+			// 2. Check for version accumulation.
 			go s.scanVersionsAndAliases(ctx, name, arn)
 		}
 	}
@@ -139,8 +137,7 @@ func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName str
 		}
 	}
 
-	// Store data for Heuristic to process (separation of concerns)
-	// Store data for Heuristic to process (separation of concerns)
+
 	node := s.Graph.GetNode(funcName)
 	if node != nil {
 		s.Graph.Mu.Lock()

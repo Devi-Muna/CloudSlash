@@ -39,13 +39,13 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 			"CreationDate": bucket.CreationDate,
 		}
 
-		// Check Lifecycle (Optimization)
+		// Check for lifecycle rules.
 		hasAbortRule := s.hasAbortLifecycle(ctx, name)
 		props["HasAbortLifecycle"] = hasAbortRule
 		
 		s.Graph.AddNode(arn, "AWS::S3::Bucket", props)
 
-		// Check for Multipart Uploads ONLY if strict cleaning isn't automated
+		// Scan for incomplete multipart uploads if no abort rule exists.
 		if !hasAbortRule {
 			if err := s.scanMultipartUploads(ctx, name, arn); err != nil {
 				fmt.Printf("Failed to scan multipart uploads for bucket %s: %v\n", name, err)

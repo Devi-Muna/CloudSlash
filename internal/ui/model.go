@@ -65,7 +65,7 @@ type Model struct {
 	// navigation
 	cursor       int // main list cursor
 	topologyCursor int // topology view cursor
-	detailsScroll int // TODO: implement scroll if needed
+	detailsScroll int
 
 	// animation
 	tickCount int

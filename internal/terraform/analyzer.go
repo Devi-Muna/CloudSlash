@@ -7,39 +7,37 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// AnalysisReport contains the results of the Terraform state analysis.
+// AnalysisReport holds state analysis results.
 type AnalysisReport struct {
-	ModulesToDelete   []string // e.g. "module.payments"
-	ResourcesToDelete []string // e.g. "module.shared.aws_s3_bucket.logs"
+	ModulesToDelete   []string // List of modules to remove.
+	ResourcesToDelete []string // List of resources to remove.
 	TotalUnused       int
 }
 
-// Analyze correlates confirmed unused nodes from the scan with the Terraform state.
-// It implements the "Module Awareness" logic: if all resources in a module are unused,
-// recommend deleting the module.
+// Analyze compares unused nodes with Terraform state.
+// Identifies unused modules and resources.
 func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 	report := &AnalysisReport{
 		ModulesToDelete:   []string{},
 		ResourcesToDelete: []string{},
 	}
 
-	// 1. Index Unused Resources for O(1) matching
-	// We match against ID (mostly) and ARN (fallback).
+	// 1. Index unused resources.
+	// Match by ID or ARN.
 	unusedMap := make(map[string]bool)
 	for _, z := range unused {
 		unusedMap[z.ID] = true
-		// Additional ID forms? For now, we rely on the primary ID (i-xxx, vol-xxx).
 	}
 
-	// 2. Build Module Stats
-	// Map: ModulePath -> Total Resource Count
+	// 2. Calculate module usage statistics.
+	
 	moduleTotal := make(map[string]int)
-	// Map: ModulePath -> Unused Resource Count
+	
 	moduleUnused := make(map[string]int)
-	// Map: ModulePath -> List of Unused Resource Clean Addresses (for fallback)
+	
 	moduleUnusedAddrs := make(map[string][]string)
 
-	// Traverse the State
+	// Iterate through state resources.
 	for _, res := range state.Resources {
 		// Only care about managed resources, not data sources
 		if res.Mode != "managed" {
@@ -54,15 +52,15 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 			countInstances(&res, func() { moduleTotal[modulePath]++ })
 		}
 
-		// Check Instances for Zombie DNA Match
+		// Check for unused instances.
 		for i, inst := range res.Instances {
-			// Extract ID/ARN from attributes bag
+			// Extract resource identifiers.
 			var attrs ParsedAttribute
 			if err := json.Unmarshal(inst.Attributes, &attrs); err != nil {
 				continue
 			}
 
-			// Match Logic
+			// Determine if unused.
 			isUnused := false
 			if attrs.ID != "" && unusedMap[attrs.ID] {
 				isUnused = true
@@ -71,12 +69,12 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 			}
 
 			if isUnused {
-				// Construct the full address for this instance
+				// Build resource address.
 				fullAddr := addrBase
-				// If multiple instances allow index, usually we'd append [i],
-				// but simplistic approach: standard address matching
-				// Ideally we'd handle "aws_instance.web[0]", but for "State Analysis"
-				// we'll stick to base address if count=1.
+				// Handle indexed resources.
+				
+				
+				
 				if len(res.Instances) > 1 {
 					fullAddr = fmt.Sprintf("%s[%d]", addrBase, i)
 				}
@@ -85,7 +83,7 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 					moduleUnused[modulePath]++
 					moduleUnusedAddrs[modulePath] = append(moduleUnusedAddrs[modulePath], fullAddr)
 				} else {
-					// Root module resource -> Direct delete
+					// Add root resource to deletion list.
 					report.ResourcesToDelete = append(report.ResourcesToDelete, fullAddr)
 				}
 				report.TotalUnused++
@@ -93,7 +91,7 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 		}
 	}
 
-	// 3. The Verdict: Module Aggregation Logic
+	// 3. Aggregate module results.
 	for mod, total := range moduleTotal {
 		unusedCount := moduleUnused[mod]
 		
@@ -102,11 +100,11 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 			continue
 		}
 
-		// Logic: 100% Unused Rate?
+		// Check if entire module is unused.
 		if unusedCount == total {
 			report.ModulesToDelete = append(report.ModulesToDelete, mod)
 		} else {
-			// Partial unused: Fallback to individual resources
+			// Add individual resources from partial modules.
 			report.ResourcesToDelete = append(report.ResourcesToDelete, moduleUnusedAddrs[mod]...)
 		}
 	}

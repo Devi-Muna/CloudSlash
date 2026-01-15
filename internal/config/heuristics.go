@@ -23,7 +23,7 @@ type S3MultipartConfig struct {
 	AgeThreshold time.Duration `mapstructure:"age_threshold"`
 }
 
-// DefaultHeuristicConfig returns the safe defaults (current hardcoded values).
+// DefaultHeuristicConfig returns default configuration values.
 func DefaultHeuristicConfig() HeuristicConfig {
 	return HeuristicConfig{
 		IdleCluster: IdleClusterConfig{

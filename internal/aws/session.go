@@ -30,7 +30,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		opts = append(opts, config.WithSharedConfigProfile(profile))
 	}
 
-	// TRAP: User-Agent Fingerprint
+	// Configure User-Agent.
 	const signature = "CS-v1-7f8a9d-AGPL"
 
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
@@ -38,7 +38,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		return nil, fmt.Errorf("unable to load SDK config: %v", err)
 	}
 
-	// Inject signature
+	// Add middleware for User-Agent.
 	cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 		return stack.Build.Add(middleware.BuildMiddlewareFunc("UserAgentTrap", func(ctx context.Context, input middleware.BuildInput, next middleware.BuildHandler) (
 			middleware.BuildOutput, middleware.Metadata, error,
@@ -55,15 +55,14 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		}), middleware.After)
 	})
 
-	// 💊 MATRIX MODE (Visual Logging)
+	// Enable verbose logging.
 	if verbose {
 		cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 			return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("MatrixLogger", func(ctx context.Context, input middleware.InitializeInput, next middleware.InitializeHandler) (
 				middleware.InitializeOutput, middleware.Metadata, error,
 			) {
 				opName := middleware.GetOperationName(ctx)
-				// Green/Dim Text: \033[2m (Dim) \033[32m (Green)
-				fmt.Printf("\033[2m\033[32m[MATRIX] AWS API Call: %s\033[0m\n", opName)
+				fmt.Printf("\033[2m\033[32m[AWS-SDK] API Call: %s\033[0m\n", opName)
 				return next.HandleInitialize(ctx, input)
 			}), middleware.Before)
 		})

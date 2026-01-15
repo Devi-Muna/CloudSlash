@@ -24,7 +24,7 @@ func NewEIPScanner(cfg aws.Config, g *graph.Graph) *EIPScanner {
 	}
 }
 
-// ScanAddresses implements "Safe-Release" EIP checking.
+// ScanAddresses discovers Elastic IPs.
 func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 	out, err := s.Client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if err != nil {
@@ -51,7 +51,7 @@ func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 
 		s.Graph.AddNode(id, "aws_eip", props)
 		
-		// The "Genius" Safety Lock: DNS Check
+		// Verify DNS usage to prevent conflicts.
 		go s.checkDNS(ctx, id, ip)
 	}
 	return nil
@@ -70,9 +70,8 @@ func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 		
 		for _, zone := range page.HostedZones {
 			// 2. Search Records in Zone
-			// We optimize by just Listing Record Sets and iterating.
-			// Ideally we could filter by Name, but we iterate broadly because an IP might appear in string value (TXT etc), though prompt specifically says "A Record".
-			// But Route53 doesn't support searching by Value (IP). We must ListAll and scan.
+			// List all record sets.
+			// Note: Route53 API does not support filtering by value.
 			
 			recPaginator := route53.NewListResourceRecordSetsPaginator(s.R53Client, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: zone.Id,
@@ -100,7 +99,7 @@ func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 		if foundInDNS { break }
 	}
 	
-	// Updated for Integer Graph
+
 	node := s.Graph.GetNode(id)
 	if node != nil {
 		s.Graph.Mu.Lock()

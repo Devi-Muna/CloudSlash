@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// CodeAuditor finds the source code definition of a resource.
+// CodeAuditor locates resource definitions.
 type CodeAuditor struct {
 	State   *State
 	Mapping map[string]string // ID -> Address
@@ -26,7 +26,7 @@ func NewCodeAuditor(state *State) *CodeAuditor {
 	}
 }
 
-// FindSource attempts to locate the file and line number where the resource is defined.
+// FindSource locates resource definition in files.
 func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int, error) {
 	if a.Mapping == nil {
 		return "", 0, fmt.Errorf("no state mapping available")
@@ -37,9 +37,9 @@ func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int
 		return "", 0, fmt.Errorf("resource ID %s not found in state", resourceID)
 	}
 
-	// Address format: module.foo.type.name OR type.name
-	// We need to extract Type and Name.
-	// This is a naive parser for now.
+	// Parse address components.
+	
+	
 	parts := strings.Split(address, ".")
 	if len(parts) < 2 {
 		return "", 0, fmt.Errorf("invalid address format: %s", address)
@@ -48,9 +48,9 @@ func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int
 	resourceName := parts[len(parts)-1]
 	resourceType := parts[len(parts)-2]
 
-	// Regex to match: resource "type" "name"
-	// Allow flexible whitespace.
-	// resourceType and resourceName are safe strings from TF state (mostly).
+	// Compile regex for resource block.
+	
+	
 	pattern := fmt.Sprintf(`resource\s+"%s"\s+"%s"`, regexp.QuoteMeta(resourceType), regexp.QuoteMeta(resourceName))
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -78,13 +78,13 @@ func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int
 		if found {
 			foundFile = path
 			foundLine = lineNum
-			return fmt.Errorf("found") // Abort walk
+			return fmt.Errorf("found")
 		}
 		return nil
 	})
 
 	if foundFile != "" {
-		// Return relative path if possible for cleaner UI
+		// Use relative path.
 		rel, err := filepath.Rel(rootDir, foundFile)
 		if err == nil {
 			foundFile = rel

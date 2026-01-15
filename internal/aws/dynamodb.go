@@ -31,8 +31,8 @@ func NewDynamoDBScanner(cfg aws.Config, g *graph.Graph) *DynamoDBScanner {
 	}
 }
 
-// ScanTables identifies tables suffering from "Provisioned Bleed".
-// Window: 30 Days.
+// ScanTables identifies tables with excessive provisioned capacity.
+// Analyzes usage metrics over 30 days.
 func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 	paginator := dynamodb.NewListTablesPaginator(s.Client, &dynamodb.ListTablesInput{})
 
@@ -50,15 +50,14 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 			}
 			table := desc.Table
 
-			// Filter: Only PROVISIONED mode
+			// Filter for provisioned billing mode.
 			isProvisioned := false
 			if table.BillingModeSummary != nil {
 				if table.BillingModeSummary.BillingMode == types.BillingModeProvisioned {
 					isProvisioned = true
 				}
 			} else {
-				// Default is provisioned if not specified (older tables)
-				// But we check ProvisionedThroughput
+				// Legacy tables default to provisioned.
 				if table.ProvisionedThroughput != nil {
 					isProvisioned = true
 				}
@@ -83,7 +82,7 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 
 			s.Graph.AddNode(tableName, "aws_dynamodb_table", props)
 
-			// Check Auto-Scaling via Application Autoscaling
+			// Check for auto-scaling configuration.
 			go s.checkAutoScaling(ctx, tableName, props)
 
 			// Enrich with Consumed Metrics
@@ -167,11 +166,7 @@ func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName stri
 	if err != nil { return }
 
 	var avgConsumedRCU, avgConsumedWCU float64
-	// Calculate average consumed units per second from the sum
-	// Sum is total units consumed in 86400 seconds.
-	// Avg/Sec = Sum / 86400
-	
-	// Better: We get 30 data points (days). We want the Average Usage over 30 days.
+	// Calculate average daily usage.
 	
 	for _, res := range out.MetricDataResults {
 		totalSum := 0.0

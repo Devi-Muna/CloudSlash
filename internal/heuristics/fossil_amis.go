@@ -56,7 +56,7 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			if !hasAMI {
 				node.IsWaste = true
 				node.RiskScore = 60
-				node.Properties["Reason"] = "Fossil Snapshot: Created by an AMI which no longer exists."
+				node.Properties["Reason"] = "Orphaned Snapshot: Created by an AMI which no longer exists."
 
 				// Estimate Cost ($0.05/GB standard-ish)
 				if size, ok := node.Properties["VolumeSize"].(int32); ok {

@@ -38,8 +38,7 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 		return nil
 	}
 
-	// DescribeClusters has a limit of 100 clusters per call.
-	// We need to chunk the ARNs.
+	// Chunk cluster description requests to respect API limits (100 per call).
 	chunkSize := 100
 	for i := 0; i < len(clusterARNs); i += chunkSize {
 		end := i + chunkSize
@@ -127,7 +126,7 @@ func (s *ECSScanner) ScanServices(ctx context.Context, clusterArn string) error 
 
 func (s *ECSScanner) addServiceNode(service types.Service, clusterArn string) {
 	events := []string{}
-	// Capture last 3 events for forensics
+	// Store recent events for analysis.
 	for i := 0; i < len(service.Events) && i < 3; i++ {
 		events = append(events, *service.Events[i].Message)
 	}
@@ -188,11 +187,10 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 
 		for _, ci := range output.ContainerInstances {
 			// Add Container Instance Node
-			// We map it to the underlying EC2 Instance ID if possible for the "Verification" uptime check
+			// Map container instance to EC2 instance for uptime cross-referencing.
 			ec2InstanceID := *ci.Ec2InstanceId
 
-			// We primarily care about the registeredAt time for the "Waste" check
-			// But we need to link it to the Cluster
+			// Capture registration time for uptime analysis.
 
 			s.Graph.AddNode(*ci.ContainerInstanceArn, "AWS::ECS::ContainerInstance", map[string]interface{}{
 				"ClusterArn":    clusterArn,

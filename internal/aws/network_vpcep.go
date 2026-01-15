@@ -26,11 +26,11 @@ func NewVpcEndpointScanner(cfg aws.Config, g *graph.Graph) *VpcEndpointScanner {
 	}
 }
 
-// ScanEndpoints checks for unused Interface Endpoints.
+// ScanEndpoints discovers Interface type VPC endpoints.
 func (s *VpcEndpointScanner) ScanEndpoints(ctx context.Context) error {
 	paginator := ec2.NewDescribeVpcEndpointsPaginator(s.Client, &ec2.DescribeVpcEndpointsInput{
 		Filters: []types.Filter{
-			{Name: aws.String("vpc-endpoint-type"), Values: []string{"Interface"}}, // Only scan Interface ($$$)
+			{Name: aws.String("vpc-endpoint-type"), Values: []string{"Interface"}},
 		},
 	})
 
@@ -61,8 +61,7 @@ func (s *VpcEndpointScanner) checkFlow(ctx context.Context, id string, props map
 	node := s.Graph.GetNode(id)
 	if node == nil { return }
 	
-	// Metric: BytesProcessed
-	// Note: Per Endpoint
+	// Check processed bytes metric.
 	
 	endTime := time.Now()
 	startTime := endTime.Add(-30 * 24 * time.Hour) // 30 Days

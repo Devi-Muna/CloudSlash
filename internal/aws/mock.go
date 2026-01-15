@@ -104,6 +104,45 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region":      "us-east-1",
 	})
 
+	// 5g. Aged AMI (New Heuristic Test)
+	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockAged", "AWS::EC2::AMI", map[string]interface{}{
+		"Name":         "legacy-server-backup-2023",
+		"State":        "available",
+		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"), // 100 days old
+	})
+
+	// 5h. Ignored AMI (Explicit True) -> SHOULD NOT APPEAR
+	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreTrue", "AWS::EC2::AMI", map[string]interface{}{
+		"Name":         "important-backup",
+		"State":        "available",
+		"CreationDate": time.Now().Add(-200 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"), // 200 days old
+		"Tags": map[string]string{
+			"cloudslash:ignore": "true",
+		},
+	})
+
+	// 5i. Ignored AMI (Duration Pass) -> SHOULD NOT APPEAR
+	// Age: 100d. Ignore: 120d. (100 < 120, so valid/ignored)
+	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreDurationPass", "AWS::EC2::AMI", map[string]interface{}{
+		"Name":         "semi-old-backup",
+		"State":        "available",
+		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+		"Tags": map[string]string{
+			"cloudslash:ignore": "120d",
+		},
+	})
+
+	// 5j. Ignored AMI (Duration Fail) -> SHOULD APPEAR AS WASTE
+	// Age: 100d. Ignore: 30d. (100 > 30, so expired/waste)
+	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreDurationFail", "AWS::EC2::AMI", map[string]interface{}{
+		"Name":         "expired-backup",
+		"State":        "available",
+		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+		"Tags": map[string]string{
+			"cloudslash:ignore": "30d",
+		},
+	})
+
 	// 5f. Orphaned ELB (Graph-based)
 	// Needs to be tagged with a cluster that is also waste (or missing?)
 	// ... (Rest of existing mocks)

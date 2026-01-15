@@ -55,7 +55,7 @@ func TestScanVolumes(t *testing.T) {
 		checkNode     func(*testing.T, *graph.Graph)
 	}{
 		{
-			name: "Zombie Volume",
+			name: "Available Volume",
 			volumes: []types.Volume{
 				{
 					VolumeId:   aws.String("vol-zombie"),
@@ -68,7 +68,7 @@ func TestScanVolumes(t *testing.T) {
 			checkNode: func(t *testing.T, g *graph.Graph) {
 				node := g.GetNode("arn:aws:ec2:region:account:volume/vol-zombie")
 				if node == nil {
-					t.Fatal("Zombie volume not found in graph")
+					t.Fatal("Volume not found in graph")
 				}
 				if node.Properties["State"] != "available" {
 					t.Errorf("Expected state available, got %v", node.Properties["State"])
@@ -76,7 +76,7 @@ func TestScanVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "Clean Volume",
+			name: "In-Use Volume",
 			volumes: []types.Volume{
 				{
 					VolumeId:   aws.String("vol-inuse"),
@@ -97,7 +97,7 @@ func TestScanVolumes(t *testing.T) {
 				nodeID := "arn:aws:ec2:region:account:volume/vol-inuse"
 				node := g.GetNode(nodeID)
 				if node == nil {
-					t.Fatal("Clean volume not found in graph")
+					t.Fatal("Volume not found in graph")
 				}
 				
 				// Verify edge to instance exists

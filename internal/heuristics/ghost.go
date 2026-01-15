@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/DrSkyle/cloudslash/internal/aws"
+	"github.com/DrSkyle/cloudslash/internal/config"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// GhostNodeGroupHeuristic identifies EKS Node Groups that are active but serving 0 user workloads.
+// GhostNodeGroupHeuristic identifies EKS Node Groups with active nodes but zero user workloads.
 type GhostNodeGroupHeuristic struct{}
 
 func (h *GhostNodeGroupHeuristic) Name() string { return "GhostNodeGroupHeuristic" }
@@ -29,22 +31,26 @@ func (h *GhostNodeGroupHeuristic) Run(ctx context.Context, g *graph.Graph) error
 
 		nodeCount, _ := node.Properties["NodeCount"].(int)
 
-		// THE VERDICT
-		// If RealWorkloadCount == 0 for EVERY node in the Node Group (Group Level Aggregation was done in Scanner)
-		// AND there are actual nodes billing (NodeCount > 0)
+		// If RealWorkloadCount == 0 for all nodes, but NodeCount > 0, the group is idle.
 		if realWorkloadCount == 0 && nodeCount > 0 {
-			// GHOST DETECTED
 			node.IsWaste = true
-			node.RiskScore = 95 // Extremely High Confidence
+			node.RiskScore = 95 // High confidence.
 
-			// Cost Estimation: Assume generic m5.large (~$70/mo) * nodeCount as a baseline estimate
-			// Optimally we'd look up instance type from ASG, but we have "NodeCount".
-			estCostPerNode := 70.0
-			node.RiskScore = 1500 // High Risk (Costly)
+			// Dynamic Cost Estimation
+			instanceType := "m5.large" // Default fallback
+			if it, ok := node.Properties["InstanceType"].(string); ok && it != "" {
+				instanceType = it
+			}
+			region := config.DefaultRegion
+			if r, ok := node.Properties["Region"].(string); ok && r != "" {
+				region = r
+			}
+
+			estimator := &aws.StaticCostEstimator{}
+			estCostPerNode := estimator.GetEstimatedCost(instanceType, region)
+			
 			node.Cost = estCostPerNode * float64(nodeCount)
-			// node.Properties["Reason"] = fmt.Sprintf("Ghost Node Group: %d nodes running with NO workloads.", scalingCount)
-			// Clean version:
-			node.Properties["Reason"] = fmt.Sprintf("Ghost Node Group: %d nodes running with NO workloads.", nodeCount)
+			node.Properties["Reason"] = fmt.Sprintf("Idle Node Group: %d nodes of type %s running with 0 workloads.", nodeCount, instanceType)
 		}
 	}
 

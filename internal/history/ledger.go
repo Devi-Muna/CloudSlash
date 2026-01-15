@@ -7,23 +7,23 @@ import (
 	"path/filepath"
 )
 
-// Snapshot represents the state of the infrastructure at a point in time.
+// Snapshot represents a point-in-time state.
 type Snapshot struct {
 	Timestamp      int64             `json:"timestamp"`       // Unix Epoch
-	TotalMonthlyCost float64           `json:"monthly_cost"`    // Total Estimated Burn
-	ResourceCounts map[string]int    `json:"resource_counts"` // e.g. "EC2": 10, "NAT": 2
+	TotalMonthlyCost float64           `json:"monthly_cost"`    // Monthly cost estimate.
+	ResourceCounts map[string]int    `json:"resource_counts"` // Resource counts by type.
 	WasteCount     int               `json:"waste_count"`     // Total number of flagged resources
-	Vector         Vector            `json:"-"`               // Computed in memory, not typically stored raw (can be derived)
+	Vector         Vector            `json:"-"`               // Derived state vector.
 }
 
-// Append writes a new snapshot to the local ledger.
+// Append adds a snapshot to the ledger.
 func Append(s Snapshot) error {
 	path, err := GetLedgerPath()
 	if err != nil {
 		return err
 	}
 
-	// Ensure directory exists
+	// Create directory.
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -35,13 +35,13 @@ func Append(s Snapshot) error {
 	}
 	defer f.Close()
 
-	// Serialize to JSON
+	// Marshal to JSON.
 	data, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
 
-	// Append newline
+	// Append newline.
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func Append(s Snapshot) error {
 	return nil
 }
 
-// LoadWindow retrieves the last N snapshots from the ledger.
+// LoadWindow returns recent snapshots.
 func LoadWindow(n int) ([]Snapshot, error) {
 	path, err := GetLedgerPath()
 	if err != nil {
@@ -58,7 +58,7 @@ func LoadWindow(n int) ([]Snapshot, error) {
 
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
-		return []Snapshot{}, nil // Empty history is fine
+		return []Snapshot{}, nil // Return empty if file missing.
 	}
 	if err != nil {
 		return nil, err
@@ -68,8 +68,8 @@ func LoadWindow(n int) ([]Snapshot, error) {
 	var history []Snapshot
 	scanner := bufio.NewScanner(f)
 	
-	// Read all (inefficient for years of data, fine for CLI tool v1)
-	// Optimization: Seek to end and read backwards? For now, read all is robust.
+	// Read all snapshots.
+	
 	for scanner.Scan() {
 		var s Snapshot
 		if err := json.Unmarshal(scanner.Bytes(), &s); err != nil {
@@ -82,14 +82,14 @@ func LoadWindow(n int) ([]Snapshot, error) {
 		return nil, err
 	}
 
-	// Return up to N
+	// Return last N items.
 	if len(history) > n {
 		return history[len(history)-n:], nil
 	}
 	return history, nil
 }
 
-// GetLedgerPath resolves the ~/.cloudslash/ledger.jsonl path.
+// GetLedgerPath returns the ledger file path.
 func GetLedgerPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

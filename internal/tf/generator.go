@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/internal/config"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/version"
 )
@@ -19,7 +20,7 @@ func NewGenerator(g *graph.Graph, s *State) *Generator {
 	return &Generator{Graph: g, State: s}
 }
 
-// GenerateWasteTF generates the waste.tf file containing resource blocks.
+// GenerateWasteTF creates Terraform resource blocks for waste.
 func (g *Generator) GenerateWasteTF(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -37,17 +38,17 @@ func (g *Generator) GenerateWasteTF(path string) error {
 
 		tfType := mapResourceTypeToTF(node.Type)
 		if tfType == "" {
-			continue // Skip non-terraformable resources
+			continue // Skip unsupported types.
 		}
 
-		// Use ID as the resource name (sanitized)
+		// Generate sanitized resource name.
 		tfName := sanitizeName(node.ID)
 
 		fmt.Fprintf(f, "resource \"%s\" \"%s\" {\n", tfType, tfName)
-		// We don't need full config for import, just enough to pass validation if possible.
-		// Usually empty block is enough for import, but `terraform plan` might complain.
-		// For "Reverse Terraform", we ideally want to reconstruct the config.
-		// For now, we'll write minimal config or comments.
+		// Write import metadata.
+		
+		
+		
 		fmt.Fprintf(f, "  # Imported by CloudSlash (Risk Score: %d)\n", node.RiskScore)
 		if isGP2, _ := node.Properties["IsGP2"].(bool); isGP2 {
 			fmt.Fprintf(f, "  type = \"gp3\"\n")
@@ -60,7 +61,7 @@ func (g *Generator) GenerateWasteTF(path string) error {
 	return nil
 }
 
-// GenerateImportScript generates the import.sh script.
+// GenerateImportScript creates the import script.
 func (g *Generator) GenerateImportScript(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -86,7 +87,7 @@ func (g *Generator) GenerateImportScript(path string) error {
 
 		tfName := sanitizeName(node.ID)
 
-		// Extract actual ID from ARN or use ARN depending on resource
+		// Resolve resource ID.
 		resourceID := extractResourceID(node.ID, node.Type)
 
 		fmt.Fprintf(f, "terraform import %s.%s %s\n", tfType, tfName, resourceID)
@@ -94,7 +95,7 @@ func (g *Generator) GenerateImportScript(path string) error {
 	return nil
 }
 
-// GenerateDestroyPlan generates a human-readable report.
+// GenerateDestroyPlan creates destruction report.
 func (g *Generator) GenerateDestroyPlan(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -135,7 +136,7 @@ func (g *Generator) GenerateDestroyPlan(path string) error {
 	return nil
 }
 
-// GenerateFixScript generates a script to remove waste from Terraform State.
+// GenerateFixScript creates state removal script.
 func (g *Generator) GenerateFixScript(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -143,7 +144,7 @@ func (g *Generator) GenerateFixScript(path string) error {
 	}
 	defer f.Close()
 
-	// SSSS+ Safe Template
+	// Write script header.
 	fmt.Fprintf(f, "#!/bin/bash\n")
 	fmt.Fprintf(f, "set -e\n")
 	fmt.Fprintf(f, "set -o pipefail\n\n")
@@ -204,7 +205,7 @@ echo -e "${CYAN}[3/3] Removing Unused Resources...${NC}"
 			continue
 		}
 
-		// Skip logical upgrades (handled by waste.tf -> terraform plan)
+		// Skip logical upgrades.
 		if isGP2, _ := node.Properties["IsGP2"].(bool); isGP2 {
 			continue
 		}
@@ -214,13 +215,13 @@ echo -e "${CYAN}[3/3] Removing Unused Resources...${NC}"
 			continue
 		}
 
-		// Try to find exact Terraform Address from State
+		// Find resource address.
 		resourceName := ""
 
 		if addr, ok := stateMap[node.ID]; ok {
 			resourceName = addr
 		} else {
-			// Try shortened ID
+			// Try shortened ID match.
 			shortID := extractResourceID(node.ID, node.Type)
 			if addr, ok := stateMap[shortID]; ok {
 				resourceName = addr
@@ -263,7 +264,7 @@ func mapResourceTypeToTF(awsType string) string {
 }
 
 func sanitizeName(id string) string {
-	// arn:aws:ec2:region:account:instance/i-12345 -> i_12345
+	// Sanitize resource ID for Terraform name.
 	parts := strings.Split(id, "/")
 	if len(parts) > 1 {
 		return strings.ReplaceAll(parts[len(parts)-1], "-", "_")
@@ -272,7 +273,7 @@ func sanitizeName(id string) string {
 }
 
 func extractResourceID(arn, awsType string) string {
-	// Simplified extraction
+	// Extract suffix from ARN.
 	parts := strings.Split(arn, "/")
 	if len(parts) > 1 {
 		return parts[len(parts)-1]
@@ -280,7 +281,7 @@ func extractResourceID(arn, awsType string) string {
 	return arn
 }
 
-// GenerateDeletionScript generates the Safe Deletion Script.
+// GenerateDeletionScript creates deletion script.
 func (g *Generator) GenerateDeletionScript(path string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -310,8 +311,8 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 	}
 
 	// 3. Topological Sort (Reverse Dependency Order)
-	// Current Algo returns [Root, ..., Leaf] (Creation Order).
-	// We need [Leaf, ..., Root] (Deletion Order).
+	// Reverse topological sort for safe deletion.
+	
 	creationOrder, err := g.Graph.TopologicalSort(wasteNodes)
 	if err != nil {
 		fmt.Fprintf(f, "# ERROR: Cyclic dependency detected. Manual intervention required.\n")
@@ -319,7 +320,7 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 		return nil
 	}
 
-	// Reverse in place
+	// Reverse order.
 	sortedVertices := make([]*graph.Node, len(creationOrder))
 	for i, n := range creationOrder {
 		sortedVertices[len(creationOrder)-1-i] = n
@@ -337,7 +338,7 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 		}
 
 		fmt.Fprintf(f, "# [%d] Deleting %s (%s)...\n", i+1, node.ID, node.Type)
-		// Add sleep for network interfaces to allow detach/termination propagation
+		// Wait for network interface detach.
 		if node.Type == "AWS::EC2::NetworkInterface" {
 			fmt.Fprintf(f, "sleep 5\n")
 		}
@@ -350,7 +351,7 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 }
 
 func mapToCLI(n *graph.Node) string {
-	// Extract ID (usually ARN or simple ID)
+	// Extract ID.
 	id := extractResourceID(n.ID, n.Type)
 	region := "us-east-1"
 	if r, ok := n.Properties["Region"].(string); ok {
@@ -359,7 +360,7 @@ func mapToCLI(n *graph.Node) string {
 
 	base := fmt.Sprintf("aws --region %s", region)
 
-	// Normalize type handling
+	// Generate CLI command by type.
 	switch strings.ToLower(n.Type) {
 	case "aws::ec2::instance":
 		return fmt.Sprintf("%s ec2 terminate-instances --instance-ids %s", base, id)
@@ -408,7 +409,7 @@ func mapToCLI(n *graph.Node) string {
 		if n.Properties["Name"] != nil {
 			svcName = n.Properties["Name"].(string)
 		}
-		// Force delete needed? usually just delete-service
+		// Force delete service.
 		return fmt.Sprintf("%s ecs delete-service --cluster %s --service %s --force", base, cluster, svcName)
 	case "aws::ecs::cluster":
 		return fmt.Sprintf("%s ecs delete-cluster --cluster %s", base, id)
@@ -417,14 +418,14 @@ func mapToCLI(n *graph.Node) string {
 	case "aws::elasticloadbalancingv2::loadbalancer":
 		return fmt.Sprintf("%s elbv2 delete-load-balancer --load-balancer-arn %s", base, n.ID)
 	case "aws::ec2::snapshot":
-		// ID format: arn:aws:ec2:us-east-1:123:snapshot/snap-123
+		
 		id := extractResourceID(n.ID, n.Type)
 		return fmt.Sprintf("%s ec2 delete-snapshot --snapshot-id %s", base, id)
 	case "aws_subnet", "aws::ec2::subnet":
 		id := extractResourceID(n.ID, n.Type)
-		// Usually ID is subnet-123
+		
 		if strings.HasPrefix(id, "arn:") {
-			// arn:aws:ec2:us-east-1:123:subnet/subnet-123
+			
 			parts := strings.Split(id, "/")
 			id = parts[len(parts)-1]
 		}
@@ -437,16 +438,16 @@ func mapToCLI(n *graph.Node) string {
 		}
 		return fmt.Sprintf("%s ec2 delete-vpc --vpc-id %s", base, id)
 	case "aws::s3::multipartupload":
-		// Requires Key, Buckey, UploadId. Graph ID usually format?
-		// arn:aws:s3:::bucket/upload-1
-		// Complex. Skip CLI generation for now or generic.
+		// Multipart upload CLI generation not implemented.
+		
+		
 		return ""
 	}
 	return ""
 }
 
-// GenerateRestorationPlan implements the "Lazarus Protocol".
-// It generates a Terraform v1.5+ import block file (restore.tf) for all flagged resources.
+// GenerateRestorationPlan creates restoration config.
+// Generates Terraform import blocks.
 // This allows the user to run 'terraform plan -generate-config-out=backup.tf' to snapshot
 // the resource configuration into HCL before deletion.
 func (g *Generator) GenerateRestorationPlan(path string) error {
@@ -468,7 +469,7 @@ func (g *Generator) GenerateRestorationPlan(path string) error {
 	fmt.Fprintf(f, "# 4. If you later need to 'Undo' a deletion, use the code in lazarus_backup.tf to recreate the resource.\n\n")
 
 	fmt.Fprintf(f, "terraform {\n  required_version = \">= 1.5.0\"\n  required_providers {\n    aws = {\n      source = \"hashicorp/aws\"\n      version = \"~> 5.0\"\n    }\n  }\n}\n\n")
-	fmt.Fprintf(f, "provider \"aws\" {\n  region = \"us-east-1\" # Default, override via env var if needed\n}\n\n")
+	fmt.Fprintf(f, "provider \"aws\" {\n  region = \"%s\" # Default, override via env var if needed\n}\n\n", config.DefaultRegion)
 
 	count := 0
 	for _, node := range g.Graph.Nodes {
@@ -480,7 +481,7 @@ func (g *Generator) GenerateRestorationPlan(path string) error {
 		tfType := mapResourceTypeToTF(node.Type)
 
 		if tfType != "" {
-			// Sanitize ID for Terraform Resource Name
+			// Sanitize ID.
 			safeID := strings.ReplaceAll(resourceID, "-", "_")
 			safeID = strings.ReplaceAll(safeID, ".", "_")
 			safeID = strings.ReplaceAll(safeID, "/", "_")

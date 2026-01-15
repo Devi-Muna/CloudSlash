@@ -60,12 +60,12 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 				props["Retention"] = *group.RetentionInDays
 			}
 
-			// METRIC CHECK: IncomingBytes (Opt-In Check)
-			incomingBytes := float64(-1) // Default: Unknown/Skipped
+			// Check incoming bytes metric if enabled.
+			incomingBytes := float64(-1)
 
 			if !c.DisableMetrics && storedBytes > 0 {
-				// Only check metrics if stored > 0 to save costs
-				// We check Last 30 Days
+				// Optimization: Skip metric check for empty log groups.
+				// Analyzes last 30 days.
 				now := time.Now()
 				start := now.Add(-30 * 24 * time.Hour)
 
@@ -86,8 +86,7 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 						incomingBytes = *metricOut.Datapoints[0].Sum
 					}
 				} else if err != nil {
-					// Log warning but continue?
-					// fmt.Printf("DEBUG: Metric check failed for %s: %v\n", *group.LogGroupName, err)
+					// Metric check failed.
 				} else {
 					// No datapoints usually means 0
 					incomingBytes = 0
@@ -101,9 +100,7 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 	return nil
 }
 
-// DescribeLogGroups helper if needed for direct access
+// DescribeLogGroups lists log groups.
 func (c *CloudWatchLogsClient) DescribeLogGroups(ctx context.Context) ([]types.LogGroup, error) {
-	// ... logic duplicated above, but simplified for heuristic direct use if we didn't use graph scan
-	// But we prefer scanning into graph.
 	return nil, nil
 }

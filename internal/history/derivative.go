@@ -5,20 +5,20 @@ import (
 	"time"
 )
 
-// AnalysisResult holds the derived signals from the history window.
+// AnalysisResult contains derived cost signals.
 type AnalysisResult struct {
 	CurrentBurnRate   float64 // $/month
-	Velocity          float64 // $/month per HOUR (The rate of change)
-	Acceleration      float64 // $/month per HOUR^2 (The rate of acceleration)
+	Velocity          float64 // First derivative (velocity).
+	Acceleration      float64 // Second derivative (acceleration).
 	
-	ProjectedBurn24h  float64 // Forecasted burn rate in 24 hours
+	ProjectedBurn24h  float64 // Projected 24h burn rate.
 	TimeToBankrupt    time.Duration
 	
 	Alerts            []string
 }
 
-// Analyze processes the ledger history and returns signal derivatives.
-// budget: User defined budget cap (e.g. $10,000). If 0, TTB is skipped.
+// Analyze calculates cost trends.
+// Calculate derivatives relative to budget.
 func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	if len(history) < 2 {
 		return AnalysisResult{CurrentBurnRate: 0}
@@ -27,17 +27,17 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	current := history[len(history)-1]
 	prev := history[len(history)-2]
 
-	// 1. Calculate Time Delta (Hours)
+	// 1. Calculate time delta.
 	timeDelta := float64(current.Timestamp - prev.Timestamp) / 3600.0
 	if timeDelta == 0 {
 		return AnalysisResult{CurrentBurnRate: current.TotalMonthlyCost}
 	}
 
-	// 2. Calculate Velocity (First Derivative): Change in Monthly Cost per Hour
+	// 2. Calculate velocity.
 	costDelta := current.TotalMonthlyCost - prev.TotalMonthlyCost
 	velocity := costDelta / timeDelta
 
-	// 3. Calculate Acceleration (Second Derivative)
+	// 3. Calculate acceleration.
 	acceleration := 0.0
 	if len(history) >= 3 {
 		prev2 := history[len(history)-3]
@@ -48,12 +48,12 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 		}
 	}
 
-	// 4. Project Future Burn (24h)
+	// 4. Project future burn.
 	projectedBurn := current.TotalMonthlyCost + (velocity * 24) + (0.5 * acceleration * 24 * 24)
 
-	// 5. Time-To-Bankrupt (TTB)
-	// Logic: If (CurrentBurn + PredictedGrowth) > Budget, how long until we cross it?
-	// Simplified Linear Projection: Limit - Current / Velocity
+	// 5. Calculate Time-To-Bankrupt.
+	
+	
 	var ttb time.Duration = -1
 	if budget > 0 && velocity > 0 {
 		remainingHeadroom := budget - current.TotalMonthlyCost
@@ -61,24 +61,24 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 			hoursToCap := remainingHeadroom / velocity
 			ttb = time.Duration(hoursToCap * float64(time.Hour))
 		} else {
-			ttb = 0 // Already bankrupt
+			ttb = 0 // Budget exhausted.
 		}
 	}
 
-	// 6. Generate Alerts
+	// 6. Generate alerts.
 	var alerts []string
 
-	// Velocity Alert (Massive Spike > $1000/mo added in 1 hour)
+	// Check velocity threshold.
 	if velocity > 1000 {
 		alerts = append(alerts, fmt.Sprintf("[CRITICAL] SPEND SPIKE: Spending velocity +$%.0f/mo per hour", velocity))
 	}
 
-	// Acceleration Alert (The "Runway Killer")
+	// Check acceleration threshold.
 	if acceleration > 500 {
 		alerts = append(alerts, fmt.Sprintf("[WARNING] SPEND ACCELERATION: Spending suggests exponential leak (+%.0f/h²)", acceleration))
 	}
 	
-	// TTB Alert
+	// Check TTB threshold.
 	if ttb > 0 && ttb < 24*time.Hour {
 		alerts = append(alerts, fmt.Sprintf("[CRITICAL] BUDGET EXHAUSTION: Budget exhaustion predicted in %s", ttb.Round(time.Minute)))
 	}

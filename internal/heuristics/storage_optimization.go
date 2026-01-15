@@ -37,7 +37,7 @@ func (h *StorageOptimizationHeuristic) analyzeMultipart(n *graph.Node) {
 	if dayz > 7 {
 		n.IsWaste = true
 		n.RiskScore = 20
-		n.Properties["Reason"] = fmt.Sprintf("Stalled Upload: Initiated %d days ago.", dayz)
+		n.Properties["Reason"] = fmt.Sprintf("Incomplete Multipart Upload: Initiated %d days ago.", dayz)
 		n.Properties["FixRecommendation"] = "Add AbortIncompleteMultipartUpload Lifecycle Rule (7 days)."
 	}
 }

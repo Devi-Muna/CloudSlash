@@ -23,12 +23,12 @@ func NewCloudTrailClient(cfg aws.Config) *CloudTrailClient {
 // LookupCreator attempts to find the IAM identity that created a resource.
 // It searches CloudTrail events for the past 90 days.
 func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string) (string, error) {
-	// 1. Define window (CloudTrail Lookup is limited)
+	// 1. Identify search window.
 	endTime := time.Now()
-	startTime := endTime.AddDate(0, 0, -90) // 90 days ago
+	startTime := endTime.AddDate(0, 0, -90)
 
-	// 2. Define Lookup Attribute
-	// We use ResourceName because ResourceID is not always indexed, but ResourceName often matches ID for EC2/EBS.
+	// 2. Configure lookup attributes.
+	// ResourceName is used for broader compatibility across resource types.
 	attrKey := types.LookupAttributeKeyResourceName
 
 	input := &cloudtrail.LookupEventsInput{
@@ -43,7 +43,7 @@ func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string)
 		MaxResults: aws.Int32(50),
 	}
 
-	// 3. Query
+	// 3. Execute query.
 	paginator := cloudtrail.NewLookupEventsPaginator(c.Client, input)
 
 	// We only need the first page usually.
@@ -54,7 +54,7 @@ func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string)
 		}
 
 		for _, event := range output.Events {
-			// Look for "creation" like events
+			// Identify creation events.
 			eventName := aws.ToString(event.EventName)
 			if isCreationEvent(eventName) {
 				return aws.ToString(event.Username), nil

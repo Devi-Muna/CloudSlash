@@ -46,7 +46,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 		fmt.Printf("%s %s [%s]\n", version.AppName, version.Current, version.License)
 	}
 
-	// Global Panic Recovery Middleware
+	// Recover from panics.
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("\n[CRITICAL FAILURE]")
@@ -64,8 +64,7 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 		}
 	}()
 
-	// HEADLESS MODE
-	// Enterprise compliance for license scanning.
+	// Initialize headless mode context.
 
 	ctx := context.Background()
 	var g *graph.Graph
@@ -109,12 +108,12 @@ func Run(cfg Config) (bool, *graph.Graph, error) {
 func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) {
 	mockScanner := aws.NewMockScanner(g)
 
-	// v1.3.5: Seed Mock History for Derivative Engine Demo
+	// Seed mock history data.
 	history.SeedMockData()
 
 	mockScanner.Scan(ctx)
 
-	// Demo Heuristics
+	// Register mock heuristics.
 	heuristicEngine := heuristics.NewEngine()
 	heuristicEngine.Register(&heuristics.UnattachedVolumeHeuristic{Config: internalconfig.DefaultHeuristicConfig().UnattachedVolume})
 	heuristicEngine.Register(&heuristics.S3MultipartHeuristic{Config: internalconfig.DefaultHeuristicConfig().S3Multipart})
@@ -124,8 +123,8 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	heuristicEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
 	heuristicEngine.Register(&heuristics.ElasticIPHeuristic{})
 	heuristicEngine.Register(&heuristics.RDSHeuristic{})
+	heuristicEngine.Register(&heuristics.AgedAMIHeuristic{})
 
-	// v1.3.0
 	heuristicEngine.Register(&heuristics.NetworkForensicsHeuristic{})
 	heuristicEngine.Register(&heuristics.StorageOptimizationHeuristic{})
 	heuristicEngine.Register(&heuristics.EBSModernizerHeuristic{})
@@ -154,7 +153,7 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
 	os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
 
-	// v1.4: Enable Full Artifact Suite for Mock Mode
+	// Generate mock artifacts.
 	gen.GenerateWasteTF("cloudslash-out/waste.tf")
 	gen.GenerateImportScript("cloudslash-out/import.sh")
 	gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
@@ -204,7 +203,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	var err error
 	pricingClient, err = pricing.NewClient(ctx)
 	if err != nil {
-		// Log but continue (Pricing is optional but nice)
+		// Log pricing client initialization error.
 		// fmt.Printf("Warning: Failed to initialize Pricing Client: %v\n", err)
 	}
 
@@ -269,7 +268,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			ecrScanner.ScanRepositories(context.Background())
 		}
 
-		// Shadow State Reconciliation
+		// Reconcile with Terraform state.
 		var state *tf.State
 		if _, err := os.Stat(cfg.TFStatePath); err == nil {
 			var err error
@@ -325,8 +324,9 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		hEngine.Register(&heuristics.StorageOptimizationHeuristic{})
 		hEngine.Register(&heuristics.EBSModernizerHeuristic{})
 		hEngine.Register(&heuristics.GhostNodeGroupHeuristic{})
+		hEngine.Register(&heuristics.AgedAMIHeuristic{})
 		
-		// v1.3.6: ECS Waste Detection
+		// Register ECS heuristics.
 		hEngine.Register(&heuristics.IdleClusterHeuristic{Config: cfg.Heuristics.IdleCluster})
 		hEngine.Register(&heuristics.EmptyServiceHeuristic{ECR: ecrScanner, ECS: ecsScanner})
 
@@ -340,7 +340,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			fmt.Printf("Deep Analysis failed: %v\n", err)
 		}
 
-		// Time Machine Analysis
+		// Analyze snapshot history.
 		hEngine2 := heuristics.NewEngine()
 		if pricingClient != nil {
 			hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{Pricing: pricingClient})
@@ -354,7 +354,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		detective := forensics.NewDetective(ctClient)
 		detective.InvestigateGraph(ctx, g)
 
-		// OUTPUT GENERATION
+		// Generate output files.
 		os.Mkdir("cloudslash-out", 0755)
 
 		// 1. Report Generation
@@ -416,14 +416,14 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 
 
 
-		// v1.3.5: Signal Processing
+		// Analyze cost signals.
 		var slackClient *notifier.SlackClient
 		if cfg.SlackWebhook != "" {
 			slackClient = notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
 		}
 		performSignalAnalysis(g, slackClient)
 
-		// Partial Graph Check
+		// Check for partial graph results.
 		g.Mu.RLock()
 		if g.Metadata.Partial {
 			fmt.Println("\n[ WARNING: PARTIAL GRAPH ]")
@@ -509,9 +509,9 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 	return awsClient, nil
 }
 
-// performSignalAnalysis executes the v1.3.5 Derivative Engine logic
+// performSignalAnalysis analyzes cost trends.
 func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
-	// 1. Snapshot State
+	// 1. Create state snapshot.
 	s := history.Snapshot{
 		Timestamp:      time.Now().Unix(),
 		ResourceCounts: make(map[string]int),
@@ -534,13 +534,13 @@ func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
 		// Non-critical failure, just log to debug if needed
 	}
 
-	// 3. Analyze History Window
+	// 3. Analyze history window.
 	window, err := history.LoadWindow(10)
 	if err == nil {
-		// Budget set to 0 for now (TTB skipped)
+		// Analyze with zero budget baseline.
 		res := history.Analyze(window, 0)
 
-		// 4. Output Alerts
+		// 4. Log alerts.
 		if len(res.Alerts) > 0 {
 			fmt.Println("\n[ COST ANOMALY DETECTED ]")
 			for _, alert := range res.Alerts {
@@ -557,8 +557,7 @@ func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
 			}
 			fmt.Println("-----------------------------------------------------------------")
 		} else if res.Velocity != 0 {
-			// Verbose / Info level
-			// fmt.Printf("\n[Signal] Spend Velocity: %+.2f $/mo/h\n", res.Velocity)
+			
 		}
 	}
 }

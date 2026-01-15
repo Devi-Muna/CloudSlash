@@ -81,8 +81,7 @@ func (m regionModel) View() string {
 	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("? Which regions do you want to scan?"))
 	s.WriteString("\n\n")
 
-	// Paginator Logic
-	// Window size = 10
+	// Pagination logic.
 	windowHeight := 10
 	start := 0
 	end := len(m.choices)
@@ -131,8 +130,7 @@ func (m regionModel) View() string {
 
 func (m regionModel) GetSelectedRegions() []string {
 	var selected []string
-	// If nothing selected, default to us-east-1? Or all?
-	// User said: "Interactive Selection".
+	// Default to us-east-1 if no selection.
 	if len(m.selected) == 0 {
 		return []string{"us-east-1"}
 	}
@@ -143,10 +141,9 @@ func (m regionModel) GetSelectedRegions() []string {
 }
 
 func PromptForRegions() ([]string, error) {
-	// 1. Try Dynamic Fetch (Smart Discovery)
+	// 1. Attempt dynamic region discovery.
 	dynamicRegions, err := fetchDynamicRegions()
 	if err == nil && len(dynamicRegions) > 0 {
-		// Use dynamic list!
 		p := tea.NewProgram(regionModel {
 			choices: dynamicRegions,
 			selected: make(map[int]struct{}),
@@ -159,7 +156,7 @@ func PromptForRegions() ([]string, error) {
 		return []string{"us-east-1"}, nil
 	}
 
-	// 2. Fallback to Static List
+	// 2. Fallback to static region list.
 	p := tea.NewProgram(initialRegionModel())
 	m, err := p.Run()
 	if err != nil {

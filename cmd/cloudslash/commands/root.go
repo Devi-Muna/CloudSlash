@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
     
 Identify. Audit. Optimize.`,
 	Version: version.Current,
-	// Run: nil - This forces Cobra to print Help if no subcommand is provided.
+	// Run: nil (Forces help output).
 	Run: nil,
 }
 

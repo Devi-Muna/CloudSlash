@@ -32,8 +32,7 @@ var updateCmd = &cobra.Command{
 			return
 		}
 
-		// Basic semantic check to prevent "downgrade" notifications if local > remote
-		// (Assuming format vX.Y.Z)
+		// Prevent downgrades.
 		if latest < version.Current {
 			fmt.Printf("You are running a newer version (%s) than the latest release (%s).\n", version.Current, latest)
 			return
@@ -70,9 +69,7 @@ func fetchLatestVersion() (string, error) {
 }
 
 func doUpdate() error {
-	// 1. Determine download URL based on OS specific command
-	// The simplest "Auto-Update" is actually just re-running the install script!
-
+	// 1. Execute update script.
 	cmd := exec.Command("sh", "-c", "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash")
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("powershell", "-Command", "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex")

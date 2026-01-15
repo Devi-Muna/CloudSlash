@@ -241,6 +241,28 @@ For persistent configuration, create a `cloudslash.yaml` in your root directory.
 
 ---
 
+## Resource Exclusion & Tagging Policy
+
+CloudSlash respects specific resource tags to allow for granular control over waste detection. Organizations can define retention policies or explicitly exclude resources from analysis using the `cloudslash:ignore` tag key.
+
+### Exclusion Logic
+
+To exclude a resource from the waste report, apply the tag `cloudslash:ignore` with one of the following value formats:
+
+- **Boolean:** Set to `true` to permanently exclude the resource from all analysis.
+- **Expiration Date:** Set a date in `YYYY-MM-DD` format (e.g., `2027-01-01`). The resource will be ignored until this date is reached.
+- **Retention Period:** Set a duration with a `d` (days) or `h` (hours) suffix (e.g., `120d`). The resource will be ignored if its age is less than the specified duration.
+
+### Application to AMIs
+
+The logic described above applies to all supported resources, including Amazon Machine Images (AMIs). For example, to enforce a custom retention policy for a specific backup AMI, apply the tag `cloudslash:ignore` with value `180d`. This overrides the default heuristic and ensures the image is only flagged as waste after 180 days have elapsed.
+
+### Effect
+
+Resources matching the exclusion criteria are removed from the interactive TUI, the JSON output, and the Executive Dashboard. They will not be counted towards waste totals or financial deficiency metrics.
+
+---
+
 ## Usage Guide
 
 ### 1. Analysis Scan

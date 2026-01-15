@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
-// Generator handles creates remediation scripts.
+// Generator creates remediation scripts.
 type Generator struct {
 	Graph *graph.Graph
 }
@@ -35,7 +35,7 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 	fmt.Fprintf(f, "#!/bin/bash\n")
 	fmt.Fprintf(f, "# CloudSlash Safe Remediation Script\n")
 	fmt.Fprintf(f, "# Generated: %s\n\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(f, "set -e\n\n") // Exit on error
+	fmt.Fprintf(f, "set -e\n\n")
 
 	wasteCount := 0
 
@@ -44,43 +44,104 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 			continue
 		}
 
-		// Resource ID extraction using robust ARN parsing
+		// Extract resource ID from ARN.
 		resourceID := extractResourceID(node.ID)
 
 		switch node.Type {
 		case "AWS::EC2::Instance":
 			fmt.Fprintf(f, "echo \"Stopping EC2 Instance: %s\"\n", resourceID)
-			// Soft Delete: Stop the instance to stop compute billing, but keep storage.
+			// Generate stop command for soft delete.
 			fmt.Fprintf(f, "aws ec2 stop-instances --instance-ids %s\n\n", resourceID)
 			wasteCount++
 
+
 		case "AWS::EC2::Volume":
 			fmt.Fprintf(f, "echo \"Processing Volume: %s\"\n", resourceID)
-			// Safety Snapshot
-			desc := fmt.Sprintf("CloudSlash-Archive-%s", resourceID)
-			fmt.Fprintf(f, "aws ec2 create-snapshot --volume-id %s --description \"%s\" --tag-specifications 'ResourceType=snapshot,Tags=[{Key=CloudSlash,Value=Archive}]'\n", resourceID, desc)
-			// Detach if attached? Script logic implies unused, so just delete/archive.
-			// Ideally we DetachVolume but for 'Waste' volumes they are usually unattached.
-			fmt.Fprintf(f, "aws ec2 delete-volume --volume-id %s\n\n", resourceID)
+			
+			// Safety: Check for EBS Modernizer (GP2 -> GP3)
+			if isGP2, _ := node.Properties["IsGP2"].(bool); isGP2 {
+				fmt.Fprintf(f, "echo \"  -> ACTION: Modify Volume (Optimizing gp2 -> gp3)\"\n")
+				fmt.Fprintf(f, "aws ec2 modify-volume --volume-id %s --volume-type gp3\n\n", resourceID)
+			} else {
+				// Standard Waste: Delete
+				desc := fmt.Sprintf("CloudSlash-Archive-%s", resourceID)
+				fmt.Fprintf(f, "aws ec2 create-snapshot --volume-id %s --description \"%s\" --tag-specifications 'ResourceType=snapshot,Tags=[{Key=CloudSlash,Value=Archive}]'\n", resourceID, desc)
+				fmt.Fprintf(f, "aws ec2 delete-volume --volume-id %s\n\n", resourceID)
+			}
 			wasteCount++
 
 		case "AWS::RDS::DBInstance":
 			fmt.Fprintf(f, "echo \"Stopping RDS: %s\"\n", resourceID)
-			// Soft Delete: Stop the DB
+			// Generate stop command.
 			fmt.Fprintf(f, "aws rds stop-db-instance --db-instance-identifier %s\n\n", resourceID)
 			wasteCount++
 
 		case "AWS::EC2::NatGateway":
 			fmt.Fprintf(f, "echo \"Processing NAT Gateway: %s\"\n", resourceID)
-			// Hard Delete as Stop is not supported.
-			// Restoration logic will handle re-creation.
+			// Delete NAT Gateway.
 			fmt.Fprintf(f, "aws ec2 delete-nat-gateway --nat-gateway-id %s\n\n", resourceID)
 			wasteCount++
 
 		case "AWS::EC2::EIP":
 			fmt.Fprintf(f, "echo \"Processing EIP: %s\"\n", resourceID)
-			// Release
+			// Release Elastic IP.
 			fmt.Fprintf(f, "aws ec2 release-address --allocation-id %s\n\n", resourceID)
+			wasteCount++
+		
+		case "AWS::EC2::AMI":
+			fmt.Fprintf(f, "echo \"Deregistering AMI: %s\"\n", resourceID)
+			// Deregister AMI
+			fmt.Fprintf(f, "aws ec2 deregister-image --image-id %s\n\n", resourceID)
+			wasteCount++
+
+		case "AWS::ElasticLoadBalancingV2::LoadBalancer":
+			fmt.Fprintf(f, "echo \"Deleting Load Balancer: %s\"\n", node.ID)
+			fmt.Fprintf(f, "aws elbv2 delete-load-balancer --load-balancer-arn %s\n\n", node.ID)
+			wasteCount++
+
+		case "AWS::ECS::Cluster":
+			fmt.Fprintf(f, "echo \"Deleting ECS Cluster: %s\"\n", resourceID)
+			fmt.Fprintf(f, "aws ecs delete-cluster --cluster %s\n\n", resourceID)
+			wasteCount++
+
+		case "AWS::ECS::Service":
+			parts := strings.Split(node.ID, "/")
+			if len(parts) >= 3 {
+				cluster := parts[1]
+				service := parts[2]
+				fmt.Fprintf(f, "echo \"Deleting ECS Service: %s/%s\"\n", cluster, service)
+				fmt.Fprintf(f, "aws ecs delete-service --cluster %s --service %s --force\n\n", cluster, service)
+				wasteCount++
+			}
+
+		case "AWS::EKS::Cluster":
+			// ID for cluster is usually Name or ARN. Using resourceID (name)
+			fmt.Fprintf(f, "echo \"Deleting EKS Cluster: %s\"\n", resourceID)
+			fmt.Fprintf(f, "aws eks delete-cluster --name %s\n\n", resourceID)
+			wasteCount++
+
+		case "AWS::EKS::NodeGroup":
+			cluster := "unknown-cluster"
+			if n, ok := node.Properties["ClusterName"].(string); ok {
+				cluster = n
+			}
+			fmt.Fprintf(f, "echo \"Deleting EKS NodeGroup: %s (Cluster: %s)\"\n", resourceID, cluster)
+			fmt.Fprintf(f, "aws eks delete-nodegroup --cluster-name %s --nodegroup-name %s\n\n", cluster, resourceID)
+			wasteCount++
+
+		case "AWS::ECR::Repository":
+			fmt.Fprintf(f, "echo \"Deleting ECR Repository: %s\"\n", resourceID)
+			fmt.Fprintf(f, "aws ecr delete-repository --repository-name %s --force\n\n", resourceID)
+			wasteCount++
+
+		case "AWS::Lambda::Function":
+			fmt.Fprintf(f, "echo \"Deleting Lambda Function: %s\"\n", resourceID)
+			fmt.Fprintf(f, "aws lambda delete-function --function-name %s\n\n", resourceID)
+			wasteCount++
+
+		case "AWS::Logs::LogGroup":
+			fmt.Fprintf(f, "echo \"Deleting Log Group: %s\"\n", resourceID)
+			fmt.Fprintf(f, "aws logs delete-log-group --log-group-name \"%s\"\n\n", resourceID)
 			wasteCount++
 		}
 	}
@@ -111,7 +172,7 @@ func (g *Generator) GenerateIgnoreScript(path string) error {
 	fmt.Fprintf(f, "# Run this script to suppressed reporting for these resources in future scans.\n")
 	fmt.Fprintf(f, "set -e\n\n")
 
-	// Collect waste nodes first to sort them for deterministic output
+	// Sort waste nodes for deterministic output.
 	type wasteItem struct {
 		ID   string
 		Type string
@@ -154,8 +215,8 @@ func (g *Generator) GenerateIgnoreScript(path string) error {
 }
 
 func extractResourceID(id string) string {
-	// Robust ARN parsing using official library
-	// This helps avoid fragile string splitting errors
+	// Parse ARN using official library.
+	
 	if parsed, err := arn.Parse(id); err == nil {
 		// Use fields function to split by / or : safely
 		parts := strings.FieldsFunc(parsed.Resource, func(r rune) bool {
@@ -167,6 +228,6 @@ func extractResourceID(id string) string {
 		return parsed.Resource
 	}
 
-	// Fallback for non-ARN inputs (e.g. raw IDs)
+	// Return original ID if not an ARN.
 	return id
 }

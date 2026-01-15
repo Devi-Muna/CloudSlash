@@ -14,7 +14,7 @@ import (
 
 // GenerateDashboard creates a high-fidelity HTML report.
 func GenerateDashboard(g *graph.Graph, path string) error {
-	items := extractItems(g) // Reuse logic from export.go
+	items := extractItems(g) // Extract items from graph.
 
 	// Calculate Stats
 	totalCost := 0.0
@@ -26,11 +26,11 @@ func GenerateDashboard(g *graph.Graph, path string) error {
 		}
 	}
 
-	// Prepare Graph Data for Visualization
+	// Prepare visualization data.
 	graphData, err := buildSankeyData(g)
 	if err != nil {
 		fmt.Printf("[WARN] Failed to build Sankey data: %v\n", err)
-		// non-fatal, empty graph
+		// Handle empty graph gracefully.
 		graphData = []byte("{}")
 	}
 
@@ -39,7 +39,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
 		return err
 	}
 
-	// THE TEMPLATE (v2.0 Enterprise)
+	// HTML Report Template.
 	html := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,7 +62,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             --text-dim: #94A3B8;
         }
 
-        /* 1. Reset & Base */
+        /* 1. Reset and base styles. */
         * { box-sizing: border-box; }
         body {
             background: var(--bg);
@@ -73,7 +73,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             font-size: 14px;
         }
 
-        /* 2. Header */
+        /* 2. Header styles. */
         .header {
             display: flex;
             justify-content: space-between;
@@ -86,7 +86,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         .logo span { color: var(--primary); }
         .meta { color: var(--text-dim); }
 
-        /* 3. KPI Grid */
+        /* 3. KPI grid styles. */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -106,7 +106,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         .card .value.cost { color: var(--danger); }
         .card .value.safe { color: var(--primary); }
 
-        /* 4. Analytics Grid (Charts) */
+        /* 4. Analytics grid styles. */
         .analytics-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -133,7 +133,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         }
         .chart-body { flex: 1; position: relative; width: 100%; overflow: hidden; }
 
-        /* 5. Sankey Container */
+        /* 5. Sankey container styles. */
         .viz-container {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -145,7 +145,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             overflow: hidden;
         }
 
-        /* 6. Data Grid (Table) */
+        /* 6. Data grid styles. */
         .table-wrapper {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -199,10 +199,10 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         .badge.REVIEW { background: rgba(135, 75, 253, 0.15); color: var(--secondary); }
         .badge.JUSTIFIED { background: rgba(0, 255, 153, 0.15); color: var(--primary); }
         
-        /* 7. Footer */
+        /* 7. Footer styles. */
         footer { margin-top: 60px; color: var(--text-dim); font-size: 0.8rem; text-align: center; border-top: 1px solid var(--border); padding-top: 20px; }
 
-        /* Sankey Styles */
+        /* Sankey styles. */
         .node rect { cursor: pointer; fill-opacity: .9; shape-rendering: crispEdges; }
         .node text { pointer-events: none; text-shadow: 0 1px 0 #000; font-family: monospace; font-size: 10px; fill: #fff; }
         .link { fill: none; stroke: #000; stroke-opacity: .2; }
@@ -216,7 +216,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         <div class="meta">Generated: {{GENERATED_TIME}}</div>
     </div>
 
-    <!-- 1. KPI Cards -->
+    <!-- 1. KPI Cards section. -->
     <div class="kpi-grid">
         <div class="card">
             <h3>Monthly Waste</h3>
@@ -232,7 +232,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         </div>
     </div>
 
-    <!-- 2. Charts -->
+    <!-- 2. Charts section. -->
     <div class="analytics-grid">
         <div class="chart-container">
             <div class="chart-header">Monthly Spend by Service</div>
@@ -248,13 +248,13 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         </div>
     </div>
 
-    <!-- 3. Sankey (Secondary) -->
+    <!-- 3. Sankey Diagram section. -->
     <div class="viz-container">
         <div class="chart-header" style="position: absolute; top: 20px; left: 20px; z-index: 10;">// NETWORK FLOW</div>
         <div id="chart"></div>
     </div>
 
-    <!-- 4. Interactive Data Grid -->
+    <!-- 4. Data Grid section. -->
     <div class="table-wrapper">
         <div class="toolbar">
             <input type="text" id="searchInput" class="search-box" placeholder="Filter resources..." onkeyup="filterTable()">
@@ -325,16 +325,14 @@ func GenerateDashboard(g *graph.Graph, path string) error {
 
         // --- 3. SORT ---
         function sortTable(n) {
-            // Simple sort implementation for string/number
-            // In a real app we'd track sort direction state
+            // Sort implementation.
             const table = document.getElementById("resourceTable");
-            // ... omitting full sort logic for brevity in single-file, 
-            // but relying on standard JS sort if needed. 
-            // For now, let's keep it static or rely on default data order (Cost Descending).
+            
+            
             console.log("Sort clicked on col " + n);
         }
 
-        // --- 4. CHARTS (Chart.js Enterprise) ---
+        // --- 4. CHARTS ---
         
         // 4.1 Gradient Helper
         function createGradient(ctx, colorStart, colorEnd) {
@@ -351,7 +349,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             serviceMap[svc] = (serviceMap[svc] || 0) + item.monthly_cost;
         });
 
-        // Top 5 Services (to stay clean) and "Others"
+        // Aggegate top services.
         const sortedServices = Object.entries(serviceMap).sort((a,b) => b[1] - a[1]);
         const topServices = sortedServices.slice(0, 5);
         if (sortedServices.length > 5) {
@@ -417,11 +415,11 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             }
         });
 
-        // 4.3 Doughnut Chart (With Center Text)
+        // 4.3 Doughnut Chart.
         const totalWaste = dataValues.reduce((a, b) => a + b, 0);
-        // Assuming ~40% efficiency gain possible, let's viz Waste vs Optimized
-        // Note: Graph data doesn't have "Good" spending, only "Waste". 
-        // We'll simulate the ratio based on typical cloud bloat (30% waste).
+        // Estimate potential savings.
+        
+        
         const estimatedTotal = totalWaste / 0.3; 
         const optimizedSpend = estimatedTotal - totalWaste;
 
@@ -429,7 +427,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         const gradientWaste = createGradient(ctxPie, '#FF3366', '#FF99AA');
         const gradientSafe = createGradient(ctxPie, '#00FF99', '#00CC7A');
 
-        // Plugin to draw text in center
+        // Center text plugin.
         const centerTextPlugin = {
             id: 'centerText',
             beforeDraw: function(chart) {
@@ -493,23 +491,23 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         });
 
 
-        // --- 5. SANKEY (D3 Enterprise) ---
+        // --- 5. SANKEY (D3) ---
         if (window.GRAPH_DATA && window.GRAPH_DATA.nodes && window.GRAPH_DATA.nodes.length > 0) {
             try {
                 const container = document.querySelector('.viz-container');
-                // Dynamic Height: Robust calculation
+                // Calculate dynamic height.
                 const nodeCount = window.GRAPH_DATA.nodes.length;
                 const dynamicHeight = Math.max(500, nodeCount * 35);
                 const width = container.clientWidth - 40;
                 const height = dynamicHeight; // Explicit height calc
                 
-                // Resize container first
+                // Set container height.
                 d3.select(".viz-container").style("height", (height + 60) + "px");
 
-                // Clear previous (if any)
+                // Clear existing chart.
                 d3.select("#chart").html("");
 
-                // Tooltip
+                // Initialize tooltip.
                 const tooltip = d3.select("body").append("div")
                     .attr("class", "sankey-tooltip")
                     .style("position", "absolute")
@@ -530,22 +528,22 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                     .attr("height", height)
                     .style("overflow", "visible");
 
-                // Gradients definition
+                // Define gradients.
                 const defs = svg.append("defs");
 
-                // Config
+                // Configure Sankey layout.
                 const sankey = d3.sankey()
                     .nodeWidth(14) // Balanced width
                     .nodePadding(Math.max(10, 50 - nodeCount * 0.5)) // Adaptive padding
                     .extent([[1, 1], [width - 1, height - 6]]);
 
-                // Safe Data Clone (D3 mutates data)
+                // Clone data to prevent mutation.
                 const graphDataClone = JSON.parse(JSON.stringify(window.GRAPH_DATA));
                 
-                // Layout
+                // Compute layout.
                 const {nodes, links} = sankey(graphDataClone);
 
-                // Create gradients for links
+                // Create link gradients.
                 links.forEach((d, i) => {
                     const gradientID = "gradient-" + i;
                     const gradient = defs.append("linearGradient")
@@ -565,7 +563,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                     gradient.append("stop").attr("offset", "100%").attr("stop-color", endColor);
                 });
 
-                // LINKS
+                // Render links.
                 const link = svg.append("g")
                     .attr("fill", "none")
                     .selectAll("path")
@@ -577,7 +575,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                     .style("stroke-opacity", 0.4)
                     .style("transition", "all 0.4s cubic-bezier(0.16, 1, 0.3, 1)");
 
-                // NODES
+                // Render nodes.
                 const node = svg.append("g")
                     .selectAll("g")
                     .data(nodes)
@@ -600,7 +598,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                     .style("stroke-width", "1px")
                     .style("stroke-width", "1px")
                     .on("click", function(event, d) {
-                        // Sticky Highlight Logic
+                        // Handle node selection.
                         if (window.activeNode === d) {
                             // Deselect
                             window.activeNode = null;
@@ -611,20 +609,20 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                         } else {
                             // Select
                             window.activeNode = d;
-                            // Dim Everything
+                            // Dim unrelated elements.
                             node.style("opacity", 0.1);
                             link.style("stroke-opacity", 0.05);
                             
-                            // Highlight This
+                            // Highlight selected node.
                             d3.select(this)
                                 .style("opacity", 1)
                                 .style("stroke", "#fff");
                                 
-                            // Highlight Connections
+                            // Highlight connected links.
                             link.filter(l => l.source.index === d.index || l.target.index === d.index)
                                 .style("stroke-opacity", 0.8);
                                 
-                            // Highlight Connected Nodes
+                            // Highlight connected nodes.
                             const connectedIndices = new Set();
                             connectedIndices.add(d.index);
                             link.data().forEach(l => {
@@ -637,16 +635,17 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                         }
                     })
                     .on("mouseover", function(event, d) {
-                        // Tooltip Always Shows
+                        // Show tooltip.
                         tooltip.transition().duration(100).style("opacity", 1);
                         tooltip.html(
                             '<div style="font-weight:700; margin-bottom:4px; color:' + (d.waste?"#FF3366":"#fff") + '">' + d.name + '</div>' +
                             '<div style="color:#aaa; font-size:11px; letter-spacing: 1px;">' + (d.waste ? "<span style='color:#FF3366'>WASTE DETECTED</span>" : "<span style='color:#00FF99'>INFRASTRUCTURE</span>") + '</div>'
                         )
+                            .style("width", "max-content")
                             .style("left", (event.pageX + 15) + "px")
                             .style("top", (event.pageY - 20) + "px");
 
-                        // Highlight ONLY if no active selection
+                        // Highlight on hover if no selection active.
                         if (!window.activeNode) {
                             d3.select(this)
                                 .style("opacity", 1)
@@ -661,7 +660,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                     .on("mouseout", function() {
                         tooltip.transition().duration(300).style("opacity", 0);
 
-                        // Reset ONLY if no active selection
+                        // Reset styles if no selection active.
                         if (!window.activeNode) {
                              d3.select(this)
                                 .style("opacity", 0.9)
@@ -671,7 +670,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                         }
                     });
 
-                // LABELS (Smart)
+                // Render labels.
                 node.append("text")
                     .attr("x", d => d.x0 < width / 2 ? d.x1 + 10 : d.x0 - 10)
                     .attr("y", d => (d.y1 + d.y0) / 2)
@@ -682,7 +681,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                     .style("font-size", "12px")
                     .style("font-weight", "600")
                     .style("fill", "#ddd")
-                    .style("opacity", d => (d.y1 - d.y0) > 12 ? 1 : 0) // Hide on tiny nodes
+                    .style("opacity", d => (d.y1 - d.y0) > 12 ? 1 : 0) // Hide labels for small nodes.
                     .style("pointer-events", "none")
                     .style("text-shadow", "0 2px 4px rgba(0,0,0,0.8)");
 
@@ -707,7 +706,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
 	return os.WriteFile(path, []byte(html), 0644)
 }
 
-// Data Structures for D3 Sankey
+// Sankey data structures.
 type SankeyNode struct {
 	Name  string `json:"name"`
 	Waste bool   `json:"waste"`
@@ -730,11 +729,11 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 	links := make([]SankeyLink, 0)
 	idToIndex := make(map[string]int)
 
-	// 1. Add "The Internet" (Root)
+	// 1. Add Internet root node.
 	nodes = append(nodes, SankeyNode{Name: "Internet [0.0.0.0/0]", Waste: false})
 	idToIndex["INTERNET"] = 0
 
-	// 2. Add All Graph Nodes
+	// 2. Add graph nodes.
 	currentIndex := 1
 	for _, n := range g.Nodes {
 		idToIndex[n.ID] = currentIndex
@@ -743,7 +742,7 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 		currentIndex++
 	}
 
-	// 3. Create Links from Edges
+	// 3. Create links.
 	for sourceIdx, edges := range g.Edges {
 		if sourceIdx >= len(g.Nodes) { continue }
 		sourceNode := g.Nodes[sourceIdx]
@@ -760,15 +759,14 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 				continue
 			}
 
-			// Value Logic: Flow of Money
-			// If target depends on source, money flows from source to target?
-			// No, dependency is reverse.
-			// "Internet Access" flows: IGW -> VPC -> Subnet -> Instance.
-			// Visualization: "Flow of Liability".
+			// Calculate link weight based on cost.
+			
+			
+			
+			
 
-			// Robust Weighting
-			// Even simple topology connections should be thick enough to see.
-			// Base: 8.0 (Visible but not chunky) + Log10(Cost) boost.
+			// Weight link by target cost.
+			
 			val := 8.0
 			if targetNode != nil && targetNode.Cost > 0 {
 				val += math.Log10(targetNode.Cost+1) * 8
@@ -782,7 +780,7 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 		}
 	}
 
-	// 4. Link Roots to Internet
+	// 4. Link gateways to Internet.
 	// Find IGWs and link INTERNET -> IGW
 	for _, n := range g.Nodes {
 		if n.Type == "AWS::EC2::InternetGateway" {

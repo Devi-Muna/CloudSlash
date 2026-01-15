@@ -4,19 +4,19 @@ import (
 	"math"
 )
 
-// Vector represents a high-dimensional state of infrastructure resources.
+// Vector represents resource state.
 type Vector []float64
 
-// Known Patterns (Fingerprints)
+// Pattern definitions.
 var (
-	// PatternUniformScaling represents a balanced growth across balanced resources (e.g. ASG scaling)
-	PatternUniformScaling = Normalize(Vector{1.0, 1.0, 0.5, 0.1}) // High EC2/RDS, Low Waste
+	// Uniform scaling pattern.
+	PatternUniformScaling = Normalize(Vector{1.0, 1.0, 0.5, 0.1}) // Balanced growth.
 	
-	// PatternAnomaly represents a waste-heavy spike (e.g. simple leak)
-	PatternAnomaly = Normalize(Vector{0.1, 0.0, 1.0, 1.0}) // Low Compute, High Waste
+	// Anomaly pattern.
+	PatternAnomaly = Normalize(Vector{0.1, 0.0, 1.0, 1.0}) // Waste spike.
 )
 
-// Normalize returns the unit vector.
+// Normalize scales vector to unit length.
 func Normalize(v Vector) Vector {
 	var sum float64
 	for _, x := range v {
@@ -34,7 +34,7 @@ func Normalize(v Vector) Vector {
 	return result
 }
 
-// DotProduct calculates the dot product of two vectors.
+// DotProduct calculates vector dot product.
 func DotProduct(a, b Vector) float64 {
 	if len(a) != len(b) {
 		return 0
@@ -46,14 +46,13 @@ func DotProduct(a, b Vector) float64 {
 	return sum
 }
 
-// CosineSimilarity returns the cosine similarity between two vectors (-1 to 1).
-// 1.0 = Identical direction
-// 0.0 = Orthogonal (Unrelated)
-// -1.0 = Opposite
+// CosineSimilarity calculates similarity.
+// Calculate cosine similarity.
+//
+//
 func CosineSimilarity(a, b Vector) float64 {
-	// Assumes a and b are NOT normalized, so we normalize them first or divide by magnitude.
-	// For efficiency, if we maintain normalized vectors, we can just dot product.
-	// Here we will compute safely.
+	// Calculate cosine similarity.
+	//
 	
 	dot := DotProduct(a, b)
 	
@@ -75,15 +74,15 @@ func CosineSimilarity(a, b Vector) float64 {
 	return dot / (magA * magB)
 }
 
-// ClassifyPattern determines if a transition vector looks like a known pattern.
-// Returns "SAFE", "ANOMALY", or "UNKNOWN" based on similarity.
+// ClassifyPattern identifies vector patterns.
+//
 func ClassifyPattern(v Vector) string {
-	// 1. Check against SAFE patterns
+	// Check safe patterns.
 	if CosineSimilarity(v, PatternUniformScaling) > 0.8 {
 		return "SAFE"
 	}
 	
-	// 2. Check against ANOMALY patterns
+	// Check anomaly patterns.
 	if CosineSimilarity(v, PatternAnomaly) > 0.8 {
 		return "ANOMALY"
 	}

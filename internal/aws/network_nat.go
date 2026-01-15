@@ -55,10 +55,10 @@ func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 			
 			s.Graph.AddNode(id, "aws_nat_gateway", props)
 			
-			// 1. Metric Truth: ConnectionEstablishedCount
+			// 1. Check connection metrics.
 			go s.checkTraffic(ctx, id, props)
 			
-			// 2. Network Topology ("Empty Room" Check)
+			// 2. Analyze network topology.
 			go s.checkEmptyRoom(ctx, id, vpcId)
 		}
 	}
@@ -149,7 +149,7 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 	}
 	
 	if len(subnets) == 0 {
-		// No subnets use this NAT? Then it is DEFINITELY waste (if metric is low).
+		// Identify NATs with no associated subnets.
 		s.updateActiveCount(natId, 0)
 		return
 	}
@@ -209,7 +209,7 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 		}
 	}
 	
-	// Re-fetch node safely
+
 	nodeRedecl := s.Graph.GetNode(natId)
 	if nodeRedecl != nil {
 		s.Graph.Mu.Lock()

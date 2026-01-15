@@ -32,8 +32,8 @@ func (h *ECRJanitorHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		// Logic: if NO Policy AND Waste > 0
 		if !hasPolicy && wasteBytes > 0 {
 			node.IsWaste = true
-			node.RiskScore = 20 // Safe (Untagged + Unpulled)
-			node.Properties["Reason"] = "Digital Janitor: No Lifecycle Policy & Untagged Images > 90d old."
+			node.RiskScore = 20 // Low risk (Untagged + Unpulled)
+			node.Properties["Reason"] = "No Lifecycle Policy & Untagged Images > 90d old."
 
 			// Cost: $0.10/GB/month for ECR
 			node.Cost = wasteGB * 0.10

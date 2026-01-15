@@ -5,14 +5,14 @@ import (
 	"fmt"
 )
 
-// TerraformState represents the top-level structure of a .tfstate JSON export.
-// We only care about the resources for now.
+// TerraformState represents Terraform state JSON.
+//
 type TerraformState struct {
 	Resources []Resource `json:"resources"`
 }
 
-// Resource represents a single Terraform resource definition (block).
-// It can contain multiple instances (e.g. count/for_each).
+// Resource represents a state resource block.
+//
 type Resource struct {
 	Module    string     `json:"module,omitempty"` // e.g. "module.payments_cluster"
 	Mode      string     `json:"mode"`             // "managed" or "data"
@@ -21,19 +21,19 @@ type Resource struct {
 	Instances []Instance `json:"instances"`
 }
 
-// Instance represents a realized instance of a resource.
+// Instance represents a resource instance.
 type Instance struct {
-	Attributes json.RawMessage `json:"attributes"` // Dynamic bag of attributes
+	Attributes json.RawMessage `json:"attributes"` // Resource attributes.
 }
 
-// ParsedAttribute helps us extract common identifiers like ID or ARN
-// from the raw attributes bag.
+// ParsedAttribute contains common identifiers.
+//
 type ParsedAttribute struct {
 	ID  string `json:"id"`
 	ARN string `json:"arn"`
 }
 
-// ParseState parses the raw JSON output from 'terraform state pull'.
+// ParseState parses state JSON.
 func ParseState(jsonBytes []byte) (*TerraformState, error) {
 	var state TerraformState
 	if err := json.Unmarshal(jsonBytes, &state); err != nil {
@@ -41,7 +41,7 @@ func ParseState(jsonBytes []byte) (*TerraformState, error) {
 	}
 	return &state, nil
 }
-// FindAddressByID searches the state for a resource with the matching cloud ID (or ARN).
+// FindAddressByID finds resource address by ID.
 func FindAddressByID(state *TerraformState, cloudID string) (string, error) {
 	for _, res := range state.Resources {
 		if res.Mode != "managed" {

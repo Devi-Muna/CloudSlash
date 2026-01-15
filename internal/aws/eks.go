@@ -66,26 +66,26 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 	}
 	cluster := resp.Cluster
 
-	// Filter: Only Active clusters incur costs
+	// Filter for active clusters.
 	if cluster.Status != types.ClusterStatusActive {
 		return nil
 	}
 
 	arn := *cluster.Arn
 
-	// 1. Check Managed Node Groups
+	// 1. Check for managed node groups.
 	hasManagedNodes, err := s.checkManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	// 2. Check Fargate Profiles (and ingest them)
+	// 2. Check Fargate profiles.
 	hasFargate, err := s.scanFargateProfiles(ctx, name, arn)
 	if err != nil {
 		return err
 	}
 
-	// 3. Check Self-Managed Nodes (EC2)
+	// 3. Check self-managed nodes.
 	hasSelfManaged, err := s.checkSelfManagedNodes(ctx, name)
 	if err != nil {
 		return err
@@ -195,7 +195,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 }
 
 func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Tag filter: kubernetes.io/cluster/<name> = owned | shared
+	// Filter instances by cluster tag (owned or shared).
 	key := fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)
 
 	input := &ec2.DescribeInstancesInput{

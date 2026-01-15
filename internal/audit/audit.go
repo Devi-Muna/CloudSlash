@@ -24,7 +24,7 @@ func LogAction(action, resourceID, resourceType string, cost float64, reason str
 	}
 	defer f.Close()
 	
-	// Format: [DATE] Deleted nat-0x123 ($45/mo) - Reason: ...
+	// Log format: [DATE] ACTION RESOURCE COST REASON
 	entry := fmt.Sprintf("[%s] %s %s (%s) - Savings: $%.2f/mo - Reason: %s\n", 
 		time.Now().Format(time.RFC3339),
 		action,

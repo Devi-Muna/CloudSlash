@@ -29,7 +29,7 @@ func NewALBScanner(cfg aws.Config, g *graph.Graph) *ALBScanner {
 	}
 }
 
-// ScanALBs implements "Smart Idle" check.
+// ScanALBs discovers Application Load Balancers and metrics.
 func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 	paginator := elasticloadbalancingv2.NewDescribeLoadBalancersPaginator(s.Client, &elasticloadbalancingv2.DescribeLoadBalancersInput{})
 
@@ -38,8 +38,8 @@ func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 		if err != nil { return err }
 
 		for _, lb := range page.LoadBalancers {
-			// Only ALBs (Application) for this feature (Redirect/RequestCount).
-			// NLBs work differently (FlowCount).
+			// Only scan Application Load Balancers.
+			// NLBs are handled separately due to metric differences.
 			if lb.Type != elbv2types.LoadBalancerTypeEnumApplication {
 				continue
 			}
@@ -53,18 +53,15 @@ func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 				"State":   string(lb.State.Code),
 			}
 			
-			// Using ARN as ID for uniqueness (LB names unique per region but graph might be multi-region? ARN is safest).
-			// But for consistent readability we usually match conventions.
-			// Let's use ARN.
 			s.Graph.AddNode(arn, "aws_alb", props)
 			
-			// 1. Metric: RequestCount
+			// 1. Check request count metric.
 			go s.checkRequests(ctx, arn, props)
 			
-			// 2. Redirect Awareness
+			// 2. Check listener configurations.
 			go s.checkListeners(ctx, arn)
 			
-			// 3. WAF Wallet Check
+			// 3. Check WAF association.
 			go s.checkWAF(ctx, arn)
 		}
 	}
@@ -76,12 +73,9 @@ func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[st
 	if node == nil { return }
 	
 	// Extract Resource ID for CW (app/lb-name/id) from ARN
-	// AWS CW Dimension 'LoadBalancer' expects format 'app/my-load-balancer/50dc6c495c0c9188'
-	// ARN: arn:aws:elasticloadbalancing:us-west-2:123456789012:loadbalancer/app/my-load-balancer/50dc6c495c0c9188
-	// ID: app/my-load-balancer/50dc6c495c0c9188
+	// Extract Resource ID for CloudWatch from ARN.
+	// CW expects format: app/load-balancer-name/id
 	resourceId := ""
-	// Simple split by ":loadbalancer/"
-	// Note: Be careful with split.
 	
 	// Better: use manual parsing for robustness.
 	parts := -1
@@ -179,7 +173,7 @@ func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
 	
 	if err == nil && out.WebACL != nil {
 		hasWAF = true
-		// Estimate Cost: $5.00/mo + $1.00 per rule group (approx).
+		// Estimate WAF costs.
 		wafCost = 5.0
 	}
 	

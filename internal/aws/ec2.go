@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -43,7 +44,7 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 		for _, reservation := range page.Reservations {
 			for _, instance := range reservation.Instances {
 				id := *instance.InstanceId
-				arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", id) // Simplified ARN construction
+				arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", id)
 
 				props := map[string]interface{}{
 					"State":      string(instance.State.Name),
@@ -71,6 +72,12 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 					sgARN := fmt.Sprintf("arn:aws:ec2:region:account:security-group/%s", *sg.GroupId)
 					s.Graph.AddTypedEdge(arn, sgARN, graph.EdgeTypeSecuredBy, 100)
 				}
+
+				// Link to AMI (Usage)
+				if instance.ImageId != nil {
+					amiARN := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", *instance.ImageId)
+					s.Graph.AddTypedEdge(arn, amiARN, graph.EdgeTypeUses, 100)
+				}
 			}
 		}
 	}
@@ -85,7 +92,7 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 			return fmt.Errorf("failed to describe volumes: %v", err)
 		}
 
-		// Optimization: Collect IDs for Modification Check
+		// Batch collect IDs to check modification status.
 		var volIDs []string
 		for _, v := range page.Volumes {
 			volIDs = append(volIDs, *v.VolumeId)
@@ -100,10 +107,10 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 			props := map[string]interface{}{
 				"State":      string(volume.State),
 				"Size":       *volume.Size,
-				"VolumeType": string(volume.VolumeType), // Catch gp2
+				"VolumeType": string(volume.VolumeType),
 				"CreateTime": volume.CreateTime,
 				"Tags":       parseTags(volume.Tags),
-				"IsModifying": modMap[id], // Check safety lock
+				"IsModifying": modMap[id], // Check if volume is currently optimizing.
 			}
 
 			s.Graph.AddNode(arn, "AWS::EC2::Volume", props)
@@ -114,9 +121,9 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 					instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", *att.InstanceId)
 					s.Graph.AddTypedEdge(arn, instanceARN, graph.EdgeTypeAttachedTo, 100)
 
-					// Store attachment info in properties for heuristics
+					// Store attachment details.
 					props["DeleteOnTermination"] = att.DeleteOnTermination
-					props["AttachedInstanceId"] = *att.InstanceId // Store ID for easy lookup
+					props["AttachedInstanceId"] = *att.InstanceId
 				}
 			}
 		}
@@ -139,13 +146,12 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 		VolumeIds: volIDs,
 	})
 	if err != nil {
-		// If error (e.g. some IDs not found), assume safe or log. 
-		// "Low-Maintenance Code": skip but return empty.
+		// Return empty map on error.
 		return out
 	}
 	
+	// Check for modifying or optimizing states.
 	for _, mod := range resp.VolumesModifications {
-		// modifying | optimizing | completed | failed
 		state := mod.ModificationState
 		if state == types.VolumeModificationStateModifying || state == types.VolumeModificationStateOptimizing {
 			out[*mod.VolumeId] = true
@@ -248,17 +254,28 @@ func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 		arn := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", id)
 
 		props := map[string]interface{}{
-			"State": string(img.State),
-			"Name":  *img.Name,
-			"Tags":  parseTags(img.Tags),
+			"State":        string(img.State),
+			"Name":         *img.Name,
+			"Tags":         parseTags(img.Tags),
+		}
+
+		// Parse CreationDate (string) -> time.Time for MarkWaste/Heuristics
+		if img.CreationDate != nil {
+			t, err := time.Parse("2006-01-02T15:04:05.000Z", *img.CreationDate)
+			if err == nil {
+				props["CreateTime"] = t
+			} else {
+				// Fallback to string if parsing fails.
+				props["CreationDate"] = *img.CreationDate
+			}
 		}
 		s.Graph.AddNode(arn, "AWS::EC2::AMI", props)
 
-		// Link AMI to its Snapshots
+		// Link to Snapshots (Lineage)
 		for _, bdm := range img.BlockDeviceMappings {
 			if bdm.Ebs != nil && bdm.Ebs.SnapshotId != nil {
 				snapARN := fmt.Sprintf("arn:aws:ec2:region:account:snapshot/%s", *bdm.Ebs.SnapshotId)
-				// AMI -> Snapshot (AMI contains/uses Snapshot)
+				// Create lineage edge from AMI to Snapshot.
 				s.Graph.AddTypedEdge(arn, snapARN, graph.EdgeTypeContains, 100)
 			}
 		}

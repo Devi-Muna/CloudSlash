@@ -37,7 +37,7 @@ func (h *NetworkForensicsHeuristic) analyzeNAT(n *graph.Node, g *graph.Graph) {
 	if conns == 0 && active == 0 {
 		n.IsWaste = true
 		n.RiskScore = 90
-		n.Properties["Reason"] = "Hollow NAT Gateway: Serves subnets with ZERO active instances. Traffic: 0."
+		n.Properties["Reason"] = "Unused NAT Gateway: Serves subnets with zero active instances. Traffic: 0."
 		n.Cost = 32.0
 
 		h.topo(g, n)
@@ -52,7 +52,7 @@ func (h *NetworkForensicsHeuristic) topo(g *graph.Graph, nat *graph.Node) {
 
 	for _, id := range subnets {
 		g.AddNode(id, "aws_subnet", map[string]interface{}{
-			"Reason":   "Empty Subnet (Linked to Hollow NAT)",
+			"Reason":   "Empty Subnet (Linked to Unused NAT)",
 			"ParentID": nat.ID,
 			"Name":     fmt.Sprintf("Subnet: %s (Empty)", id),
 		})
@@ -64,7 +64,7 @@ func (h *NetworkForensicsHeuristic) topo(g *graph.Graph, nat *graph.Node) {
 	if rtbs, ok := nat.Properties["RouteTables"].([]string); ok {
 		for _, id := range rtbs {
 			g.AddNode(id, "aws_route_table", map[string]interface{}{
-				"Reason":   "Route Table targeting Hollow NAT",
+				"Reason":   "Route Table targeting Unused NAT",
 				"ParentID": nat.ID,
 				"Name":     fmt.Sprintf("Route Table: %s", id),
 			})
@@ -87,7 +87,7 @@ func (h *NetworkForensicsHeuristic) analyzeEIP(n *graph.Node) {
 	if inDNS {
 		zone, _ := n.Properties["DNSZone"].(string)
 		n.RiskScore = 99
-		n.Properties["Reason"] = fmt.Sprintf("DANGEROUS ZOMBIE: EIP %s is unused BUT hardcoded in DNS zone %s. Do NOT release. DNS Conflict.", n.ID, zone)
+		n.Properties["Reason"] = fmt.Sprintf("Unused EIP %s referenced in DNS zone %s. Do not release due to DNS conflict.", n.ID, zone)
 		return
 	}
 
@@ -106,13 +106,13 @@ func (h *NetworkForensicsHeuristic) analyzeALB(n *graph.Node) {
 
 	n.IsWaste = true
 	n.RiskScore = 60
-	n.Properties["Reason"] = "Zombie ALB: 0 Requests in 7 days."
+	n.Properties["Reason"] = "Unused ALB: 0 Requests in 7 days."
 	n.Cost = 16.0
 
 	if hasWAF, _ := n.Properties["HasWAF"].(bool); hasWAF {
 		waf, _ := n.Properties["WAFCostEst"].(float64)
 		n.Cost += waf
-		n.Properties["Reason"] = fmt.Sprintf("Zombie ALB + Attached WAF ($%.2f/mo waste).", n.Cost)
+		n.Properties["Reason"] = fmt.Sprintf("Unused ALB + Attached WAF ($%.2f/mo waste).", n.Cost)
 	}
 }
 
@@ -121,7 +121,7 @@ func (h *NetworkForensicsHeuristic) analyzeVPCEP(n *graph.Node) {
 	if bytes == 0 {
 		n.IsWaste = true
 		n.RiskScore = 70
-		n.Properties["Reason"] = "Hidden Leech: VPC Endpoint processed 0 bytes in 30 days."
+		n.Properties["Reason"] = "Unused VPC Endpoint: Processed 0 bytes in 30 days."
 		n.Cost = 7.0
 	}
 }

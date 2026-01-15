@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/DrSkyle/cloudslash/internal/app"
+	"github.com/DrSkyle/cloudslash/internal/aws"
+	internalconfig "github.com/DrSkyle/cloudslash/internal/config"
+	"github.com/DrSkyle/cloudslash/internal/pricing"
 	"github.com/DrSkyle/cloudslash/internal/graph"
 	"github.com/DrSkyle/cloudslash/internal/provenance"
 	tf "github.com/DrSkyle/cloudslash/internal/terraform"
@@ -53,10 +56,10 @@ Example:
 			os.Exit(1)
 		}
 
-		// Optimize (v1.4.0 Optimization Engine)
+		// Run optimization engine.
 		runSolver(g)
 
-		// Resource Deletion Script
+		// Generate resource deletion script.
 		cleanupPath := "cloudslash-out/resource_deletion.sh"
 		// Ensure output dir exists
 		if _, err := os.Stat("cloudslash-out"); os.IsNotExist(err) {
@@ -70,7 +73,7 @@ Example:
 			_ = os.Chmod(cleanupPath, 0755)
 		}
 
-		// Lazarus Protocol: Restoration Plan
+		// Generate restoration plan.
 		restorePath := "cloudslash-out/restore.tf"
 		if err := gen.GenerateRestorationPlan(restorePath); err != nil {
 			fmt.Printf("[WARN] Failed to generate restoration plan: %v\n", err)
@@ -78,7 +81,7 @@ Example:
 			fmt.Printf("[SUCCESS] Lazarus Protocol Active: Restoration plan generated: %s\n", restorePath)
 		}
 
-		// Terraform Integration
+		// Initialize Terraform client.
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
 			fmt.Println("\n[INFO] Terraform detected. Initializing State Analysis...")
@@ -102,7 +105,7 @@ Example:
 					}
 					g.Mu.RUnlock()
 
-					// Provenance Analysis
+					// Analyze resource provenance.
 					provEngine := provenance.NewEngine(".")
 					provMap := make(map[string]*provenance.ProvenanceRecord)
 
@@ -153,7 +156,7 @@ func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provena
 	for _, res := range report.ResourcesToDelete {
 		fmt.Printf("# Remove orphaned resource: %s\n", res)
 		
-		// PRINT PROVENANCE AUDIT BOX
+		// Print provenance details.
 		if rec, ok := provMap[res]; ok {
 			printProvenanceBox(rec)
 		}
@@ -219,24 +222,49 @@ func generateFixScript(report *tf.AnalysisReport) {
 
 func runSolver(g *graph.Graph) {
 	fmt.Printf("\n[ %s OPTIMIZATION ENGINE ]\n", version.Current)
-	fmt.Println("Initializing Solver...")
+	fmt.Println("Initializing Solver with Dynamic Intelligence...")
 
-	// 1. Build Workloads from Graph
-	// Extract all EC2/EKS Nodes and convert to Workloads.
-	// For MVP: We assume every existing Instance is a "Workload" we want to re-host.
-	// In reality, we'd read Pods. But for non-K8s, the "Workload" is the instance itself.
+	// 1. Initialize Pricing Client.
+	ctx := context.Background()
+	pc, err := pricing.NewClient(ctx)
+	if err != nil {
+		fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
+	}
+
+	// 2. Convert graph nodes to workloads and calculate current spend.
 	var workloads []*tetris.Item
+	var currentSpend float64
+
 	g.Mu.RLock()
 	for _, n := range g.Nodes {
 		if n.Type == "AWS::EC2::Instance" {
-			// Extract CPU/RAM from properties if available, else default (mock)
-			// Assuming we enriched this data.
-			// Mocking 2 vCPU, 4GB RAM for demo if usage known.
+			// Extract compute resources dynamically.
+			instanceType := "m5.large" // Default type.
+			if t, ok := n.Properties["Type"].(string); ok {
+				instanceType = t
+			}
+
+			specs := aws.GetSpecs(instanceType)
+			
+			// Calculate current cost for this instance
+			var cost float64
+			var err error
+			if pc != nil {
+				cost, err = pc.GetEC2InstancePrice(ctx, internalconfig.DefaultRegion, instanceType)
+			}
+			if pc == nil || err != nil || cost == 0 {
+				estimator := &aws.StaticCostEstimator{}
+				cost = estimator.GetEstimatedCost(instanceType, internalconfig.DefaultRegion)
+			}
+			
+			// Add to total monthly spend (cost is per month)
+			currentSpend += cost
+
 			workloads = append(workloads, &tetris.Item{
 				ID: n.ID,
 				Dimensions: tetris.Dimensions{
-					CPU: 2000, 
-					RAM: 4096,
+					CPU: specs.VCPU * 1000, 
+					RAM: specs.Memory,
 				},
 			})
 		}
@@ -244,29 +272,66 @@ func runSolver(g *graph.Graph) {
 	g.Mu.RUnlock()
 
 	if len(workloads) == 0 {
-		fmt.Println("No active compute workloads detected. Optimization skipped (requires running EC2 instances).")
+		fmt.Println("No active compute workloads detected. Optimization skipped.")
 		return
 	}
 
-	// 2. Setup Solver Components
-	riskEngine := oracle.NewRiskEngine()
+	// 3. Initialize solver components.
+	riskEngine := oracle.NewRiskEngine(internalconfig.DefaultRiskConfig())
 	safePolicy := policy.DefaultPolicy()
 	validator := policy.NewValidator(safePolicy)
 	optimizer := solver.NewOptimizer(riskEngine, validator)
 
-	// 3. Define Catalog (Mock for MVP)
-	// In production, this comes from AWS Pricing API
-	catalog := []solver.InstanceType{
-		{Name: "m5.large", CPU: 2000, RAM: 8192, HourlyCost: 0.096, Zone: "us-east-1a"},
-		{Name: "c6g.large", CPU: 2000, RAM: 4096, HourlyCost: 0.068, Zone: "us-east-1a"}, // Cheaper/Better
-		{Name: "r5.large", CPU: 2000, RAM: 16384, HourlyCost: 0.126, Zone: "us-east-1a"},
+	// 4. Build Dynamic Catalog
+	var catalog []solver.InstanceType
+	
+	fmt.Printf("Building Instance Catalog (%d candidates)...\n", len(aws.CandidateTypes))
+	if pc != nil {
+		fmt.Printf(" > Connected to AWS Pricing API (%s). Fetching live data...\n", internalconfig.DefaultRegion)
+	} else {
+		fmt.Println(" > AWS Pricing API unavailable. Using static estimates.")
 	}
+	
+	successCount := 0
+	fallbackCount := 0
 
-	// 4. Solve
+	for i, it := range aws.CandidateTypes {
+		specs := aws.GetSpecs(it)
+		var cost float64
+		var err error
+
+		// Visual progress indicator.
+		if pc != nil {
+			fmt.Printf("\r   [%d/%d] Querying %-12s ", i+1, len(aws.CandidateTypes), it)
+			cost, err = pc.GetEC2InstancePrice(ctx, internalconfig.DefaultRegion, it)
+		}
+		
+		if pc == nil || err != nil || cost == 0 {
+			estimator := &aws.StaticCostEstimator{}
+			cost = estimator.GetEstimatedCost(it, internalconfig.DefaultRegion)
+			fallbackCount++
+		} else {
+			successCount++
+		}
+
+		// Monthly Cost (730 hours)
+		hourlyCost := cost / 730.0
+
+		catalog = append(catalog, solver.InstanceType{
+			Name:       it,
+			CPU:        specs.VCPU * 1000,
+			RAM:        specs.Memory,
+			HourlyCost: hourlyCost,
+			Zone:       internalconfig.DefaultRegion + "a", // Default zone placement.
+		})
+	}
+	fmt.Printf("\n > Catalog Complete. Live Prices: %d | Estimates: %d\n", successCount, fallbackCount)
+
+	// 5. Execute solver.
 	req := solver.OptimizationRequest{
 		Workloads:    workloads,
 		Catalog:      catalog,
-		CurrentSpend: 1000.0, // Mock current spend
+		CurrentSpend: currentSpend,
 	}
 
 	plan, err := optimizer.Solve(req)
@@ -275,7 +340,7 @@ func runSolver(g *graph.Graph) {
 		return
 	}
 
-	// 5. Output Results
+	// 6. Print optimization results.
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Printf("OPTIMIZATION PLAN (Risk Score: %.2f%%)\n", plan.RiskScore*100)
 	fmt.Printf("Current Spend: $%.2f/mo -> Optimized: $%.2f/mo\n", req.CurrentSpend, plan.TotalCost)

@@ -17,7 +17,7 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// 1. Find all ELBs first to avoid O(N*M) lookups inside the EKS loop
+	// Collect ELB information first to optimize downstream lookups.
 	type elbInfo struct {
 		Arn  string
 		Tags map[string]string
@@ -56,20 +56,19 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 			continue // Might be sleeping
 		}
 
-		// 4. Compute Check (The Zombie Triad)
+		// Checks for any active compute nodes (Managed Node Groups, Fargate, or Self-Managed).
 		hasManaged, _ := node.Properties["HasManagedNodes"].(bool)
 		hasFargate, _ := node.Properties["HasFargate"].(bool)
 		hasSelf, _ := node.Properties["HasSelfManagedNodes"].(bool)
 
 		if !hasManaged && !hasFargate && !hasSelf {
-			// IDLE CLUSTER IDENTIFIED
 			node.IsWaste = true
-			node.RiskScore = 90    // High confidence, pure unused
+			node.RiskScore = 90    // High confidence of unused state.
 			node.Cost = 0.10 * 730 // ~$73.00/month
 
 			reason := "Idle Control Plane: Active EKS cluster with zero compute nodes for > 7 days."
 
-			// 5. Orphaned ELB Check
+			// Check for orphaned ELBs associated with this cluster to recommend deletion.
 			clusterName := ""
 			// Extract cluster name from ARN: arn:aws:eks:region:account:cluster/ClusterName
 			parts := strings.Split(node.ID, "/")

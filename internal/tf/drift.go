@@ -7,7 +7,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// DriftDetector identifies resources that exist in the graph but not in the Terraform state.
+// DriftDetector identifies unmanaged resources.
 type DriftDetector struct {
 	Graph *graph.Graph
 	State *State
@@ -21,32 +21,31 @@ func NewDriftDetector(g *graph.Graph, s *State) *DriftDetector {
 	}
 }
 
-// ScanForDrift iterates through the graph and flags resources not found in the state.
+// ScanForDrift marks unmanaged resources as waste.
 func (d *DriftDetector) ScanForDrift() {
 	managedIDs := d.State.GetManagedResourceIDs()
-
-	d.Graph.Mu.Lock() // Assuming we added Mu to Graph struct, or use existing mutex
+	d.Graph.Mu.Lock()
 	defer d.Graph.Mu.Unlock()
 
 	for _, node := range d.Graph.Nodes {
-		// Skip if node is already marked as waste (optimization)
+		// Skip already flagged nodes.
 		if node.IsWaste {
 			continue
 		}
 
-		// Check if the ID or ARN exists in the managed set
-		// Note: The graph ID is usually the ARN. The state might have ID or ARN.
-		// We need robust matching.
+		// Check if managed by Terraform.
+		//
+		//
 		id := node.ID
 
 		isManaged := false
 
-		// Direct match
+		// Check ID match.
 		if managedIDs[id] {
 			isManaged = true
 		} else {
-			// Try to match by resource ID if the graph ID is an ARN
-			// e.g. arn:aws:ec2:region:account:instance/i-12345 -> i-12345
+			// Check ARN suffix match.
+			
 			parts := strings.Split(id, "/")
 			if len(parts) > 1 {
 				resourceID := parts[len(parts)-1]
@@ -57,7 +56,7 @@ func (d *DriftDetector) ScanForDrift() {
 		}
 
 		if !isManaged {
-			// SHADOW IT DETECTED
+			// Mark as shadow IT.
 			node.IsWaste = true
 			node.RiskScore = 100
 			if node.Properties == nil {

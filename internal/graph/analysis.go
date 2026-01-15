@@ -4,17 +4,17 @@ package graph
 type ImpactReport struct {
 	TargetNode      *Node
 	DirectImpact    []*Node // Nodes directly depending on this
-	CascadingImpact []*Node // Nodes strictly reachable only through this (if we did proper dominator analysis, for now just downstream)
+	CascadingImpact []*Node // Nodes reachable through this node.
 	TotalRiskScore  int
 }
 
 // AnalyzeImpact performs a traversal to find everything that depends on the target node.
-// It uses ReverseEdges (Who points to me?) to find dependencies.
+// Analyzes dependencies.
 func (g *Graph) AnalyzeImpact(nodeID string) *ImpactReport {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
-	// Find index via idMap
+	// Lookup node index.
 	targetIdx, ok := g.idMap[nodeID]
 	if !ok {
 		return nil
@@ -25,10 +25,7 @@ func (g *Graph) AnalyzeImpact(nodeID string) *ImpactReport {
 		TargetNode: targetNode,
 	}
 
-	// 1. Direct Dependencies (Reverse Edges: Who needs me? Wait, AnalyzeImpact logic said g.Edges)
-	// Original code used: directEdges := g.Edges[nodeID]
-
-	// So "Downstream" (Forward Edges) are the things affected by this node's removal.
+	// 1. Identify direct dependencies.
 	if int(targetIdx) < len(g.Edges) {
 		directEdges := g.Edges[targetIdx] // Targets
 		for _, edge := range directEdges {
@@ -40,18 +37,18 @@ func (g *Graph) AnalyzeImpact(nodeID string) *ImpactReport {
 		}
 	}
 
-	// 2. Cascading Impact (Recursive downstream)
-	// BFS on forward edges
+	// 2. Identify cascading impact.
+	// Perform BFS analysis.
 	visited := make(map[uint32]bool)
 	queue := []uint32{}
 
-	// Seed queue with direct children indices
+	// Initialize queue.
 	for _, child := range report.DirectImpact {
 		visited[child.Index] = true
 		queue = append(queue, child.Index)
 	}
 
-	// Mark target as visited
+	// Mark processed.
 	visited[targetIdx] = true
 
 	for len(queue) > 0 {
@@ -60,7 +57,7 @@ func (g *Graph) AnalyzeImpact(nodeID string) *ImpactReport {
 
 		// Add to cascading
 		if int(currentIdx) < len(g.Nodes) {
-			// Already added during seed or loop
+			
 		}
 
 		if int(currentIdx) < len(g.Edges) {

@@ -7,7 +7,7 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// EBSModernizerHeuristic
+// EBSModernizerHeuristic identifies legacy gp2 volumes that should be upgraded to gp3.
 type EBSModernizerHeuristic struct{}
 
 func (h *EBSModernizerHeuristic) Name() string { return "EBSModernizer" }
@@ -40,7 +40,7 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 	raw := n.Properties["Size"]
 	sz := 0
 
-	// Handle SDK type ambiguity
+	// Handle type assertions for size, which involves multiple numeric types from the SDK.
 	switch v := raw.(type) {
 	case int32:
 		sz = int(v)
@@ -67,8 +67,7 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 	}
 
 	n.IsWaste = true
-	// High Risk Score because it's a "No Brainer" optimization, not just waste.
-	// But it's also "Low Risk" to change? No, risk score usually means "Priority".
+	// Assign a priority score (RiskScore) based on the impact of the optimization.
 	n.RiskScore = 3
 	n.Cost = float64(sz) * 0.02 // Savings ($0.10 -> $0.08)
 
@@ -79,7 +78,7 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 	rsn += fmt.Sprintf(" Save $%.2f/mo.", n.Cost)
 
 	n.Properties["Reason"] = rsn
-	// This connects to the Terraform Generator
+	// Suggest remediation action.
 	n.Properties["FixRecommendation"] = "Run 'cloudslash cleanup' to generate remediation scripts."
 	n.Properties["IsGP2"] = true
 }

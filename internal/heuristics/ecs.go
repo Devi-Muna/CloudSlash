@@ -12,7 +12,7 @@ import (
 	awsecs "github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-// IdleClusterHeuristic detects ECS Clusters that are costing money (EC2) but doing nothing.
+// IdleClusterHeuristic detects ECS Clusters with active container instances but no running tasks.
 type IdleClusterHeuristic struct {
 	Config internalconfig.IdleClusterConfig
 }
@@ -22,7 +22,7 @@ func (h *IdleClusterHeuristic) Name() string { return "IdleClusterHeuristic" }
 func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	g.Mu.RLock()
 	var clusters []*graph.Node
-	// Helper map to find instances by Cluster ARN
+	// Index instances by Cluster ARN.
 	instancesByCluster := make(map[string][]*graph.Node)
 
 	for _, node := range g.Nodes {
@@ -38,12 +38,11 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	g.Mu.RUnlock()
 
 	for _, cluster := range clusters {
-		// 1. The Filter (Indentifying the Zombie)
 
 		// Check 1: Capacity Exists
 		regInstances, _ := cluster.Properties["RegisteredContainerInstancesCount"].(int)
 		if regInstances == 0 {
-			// Fargate-only or empty. No EC2 waste directly attributed to "Idle Cluster".
+			// Fargate-only or empty clusters invoke no direct EC2 costs.
 			continue
 		}
 
@@ -58,17 +57,15 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		// Check 3: Services are Dormant
 		activeServices, _ := cluster.Properties["ActiveServicesCount"].(int)
 		if activeServices > 0 {
-			// Discussed: If ActiveServices > 0 but running tasks is 0, it might be broken services.
-			// But for "Idle Cluster", we strictly want abandoned ones.
+			// Active services indicate intent.
 			continue
 		}
 
-		// Check 3: The Verification (The "Pro" Check)
-		// Rule: If runningTasks == 0 AND Instance Uptime > Threshold, IT IS WASTE.
+		// Verify that all instances in the cluster have been uptime long enough to rule out scaling events.
+		// If runningTasks == 0 AND Instance Uptime > Threshold, we consider it waste.
 		isWaste := true
 
 		instances := instancesByCluster[cluster.ID]
-		hasOldInstances := false
 		
 		uptimeThreshold := h.Config.UptimeThreshold
 		if uptimeThreshold == 0 {
@@ -76,8 +73,8 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		// Logic: If ANY instance is fresh (< threshold), the cluster might be scaling up.
-		// If ALL instances are old (> threshold), it is waste.
-
+		// If ALL instances are old (> threshold), it is identified as waste.
+		
 		if len(instances) == 0 {
 			// Inconsistency: regInstances > 0 but no nodes found. Safest is to skip.
 			isWaste = false
@@ -86,7 +83,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				registeredAt, ok := inst.Properties["RegisteredAt"].(time.Time)
 				if ok {
 					if time.Since(registeredAt) > uptimeThreshold {
-						hasOldInstances = true
+						// Old instance found.
 					} else {
 						// Found a fresh instance. Abort waste flag.
 						isWaste = false
@@ -95,21 +92,14 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				}
 			}
 
-			if !hasOldInstances && isWaste {
-				// All instances were checked, none were old (and none were fresh? impossible if len > 0).
-				// Wait. logic above:
-				// if fresh found -> isWaste = false.
-				// if old found -> hasOldInstances = true.
-				// We need AT LEAST ONE old instance to confirm stasis?
-				// Actually, if we didn't find any fresh instances, and we found *some* instances, they must be old.
-				// So `isWaste` remains true (from init).
-			}
+				// All instances were checked and none were below the uptime threshold.
+				// This confirms the cluster has been idle for at least the threshold duration.
 		}
 
 		if isWaste {
 			g.MarkWaste(cluster.ID, 85)
 
-			reason := fmt.Sprintf("Idle Cluster: %d Container Instances active (>1h uptime), but 0 Tasks running.", regInstances)
+			reason := fmt.Sprintf("Idle Cluster: %d active Container Instances (>1h uptime) with 0 running tasks.", regInstances)
 			cluster.Properties["Reason"] = reason
 		}
 	}
@@ -117,7 +107,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	return nil
 }
 
-// EmptyServiceHeuristic detects services that are trying to run but failing (Crash Loop).
+// EmptyServiceHeuristic detects services with a desired count > 0 but running count == 0.
 type EmptyServiceHeuristic struct {
 	ECR *aws.ECRScanner
 	ECS *aws.ECSScanner
@@ -139,11 +129,8 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		desired, _ := service.Properties["DesiredCount"].(int)
 		running, _ := service.Properties["RunningCount"].(int)
 
-		// The Filter
 		if desired > 0 && running == 0 {
-			// It's broken.
-
-			// The Forensic Diagnosis
+			// Service is stuck. Attempt to diagnose the cause from events.
 			events, _ := service.Properties["Events"].([]string)
 			diagnosis := "Reason: Service is failing to start tasks."
 
@@ -166,13 +153,13 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				}
 			}
 
-			// Broken Image Check (The "Genius Logic")
-			// "inspect the TaskDefinition. Get the Image URI."
+			// Check if the service failure is due to a missing ECR image.
+			// Resolves the TaskDefinition to find the container image URI.
 			if h.ECS != nil && h.ECR != nil {
 				taskDefARN, _ := service.Properties["TaskDefinition"].(string)
 				if taskDefARN != "" {
-					// 1. Describe Task Definition to get Image URI
-					// N+1 Alert: Only performing this for broken services.
+					// 1. Describe Task Definition to get Image URI.
+					// Note: Only performing this for broken services to avoid N+1 issues.
 					tdOut, err := h.ECS.Client.DescribeTaskDefinition(ctx, &awsecs.DescribeTaskDefinitionInput{
 						TaskDefinition: &taskDefARN,
 					})
@@ -183,7 +170,7 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 							// 2. Check ECR
 							exists, err := h.ECR.CheckImageExists(ctx, imageURI)
 							if err == nil && !exists {
-								diagnosis = "Reason: 🚨 ZOMBIE (BROKEN ARTIFACT). Image not found in ECR."
+								diagnosis = "Reason: Broken Artifact. Image not found in ECR."
 							}
 						}
 					}

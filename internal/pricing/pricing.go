@@ -22,9 +22,9 @@ type Client struct {
 }
 
 // NewClient creates a new Pricing Client.
-// Note: Pricing API is only available in us-east-1 and ap-south-1.
+// Note: Pricing API availability is limited to specific regions.
 func NewClient(ctx context.Context) (*Client, error) {
-	// Force region to us-east-1 for Pricing API
+	// Set region to us-east-1 for pricing queries.
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	if err != nil {
 		return nil, err
@@ -59,12 +59,9 @@ func (c *Client) GetEBSPrice(ctx context.Context, region, volumeType string, siz
 }
 
 func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (float64, error) {
-	// Map API volume types to Pricing API values
-	// This varies, but let's try to be smart.
-	// EBS Pricing usually filters by "usagetype".
-	// E.g. usage type containing "EBS:VolumeUsage.gp3"
+	// Map usage types to pricing API values.
 
-	// Better approach: GetProducts with filters.
+	// Filter products by attributes.
 	filters := []types.Filter{
 		{
 			Type:  types.FilterTypeTermMatch,
@@ -99,7 +96,7 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 	case "standard":
 		volTypeVal = "Magnetic"
 	default:
-		// Fallback or unknown
+		// Handle unknown volume types.
 		return 0.1, nil // Safe default? Or error.
 	}
 
@@ -112,7 +109,7 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 	input := &pricing.GetProductsInput{
 		ServiceCode: aws.String("AmazonEC2"),
 		Filters:     filters,
-		MaxResults:  aws.Int32(1), // We just need one match to get the price
+		MaxResults:  aws.Int32(1), // Retrieve single specific product match
 	}
 
 	out, err := c.svc.GetProducts(ctx, input)
@@ -180,11 +177,11 @@ func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string)
 		{
 			Type:  types.FilterTypeTermMatch,
 			Field: aws.String("operatingSystem"),
-			Value: aws.String("Linux"), // Assumption for now
+			Value: aws.String("Linux"),
 		},
 		{
 			Type:  types.FilterTypeTermMatch,
-			Field: aws.String("preInstalledSw"), // Start clean
+			Field: aws.String("preInstalledSw"),
 			Value: aws.String("NA"),
 		},
 	}
@@ -201,7 +198,7 @@ func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string)
 	}
 
 	if len(out.PriceList) == 0 {
-		// Fallback: Try checking just instance type if strict filters failed (some instances differ)
+		// Attempt fallback search criteria.
 		return 0, fmt.Errorf("no pricing found for %s %s", region, instanceType)
 	}
 
@@ -209,7 +206,7 @@ func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string)
 }
 
 // GetNATGatewayPrice returns the monthly cost for a NAT Gateway.
-// UsageType: "NatGateway-Hours"
+// Pricing based on NatGateway-Hours usage type.
 func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64, error) {
 	cacheKey := fmt.Sprintf("nat-%s", region)
 
@@ -218,15 +215,14 @@ func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64
 	c.mu.RUnlock()
 
 	if !ok {
-		// Optimization: Fail fast (2s) if Pricing API is sluggish
+		// Check cache with short timeout to prevent blocking.
 		tCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
 		var err error
 		pricePerHour, err = c.fetchNATPrice(tCtx, region)
 		if err != nil {
-			// Fallback (Safe Mode): Return standard US-East price ($0.045/hr)
-			// This ensures the UI never hangs on network latency.
+			// Return default pricing on timeout.
 			return 0.045 * 730, nil
 		}
 		c.mu.Lock()
@@ -275,14 +271,13 @@ func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, err
 }
 
 // GetEIPPrice returns the monthly cost for an unassociated Elastic IP.
-// Pricing: $0.005/hr for unattached/remapped.
+// Pricing based on unattached EIP hourly rate.
 func (c *Client) GetEIPPrice(ctx context.Context, region string) (float64, error) {
-	// 730 hours * $0.005 = $3.65
 	return 0.005 * 730, nil
 }
 
 func parsePriceFromJSON(jsonStr string) (float64, error) {
-	// Define a minimal struct for parsing
+	// Define structs for pricing JSON parsing.
 	type PriceDimension struct {
 		PricePerUnit map[string]string `json:"pricePerUnit"`
 	}

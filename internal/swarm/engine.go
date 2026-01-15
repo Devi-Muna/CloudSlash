@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 )
@@ -116,7 +117,10 @@ func (e *Engine) worker(ctx context.Context) {
 			// Simplified throttle check
 			isThrottled := false
 			if err != nil {
-				// TODO: check for aws.isThrottle(err)
+				if strings.Contains(err.Error(), "Throttling") || strings.Contains(err.Error(), "RateExceeded") {
+					// Expo backoff handled by retry loop, just log debug
+					continue
+				}
 			}
 
 			e.aimd.Feedback(lat, isThrottled)

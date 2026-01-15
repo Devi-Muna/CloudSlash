@@ -28,8 +28,8 @@ func NewElasticacheScanner(cfg aws.Config, g *graph.Graph) *ElasticacheScanner {
 	}
 }
 
-// ScanClusters discovers clusters and analyzes "Ghost Cache" metrics.
-// Window: 7 Days.
+// ScanClusters discovers clusters and usage metrics.
+// Analyzes metrics over a 7-day window.
 func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 	paginator := elasticache.NewDescribeCacheClustersPaginator(s.Client, &elasticache.DescribeCacheClustersInput{
 		ShowCacheNodeInfo: aws.Bool(true),
@@ -56,10 +56,11 @@ func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 				"EngineVersion":  *cluster.EngineVersion,
 				"NumCacheNodes":  cluster.NumCacheNodes,
 			}
-			// 1. CurrConnections (Sum)
-			// 2. CacheHits + CacheMisses = TotalOps (Sum)
-			// 3. CPUUtilization (Max)
-			// 4. NetworkBytesIn (Sum) - Safety for "Warming" trap
+			// Fetch metrics:
+			// 1. Connections
+			// 2. Cache Hits/Misses
+			// 3. CPU Utilization
+			// 4. Network In
 			
 			go s.enrichClusterMetrics(ctx, id, cluster.CacheNodeType, props)
 		}

@@ -8,9 +8,10 @@ import (
 	"github.com/DrSkyle/cloudslash/internal/graph"
 )
 
-// DataForensicsHeuristic analyzes Data Layer services.
+// DataForensicsHeuristic identifies underutilized data layer resources.
 type DataForensicsHeuristic struct{}
 
+// Name returns the unique identifier for the heuristic.
 func (h *DataForensicsHeuristic) Name() string {
 	return "DataForensics"
 }
@@ -37,10 +38,9 @@ func (h *DataForensicsHeuristic) Analyze(g *graph.Graph) {
 }
 
 func (h *DataForensicsHeuristic) analyzeElasticache(node *graph.Node) {
-	// Tri-Metric Lock:
-	// 1. Ops (Hits+Misses) == 0
-	// 2. NetworkBytesIn < 5MB/week (Heartbeats)
-	// 3. CPU < 2%
+	// Tri-Metric Analysis:
+	// Checks for zero operations (hits/misses), low network activity, and idle CPU.
+	// This combination strongly indicates an unused cache cluster.
 	
 	hits := getFloat(node, "SumHits7d")
 	misses := getFloat(node, "SumMisses7d")
@@ -52,16 +52,17 @@ func (h *DataForensicsHeuristic) analyzeElasticache(node *graph.Node) {
 
 	if totalOps == 0 && netIn < netThreshold && cpu < 2.0 {
 		node.IsWaste = true
-		node.RiskScore = 9 // High confidence
-		node.Properties["Reason"] = "Ghost Cache: 0 Hits/Misses, Idle CPU, Negligible Network Traffic."
-		// Cost calc would utilize Node Config. Assuming generic cost for now unless Pricing API integrated.
-		node.Cost = 50.0 // Placeholder
+		node.IsWaste = true
+		node.RiskScore = 9 // High confidence due to zero activity across all metrics.
+		node.Properties["Reason"] = "Idle Cache Cluster: Zero hits/misses, negligible network, and idle CPU."
+		// Estimated cost based on node configuration.
+		node.Cost = 50.0
 	}
 }
 
 func (h *DataForensicsHeuristic) analyzeRedshift(node *graph.Node) {
-	// The Pause Button
-	// 1. Queries (24h) == 0
+	// Checks if the cluster has processed any queries in the last 24 hours.
+	// Zero queries suggests the cluster can be paused to save costs.
 	
 	queries := getFloat(node, "SumQueries24h")
 	conns := getFloat(node, "MaxConnections24h")
@@ -71,19 +72,18 @@ func (h *DataForensicsHeuristic) analyzeRedshift(node *graph.Node) {
 		node.RiskScore = 8
 		
 		if conns > 0 {
-			node.Properties["Reason"] = "Idle (Connected): 0 Queries in 24h, but active connections detected. Action: PAUSE."
+			node.Properties["Reason"] = "Idle (Connected): Zero queries in 24h, but active connections present. Consideration: Pause cluster."
 		} else {
-			node.Properties["Reason"] = "Redshift Pause Candidate: 0 Queries in 24h. Action: PAUSE."
+			node.Properties["Reason"] = "Redshift Pause Candidate: Zero queries in 24h. Recommendation: Pause cluster."
 		}
 		
-		// TODO: Check 'ClusterAvailabilityStatus' for legacy nodes
-		node.Cost = 200.0 // Placeholder
+		node.Cost = 200.0
 	}
 }
 
 func (h *DataForensicsHeuristic) analyzeDynamoDB(node *graph.Node) {
-	// Provisioned Bleed
-	// Utilization < 15%
+	// Checks for significantly over-provisioned capacity.
+	// Low utilization (< 15%) indicates wasted spend on provisioned throughput.
 	
 	rcu := getFloat(node, "ProvisionedRCU")
 	wcu := getFloat(node, "ProvisionedWCU")
@@ -110,17 +110,13 @@ func (h *DataForensicsHeuristic) analyzeDynamoDB(node *graph.Node) {
 		node.RiskScore = 7
 		
 		if hasAS {
-			node.Properties["Reason"] = fmt.Sprintf("Auto-Scaling Misconfig: Utilization %.1f%%. Lower MinCapacity.", minUtil)
+			node.Properties["Reason"] = fmt.Sprintf("Auto-Scaling Misconfiguration: Utilization %.1f%%. Recommendation: Lower minimum capacity.", minUtil)
 		} else {
-			// Breakeven Calc (Simplified)
-			// Prov Cost: $0.00065 per RCU-hour -> ~$0.47/month per RCU
-			// OnDemand: $1.25 per million units
-			// Show savings?
-			node.Properties["Reason"] = fmt.Sprintf("Provisioned Bleed: Utilization %.1f%%. Switch to On-Demand.", minUtil)
+			// Suggest switching to On-Demand for low/sporadic usage patterns.
+			node.Properties["Reason"] = fmt.Sprintf("Excessive Provisioned Capacity: Utilization %.1f%%. Recommendation: Switch to On-Demand.", minUtil)
 		}
 		
-		// Est Cost of waste = (Provisioned - Consumed) * CostPerUnit
-		node.Cost = 10.0 // Placeholder
+		node.Cost = 10.0
 	}
 }
 

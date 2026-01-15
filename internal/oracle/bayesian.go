@@ -2,42 +2,42 @@ package oracle
 
 import (
 	"sync"
+
+	"github.com/DrSkyle/cloudslash/internal/config"
 )
 
 // RiskEngine tracks the stability of cloud resources.
 type RiskEngine struct {
-	// Map "Zone:InstanceType" -> RiskScore (0.0 - 1.0)
-	// e.g. "us-east-1a:g4dn.xlarge" -> 0.8 (Highly Risky)
+	Config  config.RiskConfig
 	History map[string]float64
 	Mu      sync.RWMutex
 }
 
-func NewRiskEngine() *RiskEngine {
+func NewRiskEngine(cfg config.RiskConfig) *RiskEngine {
 	return &RiskEngine{
+		Config:  cfg,
 		History: make(map[string]float64),
 	}
 }
 
-// RecordInterruption spikes the risk for a specific pool to 100%.
+// RecordInterruption spikes the risk for a specific pool.
 func (re *RiskEngine) RecordInterruption(zone, instanceType string) {
 	re.Mu.Lock()
 	defer re.Mu.Unlock()
 	
 	key := zone + ":" + instanceType
-	re.History[key] = 1.0 // Maximum Pain
+	re.History[key] = re.Config.InterruptionPenalty // Use configured penalty (e.g. 1.0)
 }
 
-// Decay applies the healing factor. Should be called periodically (e.g. hourly).
-// Using a decay factor of 0.95 means risk halves roughly every 13 steps.
-func (re *RiskEngine) Decay(factor float64) {
+// Decay applies the healing factor.
+func (re *RiskEngine) Decay() {
 	re.Mu.Lock()
 	defer re.Mu.Unlock()
 
 	for k, v := range re.History {
-		// Minimum baseline risk for Spot is never 0.0, maybe 0.05.
-		newVal := v * factor
-		if newVal < 0.05 {
-			newVal = 0.05
+		newVal := v * re.Config.DecayFactor
+		if newVal < re.Config.BaselineRisk {
+			newVal = re.Config.BaselineRisk
 		}
 		re.History[k] = newVal
 	}
@@ -52,5 +52,5 @@ func (re *RiskEngine) GetRisk(zone, instanceType string) float64 {
 	if val, ok := re.History[key]; ok {
 		return val
 	}
-	return 0.05 // Default baseline
+	return re.Config.BaselineRisk
 }

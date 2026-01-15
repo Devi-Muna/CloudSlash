@@ -26,8 +26,8 @@ func NewRedshiftScanner(cfg aws.Config, g *graph.Graph) *RedshiftScanner {
 	}
 }
 
-// ScanClusters checks for Idle Clusters using "The Pause Button" logic.
-// Window: 24 Hours.
+// ScanClusters discovers clusters and usage metrics.
+// Analyzes metrics over a 24-hour window.
 func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 	paginator := redshift.NewDescribeClustersPaginator(s.Client, &redshift.DescribeClustersInput{})
 
@@ -54,10 +54,8 @@ func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 			// Enrich with Metrics
 			go s.enrichClusterMetrics(ctx, id, props)
 			
-			// Check RI Coverage (Note: simplified, usually requires separate API call to DescribeReservedNodes)
-			// For v1.2.9 we'll assume we check it later or here if we have cache.
-			// Let's just mark it as "OnDemand" by default unless we find an RI.
-            // (TODO: Implement DescribeReservedNodes matching logic)
+			// Optimization: Reserve Instance coverage check pending implementation.
+			// Default to On-Demand until RI matching is added.
 		}
 	}
 	return nil

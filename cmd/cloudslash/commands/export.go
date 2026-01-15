@@ -19,8 +19,7 @@ Default output directory: ./cloudslash-out/`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Initializing Forensic Export...")
 		config.Headless = true
-		// In the future, we can inject exportPath into Config if we refactor app.Run
-		// For now, this is essentially an alias for 'scan' but semantically focused on data extraction.
+		// Run scan to extract data.
 		_, _, err := app.Run(config)
 		if err != nil {
 			fmt.Printf("\n[ERROR] Export Failed: %v\n", err)
@@ -35,6 +34,4 @@ Default output directory: ./cloudslash-out/`,
 }
 
 func init() {
-	// Future expansion: --format
-	// ExportCmd.Flags().StringVar(&exportFormat, "format", "csv", "Export format (csv, json)")
 }

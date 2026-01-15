@@ -31,7 +31,7 @@ func (h *LambdaHeuristic) Analyze(g *graph.Graph) {
 }
 
 func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
-	// 1. Code Rot
+	// 1. Inactivity Check
 	invocations := getFloat(node, "SumInvocations90d")
 	lastModStr, _ := node.Properties["LastModified"].(string)
 	
@@ -48,8 +48,7 @@ func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
 	if isOld && invocations == 0 {
 		node.IsWaste = true
 		node.RiskScore = 8
-		node.Justification = "Code Rot: 0 Invocations in 90d. Last Modified > 90d."
-		// Trigger Check? (Todo)
+		node.Justification = "Inactive Function: 0 Invocations in 90d. Last Modified > 90d."
 	}
 
 	// 2. Version Pruner
@@ -59,35 +58,21 @@ func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
 	// Keep List: Top 3 (sorted?) - AWS ListVersions usually returns sorted by version?? Not valid assumption strictly, but often numerical.
 	// For simplicity, we assume generic prune count.
 	
+	// Calculate number of versions to prune (Total - 3 recent - Aliased versions).
 	pruneCount := 0
-	// We want to keep last 3.
-	// We iterate all versions. If not in aliases and not in last 3 -> Prune.
-	
-	// Assuming `versions` is list of ALL versions except $LATEST.
-	// We need to know which are "Recent".
-	// Simplification: We blindly protect Aliases.
-	// And we just count total - 3 - aliases = waste.
-	
-	// And we just count total - 3 - aliases = waste.
 	
 	for _, v := range versions {
 		if aliases[v] {
-			continue // Safe
+			continue
 		}
-		// How to identify "Recent" without sorting? 
-		// If we can't sort, we conservatively estimate waste.
-		// Let's assume user has many versions.
+		// Without exact timestamp sort, we estimate count conservatively.
 		pruneCount++ 
 	}
-	
-	// Correct logic: Total Versions - 3 (Safety) - UniqueAliases.
-	// But we need to define "waste" on the function node.
-	if pruneCount > 5 { // Threshold
-		node.IsWaste = true // Or add a separate warning?
-		// We can append to justification.
+	if pruneCount > 5 {
+		node.IsWaste = true
 		wasteGB := (float64(pruneCount) * getFloat(node, "CodeSize")) / (1024*1024*1024)
-		if wasteGB > 0.1 { // Only flag if significant storage
-			node.Justification += fmt.Sprintf(" Storage Bloat: %d Old Versions (%.2f GB) can be pruned.", pruneCount, wasteGB)
+		if wasteGB > 0.1 {
+			node.Justification += fmt.Sprintf(" Excess storage: %d old versions (%.2f GB) can be pruned.", pruneCount, wasteGB)
 		}
 	}
 }

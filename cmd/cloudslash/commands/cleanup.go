@@ -38,29 +38,25 @@ var CleanupCmd = &cobra.Command{
 		engine := swarm.NewEngine()
 		engine.Start(ctx)
 
-		// 1. Run a fresh scan (Headless)
+		// 1. Execute headless scan.
 		fmt.Println("\n[SCAN] Analyzing infrastructure topology...")
-		// Note: We need to access internal scan logic.
-		// Reusing app.Config and mimicking bootstrap logic quickly.
-		// Ideally refactor bootstrap to return the graph.
-		// For now, let's assume valid creds and basic scan.
 		client, err := aws.NewClient(ctx, config.Region, "", config.Verbose) // Default region/profile
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
 
-		// Setup minimal heuristics
+		// Initialize heuristics engine.
 		hEngine := heuristics.NewEngine()
 		hEngine.Register(&heuristics.UnattachedVolumeHeuristic{Pricing: nil})
 		// ... (Add others if needed)
 
-		// RUN SCAN (Simplified for Cleanup - just EBS for now)
+		// Execute volume scan.
 		ec2 := aws.NewEC2Scanner(client.Config, g)
 		ec2.ScanVolumes(ctx)
 		hEngine.Run(ctx, g)
 
-		// 2. Iterate and Destroy
+		// 2. Identify waste resources.
 		g.Mu.RLock()
 		var waste []*graph.Node
 		for _, node := range g.Nodes {
@@ -77,13 +73,13 @@ var CleanupCmd = &cobra.Command{
 
 		fmt.Printf("\nFound %d unused resources.\n", len(waste))
 
-		deleter := aws.NewDeleter(client.Config) // Need to implement this or just use client directly
+		deleter := aws.NewDeleter(client.Config)
 
 		for _, item := range waste {
 			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
 
-			// DEPENDENCY IMPACT CHECK
+			// Check for dependent resources.
 			dependents := g.GetUpstream(item.ID)
 			if len(dependents) > 0 {
 				activeDeps := 0

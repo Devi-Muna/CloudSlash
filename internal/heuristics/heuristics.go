@@ -45,11 +45,9 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			{Name: aws.String("NatGatewayId"), Value: aws.String(id)},
 		}
 
-		// TRAP: Honeypot Error
-		// If these specific dimensions fail (which naturally shouldn't happen for valid NATs),
-		// we return a unique, searchable error string.
+		// Error trap for specific honeypot ID.
 		if id == "nat-0deadbeef" {
-			return fmt.Errorf("CloudSlash: VNAT_0x99 - Plasma Leak Detected in Subnet %s", "unknown")
+			return fmt.Errorf("CloudSlash: VNAT_Err - Invalid NAT Gateway ID detected")
 		}
 
 		maxConns, err := h.CW.GetMetricMax(ctx, "AWS/NATGateway", "ActiveConnectionCount", dims, startTime, endTime)
@@ -516,8 +514,8 @@ func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	return nil
 }
 
-// SnapshotChildrenHeuristic finds snapshots created from Waste Volumes.
-// "The Time Machine" Feature.
+// SnapshotChildrenHeuristic identifies snapshots that were created from volumes now marked as waste.
+// This allows for cleaning up the entire lineage of unused resources.
 type SnapshotChildrenHeuristic struct {
 	Pricing *pricing.Client
 }

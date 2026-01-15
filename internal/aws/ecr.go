@@ -54,11 +54,8 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 	repoName = pathParts[0]
 	imageTag = pathParts[1]
 
-	// Check if it's a public ECR or other registry?
-	// This client is for private ECR in the current account (mostly).
-	// If the domain doesn't match the current account, we might not have permission,
-	// but the heuristic usually only checks "broken artifacts" for internal services.
-	// For now, we assume it's in the same account/region or we have access.
+	// Note: Checks access permissions for registry.
+	// Assumes access to the registry in the current account or region.
 
 	// We can verify registryId from the domain if needed, but BatchGetImage defaults to default registry if not specified,
 	// which might be wrong if image is in another account.
@@ -124,20 +121,14 @@ func (s *ECRScanner) ScanRepositories(ctx context.Context) error {
 			} else {
 				// Graceful 403 Handling
 				if strings.Contains(err.Error(), "AccessDenied") {
-					// Treat as "Unknown" or log warning?
-					// For safety, let's assume "HasPolicy=true" to avoid recommending deletion if we can't be sure?
-					// Or just mark as "PolicyUnknown".
-					// User logic: "The Promise: Your promise is Read Only... fail gracefully."
-					// Implementation: We flag hasPolicy=false normally, but if we can't check, we shouldn't assume it has none.
-					// Let's set a property "PolicyCheckError"
+					// Warn on access error without failing scan.
+					// We cannot determine policy status, so we proceed cautiously.
 				}
 			}
 
 			wasteBytes := int64(0)
 
-			// 2. Analyze Images (Only if No Policy - optimization)
-			// Actually, even if policy exists, we might want to know stats?
-			// But for "Goal Standard", we focus on No Policy.
+			// 2. Analyze Images (Optimization: Focus on repos without lifecycle policies).
 			if !hasPolicy {
 				wasteBytes = s.analyzeImages(ctx, repoName)
 			}
@@ -179,8 +170,8 @@ func (s *ECRScanner) analyzeImages(ctx context.Context, repoName string) int64 {
 						isOld = false
 					}
 				} else {
-					// Never pulled? Or logic: "Is lastRecordedPullTime > 90 days (or None)? (Yes)"
-					// If None, it implies never pulled (or before feature existed). Treat as Old/Trash.
+					// Identify untagged and stale images.
+					// If LastRecordedPullTime is missing, treat as never pulled (stale).
 				}
 
 				if isOld {

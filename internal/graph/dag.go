@@ -18,6 +18,7 @@ const (
 	EdgeTypeContains   EdgeType = "Contains"
 	EdgeTypeRuns       EdgeType = "Runs" // Added for ECS Task relationships
 	EdgeTypeFlowsTo    EdgeType = "FlowsTo"
+	EdgeTypeUses       EdgeType = "Uses"    // Added for Instance->AMI or similar dependencies
 	EdgeTypeUnknown    EdgeType = "Unknown"
 )
 
@@ -94,7 +95,7 @@ func (g *Graph) AddError(scope string, err error) {
 // GetID returns the internal integer ID for a given string ID (ARN).
 // Returns 0, false if not found.
 func (g *Graph) GetID(id string) (uint32, bool) {
-	// Optimistic Read Lock
+	// Read lock.
 	g.Mu.RLock()
 	idx, ok := g.idMap[id]
 	g.Mu.RUnlock()
@@ -102,7 +103,7 @@ func (g *Graph) GetID(id string) (uint32, bool) {
 }
 
 // GetNode returns the Node pointer for a given string ID.
-// This is a helper for legacy code but relies on the map lookup.
+// Helper method for node retrieval.
 func (g *Graph) GetNode(id string) *Node {
 	idx, ok := g.GetID(id)
 	if !ok {
@@ -133,11 +134,11 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// Intern the resource type
+	// Deduplicate resource type string.
 	resourceType = intern.String(resourceType)
 
 	if idx, exists := g.idMap[id]; exists {
-		// Update existing node
+		// Update existing node properties.
 		node := g.Nodes[idx]
 		for k, v := range props {
 			node.Properties[k] = v
@@ -146,7 +147,7 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 			node.Type = resourceType
 		}
 	} else {
-		// Create new node
+		// Initialize new node.
 		newIdx := uint32(len(g.Nodes))
 		g.idMap[id] = newIdx
 		g.Nodes = append(g.Nodes, &Node{
@@ -155,7 +156,7 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 			Type:       resourceType,
 			Properties: props,
 		})
-		// Expand Edge lists
+		// Resize edge slices.
 		g.Edges = append(g.Edges, nil)
 		g.ReverseEdges = append(g.ReverseEdges, nil)
 	}
@@ -173,7 +174,7 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// Ensure Nodes Exist
+	// Ensure nodes exist in graph.
 	srcIdx, ok := g.idMap[sourceID]
 	if !ok {
 		srcIdx = uint32(len(g.Nodes))
@@ -192,7 +193,7 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 		g.ReverseEdges = append(g.ReverseEdges, nil)
 	}
 
-	// Forward Edge
+	// Add forward edge.
 	exists := false
 	for _, e := range g.Edges[srcIdx] {
 		if e.TargetID == dstIdx && e.Type == edgeType {
@@ -209,7 +210,7 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 		})
 	}
 
-	// Reverse Edge
+	// Add reverse edge.
 	revExists := false
 	for _, e := range g.ReverseEdges[dstIdx] {
 		if e.TargetID == srcIdx && e.Type == edgeType {
@@ -287,7 +288,7 @@ func (g *Graph) MarkWaste(id string, score int) {
 	}
 	node := g.Nodes[idx]
 
-	// cloudslash:ignore logic
+	// Check for ignore tags.
 	if tags, ok := node.Properties["Tags"].(map[string]string); ok {
 		if val, ok := tags["cloudslash:ignore"]; ok {
 			val = strings.ToLower(strings.TrimSpace(val))
@@ -319,7 +320,7 @@ func (g *Graph) MarkWaste(id string, score int) {
 				}
 			}
 
-			// Grace period (e.g., "30d")
+			// Check grace period.
 			if strings.HasSuffix(val, "d") || strings.HasSuffix(val, "h") {
 				hours := 0
 				var err error
@@ -371,7 +372,7 @@ func (g *Graph) GetDownstream(id string) []string {
 	var downstream []string
 	if int(startIdx) < len(g.Edges) {
 		for _, e := range g.Edges[startIdx] {
-			// Convert index back to ID
+			// Resolve node IDs.
 			if int(e.TargetID) < len(g.Nodes) {
 				downstream = append(downstream, g.Nodes[e.TargetID].ID)
 			}
