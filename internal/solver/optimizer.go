@@ -54,8 +54,8 @@ func (opt *Optimizer) Solve(req OptimizationRequest) (*AllocationPlan, error) {
 	var bestPlan *AllocationPlan
 	minCost := req.CurrentSpend * 10.0 // Start high
 
-	// Strategy: Brute Force heuristic over "Allowed Families".
-	// Real MILP would solve this mathematically, but for v2.0 Enterprise,
+	// Strategy: Implements a brute-force heuristic over allowed instance families.
+	// While a MILP solver provides mathematical optimality, this simulation approach
 	// we simulate packing the entire cluster into each allowed instance type
 	// and pick the winner. This works well for homogenous clusters.
 
@@ -72,8 +72,7 @@ func (opt *Optimizer) Solve(req OptimizationRequest) (*AllocationPlan, error) {
 		}
 
 		// 3. Simulation: Pack everything into this instance type.
-		// Note: A real solver mixes types (heterogenous).
-		// We use a simplified homogenous assumption for the MVP iteration.
+		// Simulation assumes homogenous packing for MVP iteration.
 		factory := func() *tetris.Bin {
 			return &tetris.Bin{
 				ID:       fmt.Sprintf("node-%s-gen", instance.Name),

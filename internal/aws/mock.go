@@ -195,7 +195,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Status":               "stopped",
 		"Region":               "us-east-1",
 	})
-	// Note: RDSHeuristic handles "stopped" without CW. It should work if registered.
+	// RDSHeuristic handles stopped instances without CloudWatch metrics.
 
 	// Unused ELB (CW needed -> Manual Waste)
 	elbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/unused-internal-lb/50dc6c495c0c9999"
@@ -334,9 +334,9 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 
 	// Let's set costs here on the graph nodes directly.
 
-	// 10. [v2.0 AUTONOMY MOCK] Inefficient Monolith Fleet
+	// Scenario 10: Inefficient Monolith Fleet simulation for Autonomy Engine.
 	// Scenario: 5x m5.large instances running a legacy app.
-	// Solver should recommend migrating to c6g.large (Cheaper/Better).
+	// Solver should recommend migrating to c6g.large.
 	for i := 0; i < 5; i++ {
 		arn := fmt.Sprintf("arn:aws:ec2:us-east-1:123456789012:instance/i-0mockMonolith-%d", i)
 		s.Graph.AddNode(arn, "AWS::EC2::Instance", map[string]interface{}{
@@ -356,7 +356,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// 11. [v2.0 AUTONOMY MOCK] High Performance Compute (HPC)
+	// Scenario 11: High Performance Compute (HPC) simulation for Autonomy Engine.
 	// Scenario: 2x c5.4xlarge instances
 	for i := 0; i < 2; i++ {
 		arn := fmt.Sprintf("arn:aws:ec2:us-east-1:123456789012:instance/i-0mockHPC-%d", i)

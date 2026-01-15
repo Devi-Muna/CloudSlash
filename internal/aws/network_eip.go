@@ -71,7 +71,7 @@ func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 		for _, zone := range page.HostedZones {
 			// 2. Search Records in Zone
 			// List all record sets.
-			// Note: Route53 API does not support filtering by value.
+			// Scan all records as Route53 API lacks value-based filtering.
 			
 			recPaginator := route53.NewListResourceRecordSetsPaginator(s.R53Client, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: zone.Id,

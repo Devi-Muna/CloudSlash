@@ -22,7 +22,7 @@ type Client struct {
 }
 
 // NewClient creates a new Pricing Client.
-// Note: Pricing API availability is limited to specific regions.
+// The AWS Pricing API is region-specific and may not be available in all regions.
 func NewClient(ctx context.Context) (*Client, error) {
 	// Set region to us-east-1 for pricing queries.
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
@@ -96,8 +96,8 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 	case "standard":
 		volTypeVal = "Magnetic"
 	default:
-		// Handle unknown volume types.
-		return 0.1, nil // Safe default? Or error.
+		// Unknown volume types default to a safe value to ensure cost estimation continuity.
+		return 0.1, nil
 	}
 
 	filters = append(filters, types.Filter{

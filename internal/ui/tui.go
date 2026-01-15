@@ -91,10 +91,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Soft Delete (Mark for Death)
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
 					id := m.wasteItems[m.cursor].ID
-					// In a real app, this would call AWS: TagResource("cloudslash:status", "to-delete")
-					// For now, we simulate/log it and visually indicate it (e.g., ignore/hide it or mark it)
-					// Let's re-use ignore logic but with a "soft-delete" flag if we had one.
-					// For TUI demo, we'll log it to audit and treat it as 'handled' (ignored)
+					// Simulate "Soft Delete" by logging the action and hiding the node.
+					// This simulates a tagging operation (e.g., TagResource("cloudslash:status", "to-delete")).
 					audit.LogAction("SOFT_DELETE", id, "MARKED", 0, "Marked for later collision")
 					m.ignoreNode(id)
 				}
@@ -300,7 +298,7 @@ func (m *Model) refreshData() {
 				}
 			} else if m.FilterMode != "" {
 				// Region Filter (Simple string match on "Region" property)
-				// Note: Ensure property exists and is string
+				// Verify property existence and type before filtering.
 				if r, ok := n.Properties["Region"].(string); !ok || r != m.FilterMode {
 					continue
 				}

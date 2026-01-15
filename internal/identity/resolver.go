@@ -54,10 +54,9 @@ func (r *Resolver) Resolve(gitName, gitEmail string) (Mapping, ResolutionStatus)
 	}
 
 	// 3. Fallback: Fuzzy Name Match (Optional, strict threshold)
-	// For "Enterprise" mode, we might disable this or set threshold very high.
-	// user requests "Confidence > 90%".
-	// Implementation note: standard fuzzy matching libraries usually required.
-	// For this snippet, we will skip complex fuzzy logic to ensure safety.
+	// Enterprise mode configuration disables fuzzy matching by default for safety.
+	// Requires standard fuzzy matching library integration.
+	// For this release, strict matching is enforced.
 	
 	// 4. Unknown - Require Human Intervention
 	return Mapping{

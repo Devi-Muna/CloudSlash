@@ -54,7 +54,7 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 	repoName = pathParts[0]
 	imageTag = pathParts[1]
 
-	// Note: Checks access permissions for registry.
+	// Verify registry access permissions.
 	// Assumes access to the registry in the current account or region.
 
 	// We can verify registryId from the domain if needed, but BatchGetImage defaults to default registry if not specified,
@@ -62,7 +62,7 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 	// Let's attempt to parse registry ID from domain.
 	var registryID *string
 	domainParts := strings.Split(domain, ".")
-	if len(domainParts) > 0 && len(domainParts[0]) == 12 { // rudimentary account ID check
+	if len(domainParts) > 0 && len(domainParts[0]) == 12 { // Extract account ID from domain
 		registryID = aws.String(domainParts[0])
 	}
 

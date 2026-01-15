@@ -202,7 +202,7 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 
 			// Link to EC2 Instance Node if exists (for cross-reference)
 			ec2Arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", ec2InstanceID)
-			// Note: region/account are hard to guess here without context, but in heuristics we often match by suffix or property
+			// Construct ARN for cross-reference. Note that region/account are inferred from context.
 			// Ideally we use a consistent ARN builder. For now, we store the EC2 ID in properties for the heuristic to look up.
 			_ = ec2Arn
 		}

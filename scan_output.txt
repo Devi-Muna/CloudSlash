@@ -1,0 +1,26 @@
+
+[ COST ANOMALY DETECTED ]
+ [CRITICAL] SPEND SPIKE: Spending velocity +$1460/mo per hour
+ [WARNING] SPEND ACCELERATION: Spending suggests exponential leak (+1268/h²)
+ Current Velocity: +1459.90 $/mo per hour
+ Acceleration:     +1267.90 $/mo/h^2 (SPEND ACCELERATING)
+-----------------------------------------------------------------
+
+[ v2.1.0 OPTIMIZATION ENGINE ]
+Initializing Solver with Dynamic Intelligence...
+ -> Connecting to AWS Pricing API (this may take a moment)...
+Building Instance Catalog (30 candidates)...
+ > Connected to AWS Pricing API (us-east-1). Fetching live data...
+   [1/30] Querying m5.large        [2/30] Querying m5.xlarge       [3/30] Querying m5.2xlarge      [4/30] Querying m6i.large       [5/30] Querying m6i.xlarge      [6/30] Querying m6i.2xlarge     [7/30] Querying m6g.large       [8/30] Querying m6g.xlarge      [9/30] Querying m6g.2xlarge     [10/30] Querying t3.medium       [11/30] Querying t3.large        [12/30] Querying t3.xlarge       [13/30] Querying c5.large        [14/30] Querying c5.xlarge       [15/30] Querying c5.2xlarge      [16/30] Querying c6i.large       [17/30] Querying c6i.xlarge      [18/30] Querying c6i.2xlarge     [19/30] Querying c6g.large       [20/30] Querying c6g.xlarge      [21/30] Querying c6g.2xlarge     [22/30] Querying r5.large        [23/30] Querying r5.xlarge       [24/30] Querying r5.2xlarge      [25/30] Querying r6i.large       [26/30] Querying r6i.xlarge      [27/30] Querying r6i.2xlarge     [28/30] Querying r6g.large       [29/30] Querying r6g.xlarge      [30/30] Querying r6g.2xlarge  
+ > Catalog Complete. Live Prices: 0 | Estimates: 30
+-------------------------------------------------------------
+OPTIMIZATION PLAN (Risk Score: 5.00%)
+Current Spend: $630.00/mo -> Optimized: $0.00/mo
+POTENTIAL SAVINGS: $630.00/mo
+-------------------------------------------------------------
+ > Migrate to 0 nodes of type t3.medium
+ > Packing Efficiency: 9 items packed into 0 nodes.
+-------------------------------------------------------------
+
+[SUCCESS] Resource deletion script generated: cloudslash-out/resource_deletion.sh
+[SUCCESS] Lazarus Protocol Active: Restoration plan generated: cloudslash-out/restore.tf

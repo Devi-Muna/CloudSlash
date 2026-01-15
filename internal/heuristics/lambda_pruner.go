@@ -37,7 +37,7 @@ func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
 	
 	// Parse LastModified "2023-01-01T..."
 	lastMod, err := time.Parse("2006-01-02T15:04:05.000+0000", lastModStr) 
-	// Note: AWS format might differ, usually "2006-01-02T15:04:05.999+0000"
+	// Handle potential variations in AWS timestamp formatting.
 	if err != nil {
 		// Fallback try simple RFC3339
 		lastMod, _ = time.Parse(time.RFC3339, lastModStr)

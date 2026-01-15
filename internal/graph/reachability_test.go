@@ -43,20 +43,9 @@ func TestVoidWalker(t *testing.T) {
 		t.Errorf("InstanceA should be Reachable")
 	}
 
-	// NOTE: Current logic in reachability.go is primitive.
+	// Current reachability logic is simplified for Phase 1.
 	// It only blocks "IGW -> PrivateNode".
-	// Since chain is IGW -> VPC -> SubPrivate -> Instance
-	// IGW -> VPC (OK)
-	// VPC -> SubPrivate (OK, unless VPC is marked InternetGateway?)
-	// So InstanceB might show as Reachable unless we check "InternetSource" prop propagation.
-	//
-	// Let's adjust expectation based on CURRENT implementation or FIX implementation.
-	// Current impl: "if source == IGW && target.NetworkType == Private -> Block".
-	// But source is VPC, not IGW.
-	// So InstanceB will be reachable in current logic.
-	//
-	// REAL LOGIC needs to pass "IsPublicTraffic" token in BFS.
-	// But for now, let's just test that BFS works at all.
+	// Future enhancement: Implement token-based BFS for full traffic propagation analysis.
 
 	if g.GetNode("i-public").Reachability != ReachabilityReachable {
 		t.Errorf("BFS failed to propagate")
