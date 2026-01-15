@@ -54,18 +54,18 @@ jobs:
 
       - name: Copy Install Scripts
         run: |
-          cp scripts/install.sh dist/install.sh || true
-          cp scripts/install.ps1 dist/install.ps1 || true
-          # Fallback if scripts are in top level or legacy location?
-          # Previous context showed dist/install.sh existed in repo.
-          # Let's verify location. We will just cp everything in dist/ that exists.
+          # Create dist folder if not exists
+          mkdir -p dist
+          # Copy install.sh if it exists (check root or scripts dir)
+          if [ -f "install.sh" ]; then cp install.sh dist/; fi
+          if [ -f "scripts/install.sh" ]; then cp scripts/install.sh dist/; fi
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             dist/*
-          body_path: docs/v2.0.0_RELEASE_NOTES.md
+          body_path: docs/v2.1.0_RELEASE_NOTES.md
           draft: false
           prerelease: false
         env:
