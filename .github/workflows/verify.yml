@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: ${{ (github.event_name == 'workflow_dispatch') && fromJson('["ubuntu-latest", "windows-latest", "macos-latest"]') || fromJson('["ubuntu-latest"]') }}
 
     steps:
       - name: Checkout Code
@@ -32,34 +32,25 @@ jobs:
           go-version: "1.21"
           cache: true
 
-      - name: Build Binary
+      - name: Build Binary (Native)
         shell: bash
         run: |
           VERSION="CI-$(git rev-parse --short HEAD)"
-          # Inject version into internal/version package
           LDFLAGS="-s -w -X 'github.com/DrSkyle/cloudslash/internal/version.Current=${VERSION}'"
+          go build -v -ldflags "$LDFLAGS" -o cloudslash cmd/cloudslash/main.go
 
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            go build -v -ldflags "$LDFLAGS" -o cloudslash.exe cmd/cloudslash/main.go
-          else
-            go build -v -ldflags "$LDFLAGS" -o cloudslash cmd/cloudslash/main.go
-          fi
+      - name: Cross-Compile Verify (Windows/Mac)
+        if: runner.os == 'Linux'
+        run: |
+          echo "Verifying Cross-Compilation..."
+          GOOS=windows GOARCH=amd64 go build -o /dev/null cmd/cloudslash/main.go
+          GOOS=darwin  GOARCH=arm64 go build -o /dev/null cmd/cloudslash/main.go
+          echo "✅ Cross-platform build verified."
 
       - name: Verify Version
         shell: bash
-        run: |
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            ./cloudslash.exe --version
-          else
-            ./cloudslash --version
-          fi
+        run: ./cloudslash --version
 
       - name: Run Headless Mock Scan
         shell: bash
-        run: |
-          # Run a mock scan in headless mode to verify crash-free execution
-          if [ "${{ runner.os }}" == "Windows" ]; then
-            ./cloudslash.exe scan --mock --headless --region us-east-1
-          else
-            ./cloudslash scan --mock --headless --region us-east-1
-          fi
+        run: ./cloudslash scan --mock --headless --region us-east-1
