@@ -108,14 +108,16 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockAged", "AWS::EC2::AMI", map[string]interface{}{
 		"Name":         "legacy-server-backup-2023",
 		"State":        "available",
-		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"), // 100 days old
+		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+		"CreateTime":   time.Now().Add(-100 * 24 * time.Hour), // 100 days old
 	})
 
 	// 5h. Ignored AMI (Explicit True) -> SHOULD NOT APPEAR
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreTrue", "AWS::EC2::AMI", map[string]interface{}{
 		"Name":         "important-backup",
 		"State":        "available",
-		"CreationDate": time.Now().Add(-200 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"), // 200 days old
+		"CreationDate": time.Now().Add(-200 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+		"CreateTime":   time.Now().Add(-200 * 24 * time.Hour), // 200 days old
 		"Tags": map[string]string{
 			"cloudslash:ignore": "true",
 		},
@@ -127,6 +129,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Name":         "semi-old-backup",
 		"State":        "available",
 		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+		"CreateTime":   time.Now().Add(-100 * 24 * time.Hour),
 		"Tags": map[string]string{
 			"cloudslash:ignore": "120d",
 		},
@@ -138,6 +141,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Name":         "expired-backup",
 		"State":        "available",
 		"CreationDate": time.Now().Add(-100 * 24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+		"CreateTime":   time.Now().Add(-100 * 24 * time.Hour),
 		"Tags": map[string]string{
 			"cloudslash:ignore": "30d",
 		},
