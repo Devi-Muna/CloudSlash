@@ -225,6 +225,7 @@ func runSolver(g *graph.Graph) {
 	fmt.Println("Initializing Solver with Dynamic Intelligence...")
 
 	// 1. Initialize Pricing Client.
+	fmt.Println(" -> Connecting to AWS Pricing API (this may take a moment)...")
 	ctx := context.Background()
 	pc, err := pricing.NewClient(ctx)
 	if err != nil {
