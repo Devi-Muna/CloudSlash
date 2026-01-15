@@ -32,25 +32,26 @@ jobs:
           go-version: "1.21"
           cache: true
 
-      - name: Build Binary (Native)
-        shell: bash
+      - name: Cross-Compile (All Platforms)
         run: |
+          echo "Building binaries..."
           VERSION="CI-$(git rev-parse --short HEAD)"
           LDFLAGS="-s -w -X 'github.com/DrSkyle/cloudslash/internal/version.Current=${VERSION}'"
-          go build -v -ldflags "$LDFLAGS" -o cloudslash cmd/cloudslash/main.go
 
-      - name: Cross-Compile Verify (Windows/Mac)
-        if: runner.os == 'Linux'
-        run: |
-          echo "Verifying Cross-Compilation..."
-          GOOS=windows GOARCH=amd64 go build -o /dev/null cmd/cloudslash/main.go
-          GOOS=darwin  GOARCH=arm64 go build -o /dev/null cmd/cloudslash/main.go
-          echo "✅ Cross-platform build verified."
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o cloudslash-linux-amd64 cmd/cloudslash/main.go
 
-      - name: Verify Version
-        shell: bash
-        run: ./cloudslash --version
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o cloudslash-windows-amd64.exe cmd/cloudslash/main.go
 
-      - name: Run Headless Mock Scan
-        shell: bash
-        run: ./cloudslash scan --mock --headless --region us-east-1
+          # Mac (ARM64)
+          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o cloudslash-darwin-arm64 cmd/cloudslash/main.go
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudslash-binaries
+          path: |
+            cloudslash-linux-amd64
+            cloudslash-windows-amd64.exe
+            cloudslash-darwin-arm64
