@@ -21,7 +21,7 @@ type EKSClient interface {
 	DescribeFargateProfile(ctx context.Context, params *eks.DescribeFargateProfileInput, optFns ...func(*eks.Options)) (*eks.DescribeFargateProfileOutput, error)
 }
 
-// EKSEC2Client defines only the methods we need from EC2
+// EKSEC2Client defines the EC2 API subset required for EKS operations.
 type EKSEC2Client interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 }
@@ -51,7 +51,7 @@ func (s *EKSScanner) ScanClusters(ctx context.Context) error {
 
 		for _, clusterName := range page.Clusters {
 			if err := s.processCluster(ctx, clusterName); err != nil {
-				// Log error but continue scanning other clusters
+				// Log non-fatal cluster processing errors.
 				fmt.Printf("Warning: failed to process cluster %s: %v\n", clusterName, err)
 			}
 		}
@@ -115,8 +115,7 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 }
 
 func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// If any nodegroup exists with DesiredSize > 0, return true.
-	// Actually, listing nodegroups is paginated too.
+	// Check for any nodegroups with DesiredSize > 0.
 	paginator := eks.NewListNodegroupsPaginator(s.Client, &eks.ListNodegroupsInput{ClusterName: &clusterName})
 
 	for paginator.HasMorePages() {
@@ -165,7 +164,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 				FargateProfileName: &profileName,
 			})
 			if err != nil {
-				// Don't fail the whole scan for one profile
+				// Log warning and proceed with next profile.
 				fmt.Printf("   [Warning] Failed to describe Fargate Profile %s: %v\n", profileName, err)
 				continue
 			}
@@ -181,8 +180,8 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 				"ClusterName": clusterName,
 				"ClusterARN":  clusterARN,
 				"CreatedAt":   fp.CreatedAt,
-				"Selectors":   fp.Selectors, // Stores internal K8s Types (Namespace, Labels)
-				// PodExecutionRoleArn, Subnets, etc. can be added if needed
+				"CreatedAt":   fp.CreatedAt,
+				"Selectors":   fp.Selectors,
 			}
 
 			s.Graph.AddNode(*fp.FargateProfileArn, "AWS::EKS::FargateProfile", props)
@@ -205,12 +204,10 @@ func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName stri
 		},
 	}
 
-	// Just check if any exist. No need to paginate all if we find one.
-	// But we must paginate to find AT LEAST one.
+	// Validate existence of at least one instance matching criteria.
+	// Pagination breakdown is required to ensure complete coverage, though early exit is possible.
 	paginator := ec2.NewDescribeInstancesPaginator(s.EC2Client, input)
 
-	// We only need the first page. If it has ANY instances, we are good.
-	// Actually, we should check HasMorePages loop but break early.
 	if paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {

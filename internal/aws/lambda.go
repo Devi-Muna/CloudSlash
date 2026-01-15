@@ -62,7 +62,6 @@ func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 
 func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props map[string]interface{}) {
 	node := s.Graph.GetNode(funcName)
-	// s.Graph.Mu.Unlock() - Removed, GetNode handles lock
 	exists := (node != nil)
 	if !exists { return }
 
@@ -118,7 +117,7 @@ func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName str
 		}
 	}
 
-	// 2. Get Versions (Pagination Critical)
+	// 2. Retrieve all versions.
 	vPaginator := lambda.NewListVersionsByFunctionPaginator(s.Client, &lambda.ListVersionsByFunctionInput{FunctionName: aws.String(funcName)})
 	
 	var versions []string
@@ -130,7 +129,7 @@ func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName str
 		
 		for _, v := range page.Versions {
 			if *v.Version == "$LATEST" {
-				continue // Always keep latest
+				continue // Exclude $LATEST alias.
 			}
 			versions = append(versions, *v.Version)
 			totalSize += v.CodeSize

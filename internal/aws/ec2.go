@@ -255,16 +255,15 @@ func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 			"Tags":         parseTags(img.Tags),
 		}
 
-		// Parse CreationDate (string) -> time.Time for MarkWaste/Heuristics
-		if img.CreationDate != nil {
-			t, err := time.Parse("2006-01-02T15:04:05.000Z", *img.CreationDate)
-			if err == nil {
-				props["CreateTime"] = t
-			} else {
-				// Fallback to string if parsing fails.
-				props["CreationDate"] = *img.CreationDate
+			// Parse ISO8601 creation timestamp for waste analysis.
+			if img.CreationDate != nil {
+				t, err := time.Parse("2006-01-02T15:04:05.000Z", *img.CreationDate)
+				if err == nil {
+					props["CreateTime"] = t
+				} else {
+					props["CreationDate"] = *img.CreationDate
+				}
 			}
-		}
 		s.Graph.AddNode(arn, "AWS::EC2::AMI", props)
 
 		// Link to Snapshots (Lineage)

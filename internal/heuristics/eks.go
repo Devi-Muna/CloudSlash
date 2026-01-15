@@ -17,7 +17,7 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// Collect ELB information first to optimize downstream lookups.
+	// Index ELB information for downstream lookups.
 	type elbInfo struct {
 		Arn  string
 		Tags map[string]string
@@ -50,13 +50,13 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 			continue
 		}
 
-		// 3. Karpenter Check (Safety)
+		// 3. Karpenter Integration
 		karpenter, _ := node.Properties["KarpenterEnabled"].(bool)
 		if karpenter {
-			continue // Might be sleeping
+			continue // Skip clusters with active autoscaling.
 		}
 
-		// Checks for any active compute nodes (Managed Node Groups, Fargate, or Self-Managed).
+		// Validation of compute resources (Managed Node Groups, Fargate, or Self-Managed).
 		hasManaged, _ := node.Properties["HasManagedNodes"].(bool)
 		hasFargate, _ := node.Properties["HasFargate"].(bool)
 		hasSelf, _ := node.Properties["HasSelfManagedNodes"].(bool)
@@ -68,9 +68,9 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 
 			reason := "Idle Control Plane: Active EKS cluster with zero compute nodes for > 7 days."
 
-			// Check for orphaned ELBs associated with this cluster to recommend deletion.
+			// Identify orphaned ELBs associated with this cluster to recommend deletion.
 			clusterName := ""
-			// Extract cluster name from ARN: arn:aws:eks:region:account:cluster/ClusterName
+			// Parse cluster name from ARN: arn:aws:eks:region:account:cluster/ClusterName
 			parts := strings.Split(node.ID, "/")
 			if len(parts) > 0 {
 				clusterName = parts[len(parts)-1]
@@ -89,7 +89,7 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 				if len(orphanedELBs) > 0 {
 					reason += fmt.Sprintf("\nDeleting this cluster will leave %d Orphaned ELBs behind. Here is the CLI command to delete them too:\n", len(orphanedELBs))
 
-					// Construct CLI command
+					// Generate CLI command
 					// aws elbv2 delete-load-balancer --load-balancer-arn <ARN>
 					cmdLines := []string{}
 					for _, arn := range orphanedELBs {
