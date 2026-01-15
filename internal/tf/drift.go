@@ -34,8 +34,6 @@ func (d *DriftDetector) ScanForDrift() {
 		}
 
 		// Check if managed by Terraform.
-		//
-		//
 		id := node.ID
 
 		isManaged := false
@@ -45,7 +43,6 @@ func (d *DriftDetector) ScanForDrift() {
 			isManaged = true
 		} else {
 			// Check ARN suffix match.
-			
 			parts := strings.Split(id, "/")
 			if len(parts) > 1 {
 				resourceID := parts[len(parts)-1]
@@ -56,7 +53,7 @@ func (d *DriftDetector) ScanForDrift() {
 		}
 
 		if !isManaged {
-			// Mark as shadow IT.
+			// Identify as Shadow IT.
 			node.IsWaste = true
 			node.RiskScore = 100
 			if node.Properties == nil {

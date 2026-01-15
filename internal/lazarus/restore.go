@@ -8,7 +8,7 @@ import (
 // InstructionGenerator handles the creation of Terraform import commands
 type InstructionGenerator struct{}
 
-// GenerateImportCommand creates the command a user must run to drag a restored resource back into state.
+// GenerateImportCommand creates the command a user must run to import a restored resource.
 // address: The Terraform address (e.g. module.vpc.aws_nat_gateway.main)
 // newResourceID: The ID of the physically restored/existing resource (e.g. nat-0987654321)
 func GenerateImportCommand(address string, newResourceID string) string {

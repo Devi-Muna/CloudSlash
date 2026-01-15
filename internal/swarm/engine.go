@@ -114,11 +114,11 @@ func (e *Engine) worker(ctx context.Context) {
 			err := task(ctx)
 			lat := time.Since(start)
 
-			// Simplified throttle check
+			// Throttle detection.
 			isThrottled := false
 			if err != nil {
 				if strings.Contains(err.Error(), "Throttling") || strings.Contains(err.Error(), "RateExceeded") {
-					// Expo backoff handled by retry loop, just log debug
+					// Backoff handled by retry loop.
 					continue
 				}
 			}

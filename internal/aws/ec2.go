@@ -136,11 +136,7 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 	if len(volIDs) == 0 { return out }
 	
 	// API accepts list of IDs.
-	// We handle pagination if IDs > limit? describe_volumes_modifications usually handles simple lists.
-	// But let's assume we pass the slice.
-	
-	// Issue: If list is too big, might fail. Page size of scan is ~50-100.
-	// Should be fine.
+	// Pagination is handled by the caller or assumed to fit within request limits.
 	
 	resp, err := s.Client.DescribeVolumesModifications(ctx, &ec2.DescribeVolumesModificationsInput{
 		VolumeIds: volIDs,

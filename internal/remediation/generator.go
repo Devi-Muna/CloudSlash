@@ -50,7 +50,7 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 		switch node.Type {
 		case "AWS::EC2::Instance":
 			fmt.Fprintf(f, "echo \"Stopping EC2 Instance: %s\"\n", resourceID)
-			// Generate stop command for soft delete.
+			// Generate soft delete command.
 			fmt.Fprintf(f, "aws ec2 stop-instances --instance-ids %s\n\n", resourceID)
 			wasteCount++
 
@@ -58,7 +58,7 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 		case "AWS::EC2::Volume":
 			fmt.Fprintf(f, "echo \"Processing Volume: %s\"\n", resourceID)
 			
-			// Safety: Check for EBS Modernizer (GP2 -> GP3)
+			// Safety check: EBS Modernization.
 			if isGP2, _ := node.Properties["IsGP2"].(bool); isGP2 {
 				fmt.Fprintf(f, "echo \"  -> ACTION: Modify Volume (Optimizing gp2 -> gp3)\"\n")
 				fmt.Fprintf(f, "aws ec2 modify-volume --volume-id %s --volume-type gp3\n\n", resourceID)
@@ -170,6 +170,8 @@ func (g *Generator) GenerateIgnoreScript(path string) error {
 	fmt.Fprintf(f, "# CloudSlash Ignore Tagging Script\n")
 	fmt.Fprintf(f, "# Generated: %s\n\n", time.Now().Format(time.RFC3339))
 	fmt.Fprintf(f, "# Run this script to suppressed reporting for these resources in future scans.\n")
+	fmt.Fprintf(f, "set -e\n\n")
+
 	fmt.Fprintf(f, "set -e\n\n")
 
 	// Sort waste nodes for deterministic output.
