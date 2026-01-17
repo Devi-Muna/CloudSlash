@@ -47,6 +47,10 @@ func (m *MockEC2Client) DescribeSnapshots(ctx context.Context, params *ec2.Descr
 	return &ec2.DescribeSnapshotsOutput{}, nil
 }
 
+func (m *MockEC2Client) DescribeInstanceTypes(ctx context.Context, params *ec2.DescribeInstanceTypesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceTypesOutput, error) {
+	return &ec2.DescribeInstanceTypesOutput{}, nil
+}
+
 func TestScanVolumes(t *testing.T) {
 	tests := []struct {
 		name          string

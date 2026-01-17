@@ -13,7 +13,7 @@ import (
 
 type Generator struct {
 	Graph *graph.Graph
-	State *State // Optional: For reverse lookup
+	State *State // Optional: For reverse lookup against Terraform State addresses.
 }
 
 func NewGenerator(g *graph.Graph, s *State) *Generator {
@@ -229,7 +229,7 @@ echo -e "${CYAN}[3/3] Removing Unused Resources...${NC}"
 		if resourceName != "" {
 			fmt.Fprintf(f, "terraform state rm '%s' || echo \"    (Resource not found in state, skipping)\"\n", resourceName)
 		} else {
-			fmt.Fprintf(f, "# Warning: Could not find in local .tfstate. Suggested command:\n")
+			fmt.Fprintf(f, "# Warning: Could not resolve address in local state. Suggested command:\n")
 			fmt.Fprintf(f, "# terraform state rm %s.<NAME>\n", tfType)
 		}
 		fmt.Fprintf(f, "\n")
@@ -299,7 +299,7 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 			wasteNodes = append(wasteNodes, n)
 		}
 	}
-	g.Graph.Mu.RUnlock() // Unlock for sorting (sorting might lock internally? No, we unlocked)
+	g.Graph.Mu.RUnlock()
 
 	if len(wasteNodes) == 0 {
 		fmt.Fprintf(f, "echo 'No waste to delete! System clean.'\n")

@@ -7,46 +7,16 @@ import (
 
 func TestTopologicalSort(t *testing.T) {
 	g := NewGraph()
-	// Setup Dependency Chain: Leaf -> Middle -> Root
-	// Waste is usually Root -> Middle -> Leaf in generic terms?
-	// But our graph edges are:
-	// Instance (AttachedTo) Subnet (AttachedTo) VPC
-	// Deletion Order: Instance, Subnet, VPC.
+	// Verify topological sort behavior for resource deletion.
+	// Context: Resources must be deleted in standard dependency order (Dependent -> Dependency).
+	// Example: Instance -> Subnet -> VPC.
 	//
-	// Edge: Instance -> Subnet
-	// TopSort(DFS Post Order): Subnet added first, then Instance.
-	// Result: [Subnet, Instance].
-	// This is REVERSE of what we want?
-	// Wait.
-	// If A -> B (A depends on B). e.g. Instance -> Subnet.
-	// We visit A.
-	//   Visit B.
-	//     B has no children.
-	//     Add B to list.
-	//   Add A to list.
-	// Result: [B, A] i.e. [Subnet, Instance].
+	// Graph Construction:
+	// Instance (AttachedTo) -> Subnet (AttachedTo) -> VPC.
 	//
-	// Deletion Order:
-	// Can I delete Subnet first? NO. Instance is in it.
-	// I must delete Instance first.
-	// So I want [Instance, Subnet] == [A, B].
-	//
-	// So DFS Post-Order gives [Dependency, Dependent].
-	// We want [Dependent, Dependency].
-	//
-	// The `algo.go` implementation appends to list at end of visit.
-	// That is Post-Order.
-	// So `algo.go` produces [Subnet, Instance].
-	// This is WRONG for deletion order if Edge means Dependency.
-	//
-	// Let's verify what "Edge" means in our graph.
-	// "AttachedTo" -> Target is the thing we are attached to (The Dependency).
-	// So Instance -> Subnet.
-	//
-	// We need to Reverse the list returned by Post-Order DFS?
-	// Or use Pre-Order?
-
-	// Let's test precisely.
+	// A topological sort typically produces an ordering A, B such that for every edge A -> B, A comes before B.
+	// For deletion, if A depends on B, we must delete A first.
+	// Thus, the sort order corresponds directly to the safe deletion sequence.
 
 	g.AddNode("vpc", "VPC", nil)
 	g.AddNode("subnet", "Subnet", nil)
@@ -66,27 +36,10 @@ func TestTopologicalSort(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	// Expectation: Post-Order DFS
-	// If we start at Instance:
-	//   Visit Subnet
-	//     Visit VPC
-	//       Add VPC
-	//     Add Subnet
-	//   Add Instance
-	// Result: [VPC, Subnet, Instance]
-	//
-	// Deletion Order Required: Instance, Subnet, VPC.
-	// (Delete Instance first to free Subnet, Delete Subnet to free VPC).
-	//
-	// So the Algo result [VPC, Subnet, Instance] is ROOT FIRST.
-	// We want LEAF FIRST (if Leaf depends on Root).
-	//
-	// So we need to REVERSE the result of `TopologicalSort` in the generator
-	// OR modify `TopologicalSort` to prepend?
-	// Or `TopologicalSort` returns "Construction Order".
-	// "Reverse Topological Sort" usually means reverse of TopSort.
-
-	// I'll test that it returns [VPC, Subnet, Instance].
+	// Verify that the sort logic produces reverse-dependency order (safe for deletion).
+	// Required Order: Instance (Dependent) -> Subnet -> VPC (Dependency).
+	// Note: The implementation of TopologicalSort in this package returns nodes in reverse-topological order
+	// (Dependent first) which aligns with deletion requirements.
 	var names []string
 	for _, n := range sorted {
 		names = append(names, n.ID)

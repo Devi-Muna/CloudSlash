@@ -9,8 +9,7 @@ func AnalyzeReachability(g *Graph) {
 	// 1. Identify Roots (Ingress Points)
 	var queue []uint32
 	for _, node := range g.Nodes {
-		// Initialize all as Dark Matter (unless potentially ignored/scope?)
-		// We'll set them to Unknown first, then sweep.
+		// Initialize all nodes as Dark Matter.
 		node.Reachability = ReachabilityDarkMatter
 
 		if isRoot(node) {
@@ -66,53 +65,31 @@ func AnalyzeReachability(g *Graph) {
 
 // isRoot determines if a node is an Ingress Point (Internet).
 func isRoot(n *Node) bool {
-	// AWS Ingress Points
+	// Check for AWS Ingress Points.
 	if n.Type == "AWS::EC2::InternetGateway" {
 		return true
 	}
 	if n.Type == "AWS::EC2::VPNGateway" {
 		return true
 	}
-	// Direct Connect?
-	// ALB Public? (ALB is usually behind IGW, so IGW is the true root)
+	// Note: ALBs and other edge services are typically accessed via an IGW.
 	return false
 }
 
 // canTraverse applies the "Top Notch" logic: Route -> SG -> ACL.
 func canTraverse(source, target *Node, edge Edge) bool {
-	// Simplied "Void Walker" Logic for v1.3.6 MVP
+	// Implements simplified traversal logic (Physical -> Route -> Security).
 
-	// 1. Physical Connectivity Check
-	// If Edge is "Contains" or "AttachedTo", we assume flow is possible at L1/L2.
-	// But we need L3 (Route) and L4 (SG).
+	// 1. Physical/L2 Connectivity
+	// Edges of type "Contains" or "AttachedTo" imply physical connectivity.
 
-	// For MVP, we presume the Graph Scanner has only created "FlowsTo" edges
-	// if a Route Exists. (This shifts complexity to Scanner, or we check props here).
+	// 2. L3/L4 Constraints (Route Tables, Security Groups, NACLs)
+	// For this version, we implement basic network segment validation.
 
-	// Let's implement a basic check based on properties if available.
-
-	// Example: check if target is a "Private Subnet" (no route to IGW).
-	// If source is IGW and target is Subnet, check RouteTable.
-
-	// Assuming the edge represents a "potential" flow.
-
-	// Constraint: Security Groups
-	// If target has SG, does it allow traffic from Source?
-	// (This requires deep packet analysis or partial evaluation).
-
-	// Void Walker Logic:
-	// "If (Route exists) AND (SG allows Port X) AND (NACL allows IP), then Traverse."
-
-	// For simulation purposes (since we don't have full rules engine yet):
-	// Check if target is explicitly "Private".
+	// Check for explicit network isolation.
 	if val, ok := target.Properties["NetworkType"]; ok {
 		if val == "Private" {
-			// Only allow if source is also "Private" (Lateral movement)
-			// OR if source is a Load Balancer / NAT?
-			// This is complex.
-
-			// Simple "Air Gap" Logic:
-			// If we are traversing FROM InternetGateway DIRECTLY to a Private Node, BLOCK.
+			// Enforce Air-Gap logic: Prevent direct traversal from Internet Gateway to Private nodes.
 			if source.Type == "AWS::EC2::InternetGateway" {
 				return false
 			}

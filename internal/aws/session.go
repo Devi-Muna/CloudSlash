@@ -84,6 +84,14 @@ func (c *Client) VerifyIdentity(ctx context.Context) (string, error) {
 	return *result.Account, nil
 }
 
+// GetConfigForRegion returns a copy of the base configuration tailored for a specific region.
+// This is crucial for Cross-Region operations (like S3 buckets in EU while scanning from US).
+func (c *Client) GetConfigForRegion(region string) aws.Config {
+	cfg := c.Config.Copy()
+	cfg.Region = region
+	return cfg
+}
+
 // ListProfiles attempts to find all profiles in ~/.aws/config and ~/.aws/credentials.
 func ListProfiles() ([]string, error) {
 	home, err := os.UserHomeDir()

@@ -61,7 +61,7 @@ func TestIntegrationScanVolumes(t *testing.T) {
 	volID := *volOut.VolumeId
 	t.Logf("Created Dummy Volume: %s", volID)
 
-	// Wait briefly for consistency (LocalStack is fast but Good Practice)
+	// Wait briefly to ensure LocalStack consistency.
 	time.Sleep(1 * time.Second)
 
 	// 4. Run Scanner
@@ -75,11 +75,9 @@ func TestIntegrationScanVolumes(t *testing.T) {
 		t.Fatalf("ScanVolumes failed: %v", err)
 	}
 
-	// 5. Assert
-	// ARN format used in scanner: arn:aws:ec2:region:account:volume/ID
-	// LocalStack account ID is usually 000000000000 but scanner uses "account" placeholder in current impl
-	// Update: In internal/aws/ec2.go, I used "account" literal in fmt.Sprintf.
-	// arn := fmt.Sprintf("arn:aws:ec2:region:account:volume/%s", id)
+	// Assert
+	// Verify ARN construction matches scanner implementation.
+	// Current Implementation: arn:aws:ec2:region:account:volume/ID
 	targetARN := "arn:aws:ec2:region:account:volume/" + volID
 
 	node := g.GetNode(targetARN)

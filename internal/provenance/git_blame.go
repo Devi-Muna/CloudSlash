@@ -22,9 +22,9 @@ var execCmd = exec.Command
 // GetBlame returns the provenance for a given file and line range.
 // It attributes the resource to the commit that introduced/modified the key lines.
 func GetBlame(filePath string, startLine, endLine int) (*BlameInfo, error) {
-	// git blame -L start,end --porcelain <file>
-	// We only care about the *first* meaningful line in the block (often the resource definition).
-	// For simplicity in v1, we blame the start line of the resource block.
+	// Execute git blame via porcelain format for parsing reliability.
+	// Targets the specific start line of the resource block to identify the author.
+	// Assumes the start line represents the definition origin.
 	
 	args := []string{"blame", "-L", fmt.Sprintf("%d,%d", startLine, startLine), "--porcelain", filePath}
 	cmd := execCmd("git", args...)

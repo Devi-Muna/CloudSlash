@@ -1,8 +1,16 @@
 package aws
 
 import (
+	"context"
+	"fmt"
 	"strings"
+	"sync"
+
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
+
+var specsMu sync.RWMutex
 
 // InstanceSpecs defines the compute capacity of an instance type.
 type InstanceSpecs struct {
@@ -31,9 +39,9 @@ var CandidateTypes = []string{
 	"r6g.large", "r6g.xlarge", "r6g.2xlarge",
 }
 
-// specsMap is a local cache of instance specs to avoid API calls for standard types.
-// In a real production system, this should likely be synced from an API,
-// but for v2.0 Enterprise, a robust static map is safer than a runtime dependency failure.
+// specsMap serves as a resilient cache for instance specifications.
+// It is dynamically updated via the AWS API (DescribeInstanceTypes) during runtime,
+// but retains a curated static catalog to ensure availability during API throttling or offline analysis.
 var specsMap = map[string]InstanceSpecs{
 	// T3 Family (Burstable)
 	"t3.nano":   {VCPU: 2, Memory: 512, Arch: "x86_64"},
@@ -74,15 +82,18 @@ var specsMap = map[string]InstanceSpecs{
 }
 
 // GetSpecs returns the VCPU and Memory for a given instance type.
-// Falls back to a generic estimation if unknown.
+// Thread-safe: Uses RLock to read from the dynamic cache.
 func GetSpecs(instanceType string) InstanceSpecs {
-	if specs, ok := specsMap[instanceType]; ok {
+	specsMu.RLock()
+	specs, ok := specsMap[instanceType]
+	specsMu.RUnlock()
+
+	if ok {
 		return specs
 	}
 
-	// Heuristic Fallback: Try to parse if unknown
-	// e.g. "c5.9xlarge" -> guess based on family multiplier?
-	// For now, return a safe "Large" default to strictly avoid 0/0 division errors.
+	// Heuristic: Infer specs from family or default to a safe baseline.
+	// Prevents division-by-zero errors in utility calculations.
 	return InstanceSpecs{
 		VCPU:   2,
 		Memory: 8192,
@@ -90,13 +101,84 @@ func GetSpecs(instanceType string) InstanceSpecs {
 	}
 }
 
+// UpdateSpecsCache dynamically fetches instance details from AWS to ensure
+// the internal catalog is accurate for all observed workloads.
+func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []string) error {
+	if len(instanceTypes) == 0 {
+		return nil
+	}
+
+	// Filter for unknown types to minimize API overhead.
+	unique := make(map[string]bool)
+	var unknownTypes []types.InstanceType
+
+	specsMu.RLock()
+	for _, t := range instanceTypes {
+		if _, exists := specsMap[t]; !exists {
+			if !unique[t] {
+				unknownTypes = append(unknownTypes, types.InstanceType(t))
+				unique[t] = true
+			}
+		}
+	}
+	specsMu.RUnlock()
+
+	if len(unknownTypes) == 0 {
+		return nil
+	}
+
+	// Batch fetch details from AWS.
+	paginator := ec2.NewDescribeInstanceTypesPaginator(client, &ec2.DescribeInstanceTypesInput{
+		InstanceTypes: unknownTypes,
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			// Log failure but safely degrade to static/heuristic mode.
+			fmt.Printf("Warning: Failed to sync instance specs for %v: %v\n", unknownTypes, err)
+			return err
+		}
+
+		specsMu.Lock()
+		for _, info := range page.InstanceTypes {
+			// Extract vCPU (DefaultVCpus or VCpus)
+			vcpu := 0.0
+			if info.VCpuInfo != nil && info.VCpuInfo.DefaultVCpus != nil {
+				vcpu = float64(*info.VCpuInfo.DefaultVCpus)
+			}
+
+			// Extract Memory (SizeInMiB)
+			mem := 0.0
+			if info.MemoryInfo != nil && info.MemoryInfo.SizeInMiB != nil {
+				mem = float64(*info.MemoryInfo.SizeInMiB)
+			}
+
+			// Extract Architecture
+			arch := "x86_64"
+			if len(info.ProcessorInfo.SupportedArchitectures) > 0 {
+				// Prefer first reported architecture
+				arch = string(info.ProcessorInfo.SupportedArchitectures[0])
+			}
+
+			specsMap[string(info.InstanceType)] = InstanceSpecs{
+				VCPU:   vcpu,
+				Memory: mem,
+				Arch:   arch,
+			}
+		}
+		specsMu.Unlock()
+	}
+
+	return nil
+}
+
 // PricingStrategy defines the interface for determining costs.
 type PricingStrategy interface {
 	GetEstimatedCost(instanceType, region string) float64
 }
 
-// StaticCostEstimator provides a fallback if the API is unreachable.
-// This replaces the "Ghost Node" 70.0 hardcoded value.
+// StaticCostEstimator provides fallback pricing when the API is unavailable.
 type StaticCostEstimator struct{}
 
 func (s *StaticCostEstimator) GetEstimatedCost(instanceType, region string) float64 {

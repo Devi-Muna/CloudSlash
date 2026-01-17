@@ -18,14 +18,11 @@ func NewPacker() *Packer {
 // It takes a list of items and a factory function to create new bins (nodes).
 // It returns the list of used bins.
 func (p *Packer) Pack(items []*Item, binFactory func() *Bin) []*Bin {
-	// 1. Sort Items Decreasing (Logic: Hardest constraints first)
-	// We sort by "Area" (CPU * RAM) or Max Dimension?
-	// Standard heuristic: Sort by biggest single resource demand?
-	// Let's use scalar "Dominant Resource" heuristic.
+	// 1. Sort Items Decreasing (BFD Strategy).
+	// Constraints are handled by sorting items by resource magnitude (CPU * RAM).
+	// This ensures larger items are placed first, minimizing fragmentation.
+	// This ensures larger items are placed first, minimizing fragmentation.
 	sort.Slice(items, func(i, j int) bool {
-		// Calculate a "magnitude"
-		// magI := items[i].Dimensions.CPU + items[i].Dimensions.RAM/1024 
-		// Actually, let's just stick to "Area" proxy for now.
 		areaI := items[i].Dimensions.CPU * items[i].Dimensions.RAM
 		areaJ := items[j].Dimensions.CPU * items[j].Dimensions.RAM
 		return areaI > areaJ
@@ -37,12 +34,11 @@ func (p *Packer) Pack(items []*Item, binFactory func() *Bin) []*Bin {
 		bestFitIndex := -1
 		minResidualSpace := math.MaxFloat64
 
-		// 2. Try to fit in existing used bins (Best Fit)
+		// 2. Best Fit: Find the bin where this item leaves the minimum residual space.
 		for i, bin := range usedBins {
 			if canFit(bin, item) {
-				// Calculate "Residual Space" (Penalty)
-				// We want the bin where this item leaves the LEAST room (tightest fit).
-				// Heuristic: Residual Capacity Norm
+				// Calculate Residual Space (Current Capacity - Used - Item).
+				// Metric: Sum of residual CPU and RAM.
 				resCPU := (bin.Capacity.CPU - bin.Used.CPU) - item.Dimensions.CPU
 				resRAM := (bin.Capacity.RAM - bin.Used.RAM) - item.Dimensions.RAM
 				residual := resCPU + resRAM // Simple sum
@@ -61,8 +57,8 @@ func (p *Packer) Pack(items []*Item, binFactory func() *Bin) []*Bin {
 			// 3. Open a new Bin
 			newBin := binFactory()
 			if !newBin.AddItem(item) {
-				// Item is too big for empty bin! (Solver error usually)
-				// For now, skip or panic? Let's skip and log.
+				// Item fits neither in existing bins nor a new empty bin.
+				// This indicates the item exceeds the capacity of the largest available node type.
 				continue 
 			}
 			usedBins = append(usedBins, newBin)

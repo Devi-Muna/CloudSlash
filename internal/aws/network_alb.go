@@ -72,9 +72,8 @@ func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[st
 	node := s.Graph.GetNode(arn)
 	if node == nil { return }
 	
-	// Extract Resource ID for CW (app/lb-name/id) from ARN
 	// Extract Resource ID for CloudWatch from ARN.
-	// CW expects format: app/load-balancer-name/id
+	// Expected format: app/load-balancer-name/id
 	resourceId := ""
 	
 	// Better: use manual parsing for robustness.
@@ -136,7 +135,7 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 	
 	allRedirects := true
 	if len(out.Listeners) == 0 {
-		allRedirects = false // No listeners = Empty = Not redirect only (it's useless)
+		allRedirects = false
 	}
 	
 	for _, l := range out.Listeners {
@@ -162,8 +161,7 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 }
 
 func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
-	// WAFv2 GetWebACLForResource
-	// Scope: CLOUDFRONT or REGIONAL. ALB is REGIONAL.
+	// Check WAFv2 association (Regional Scope).
 	out, err := s.WAFClient.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{
 		ResourceArn: aws.String(arn),
 	})

@@ -19,6 +19,7 @@ type EC2Client interface {
 	DescribeSnapshots(ctx context.Context, params *ec2.DescribeSnapshotsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeSnapshotsOutput, error)
 	DescribeImages(ctx context.Context, params *ec2.DescribeImagesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeImagesOutput, error)
 	DescribeVolumesModifications(ctx context.Context, params *ec2.DescribeVolumesModificationsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesModificationsOutput, error)
+	DescribeInstanceTypes(ctx context.Context, params *ec2.DescribeInstanceTypesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceTypesOutput, error)
 }
 
 type EC2Scanner struct {
@@ -35,6 +36,8 @@ func NewEC2Scanner(cfg aws.Config, g *graph.Graph) *EC2Scanner {
 
 func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 	paginator := ec2.NewDescribeInstancesPaginator(s.Client, &ec2.DescribeInstancesInput{})
+	uniqueTypes := make(map[string]bool)
+
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -52,6 +55,8 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 					"LaunchTime": instance.LaunchTime,
 					"Tags":       parseTags(instance.Tags),
 				}
+				
+				uniqueTypes[string(instance.InstanceType)] = true
 
 				s.Graph.AddNode(arn, "AWS::EC2::Instance", props)
 
@@ -81,6 +86,23 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 			}
 		}
 	}
+
+	// Post-Scan: Synchronize specs for all discovered instance types.
+	// This ensures the solver has accurate capacity data (vCPU/RAM) for every workload,
+	// rather than relying on the static fallback catalog.
+	var observedTypes []string
+	for k := range uniqueTypes {
+		observedTypes = append(observedTypes, k)
+	}
+
+	if len(observedTypes) > 0 {
+		// Await synchronization to ensure downstream consumers have data.
+		if err := UpdateSpecsCache(ctx, s.Client, observedTypes); err != nil {
+			// Non-fatal. Fallback logic exists.
+			fmt.Printf("Warning: Spec sync failed (using static catalog): %v\n", err)
+		}
+	}
+
 	return nil
 }
 

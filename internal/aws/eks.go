@@ -180,7 +180,6 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 				"ClusterName": clusterName,
 				"ClusterARN":  clusterARN,
 				"CreatedAt":   fp.CreatedAt,
-				"CreatedAt":   fp.CreatedAt,
 				"Selectors":   fp.Selectors,
 			}
 

@@ -15,14 +15,14 @@ func TestGenerateDeletionScript(t *testing.T) {
 	g.AddNode("sub-1", "aws_subnet", nil) // Use alternate type name to test normalization
 	g.AddNode("i-1", "AWS::EC2::Instance", nil)
 
-	// Edges: Dependencies.
-	// Instance depends on Subnet. Subnet depends on VPC.
-	// Graph Edge: Dependent -> Dependency (if strictly dependency)
-	// But our graph usually models "Contains" or "AttachedTo".
-	// Algo.go TopologicalSort assumes Edge(A, B) means A depends on B (?) or A flows to B?
-	// Let's check algo_test.go: Edge("instance", "subnet").
-	// Result of TopSort: [VPC, Subnet, Instance] (Root -> Leaf).
-	// Generator Reverses this: [Instance, Subnet, VPC].
+	// Graph Topology:
+	// Instance (AttachedTo) -> Subnet (AttachedTo) -> VPC.
+	//
+	// Deletion Requirement:
+	// Resources must be deleted in reverse dependency order:
+	// 1. Instance (dependent on Subnet)
+	// 2. Subnet (dependent on VPC)
+	// 3. VPC (Root)
 
 	g.AddEdge("i-1", "sub-1")
 	g.AddEdge("sub-1", "vpc-1")
@@ -60,8 +60,8 @@ func TestGenerateDeletionScript(t *testing.T) {
 		t.Errorf("Missing VPC deletion command")
 	}
 
-	// 4. Verify Order (Dependency Resolution)
-	// Instance must be deleted BEFORE Subnet
+	// 4. Verify Execution Order
+	// Ensure instance command appears before subnet command.
 	idxInstance := strings.Index(content, "terminate-instances")
 	idxSubnet := strings.Index(content, "delete-subnet")
 	idxVPC := strings.Index(content, "delete-vpc")

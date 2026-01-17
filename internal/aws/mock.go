@@ -17,8 +17,8 @@ func NewMockScanner(g *graph.Graph) *MockScanner {
 }
 
 func (s *MockScanner) Scan(ctx context.Context) error {
-	// Simulate network delay
-	time.Sleep(100 * time.Millisecond) // Faster for demo
+	// Simulate network latency.
+	time.Sleep(100 * time.Millisecond)
 
 	// 1. Stopped Instance (Unused)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:instance/i-0mock1234567890", "AWS::EC2::Instance", map[string]interface{}{
@@ -34,8 +34,8 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	nodeMockVol := s.Graph.GetNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890")
 	if nodeMockVol != nil {
 		s.Graph.Mu.Lock()
-		nodeMockVol.Cost = 8.00                                // Manually set cost to test TUI
-		nodeMockVol.SourceLocation = "terraform/storage.tf:24" // Manually set source to test TUI
+		nodeMockVol.Cost = 8.00
+		nodeMockVol.SourceLocation = "terraform/storage.tf:24"
 		s.Graph.Mu.Unlock()
 	}
 
@@ -197,7 +197,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 	// RDSHeuristic handles stopped instances without CloudWatch metrics.
 
-	// Unused ELB (CW needed -> Manual Waste)
+	// Unused ELB (Manual Waste Simulation)
 	elbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/unused-internal-lb/50dc6c495c0c9999"
 	s.Graph.AddNode(elbArn, "AWS::ElasticLoadBalancingV2::LoadBalancer", map[string]interface{}{
 		"State":  "active",
@@ -212,7 +212,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// Right-Sizing EC2 (CW needed -> Manual Waste)
+	// Right-Sizing EC2 (Manual Waste Simulation)
 	ec2Arn := "arn:aws:ec2:us-east-1:123456789012:instance/i-0mockHuge"
 	s.Graph.AddNode(ec2Arn, "AWS::EC2::Instance", map[string]interface{}{
 		"InstanceType": "c5.4xlarge",
@@ -323,14 +323,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		},
 	})
 	s.Graph.MarkWaste("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockIGNORED", 100)
-	// Heuristic runs later and marks waste, but we need to ensure it has cost if we want charts now?
-	// The heuristics run in mock mode too (see main.go).
-	// However, heuristics calculate cost using Pricing Client which mocks don't hold.
-	// So we should manually simulate cost detection or update heuristics to check if Cost is already set?
-	// Heuristics overwrite cost usually.
-	// But in Mock Mode (main.go), we call heuristics:
-	// zombieHeuristic.Analyze(ctx, g) -> calls Pricing if set. Pricing is nil in Mock Mode.
-	// So heuristics won't set cost. We must pre-set it here and ensuring heuristics don't overwrite with 0 if Pricing is nil.
+	// Pre-set costs as Pricing Client is unavailable in mock mode.
 
 	// Let's set costs here on the graph nodes directly.
 

@@ -14,12 +14,10 @@ func TestPacker_Tetris(t *testing.T) {
 		}
 	}
 
-	// 1. Create a set of Pods that SHOULD fit perfectly into 2 nodes mathematically.
-	// Node Cap: 4000 CPU, 16384 RAM total (for 2 nodes)
-	
-	// A: 950 CPU, 3900 RAM (Fits 2 per node with gap for sidecar)
-	// Node Cap: 2000. 2x950 = 1900. Gap = 100.
-	// Sidecar: 100. Fits perfectly.
+	// Scenario:
+	// A: 950 CPU, 3900 RAM (Fits 2 per node with sidecar gap).
+	// Node Capacity used: 2x950 = 1900 mCPU. Remaining: 100 mCPU.
+	// Sidecar: 100 mCPU. Fits perfectly in the remainder.
 	items := []*Item{
 		{ID: "pod-1", Dimensions: Dimensions{CPU: 950, RAM: 3900}},
 		{ID: "pod-2", Dimensions: Dimensions{CPU: 950, RAM: 3900}},
@@ -33,10 +31,9 @@ func TestPacker_Tetris(t *testing.T) {
 	packer := NewPacker()
 	bins := packer.Pack(items, binFactory)
 
-	// Expectation:
-	// pod-1, pod-2 fit in Bin 1 (Remaining: 0 CPU, 192 RAM)
-	// pod-3, pod-4 fit in Bin 2
-	// Sidecars fit in gaps logic.
+	// Verification:
+	// Bin 1: pod-1, pod-2, sidecar (100% CPU utilization).
+	// Bin 2: pod-3, pod-4, sidecar (100% CPU utilization).
 	
 	fmt.Printf("\n🧩 Tetris Packing Result: %d Bins Used\n", len(bins))
 	for i, b := range bins {
