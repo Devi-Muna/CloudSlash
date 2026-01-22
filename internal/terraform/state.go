@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -35,6 +36,11 @@ type ParsedAttribute struct {
 
 // ParseState parses state JSON.
 func ParseState(jsonBytes []byte) (*TerraformState, error) {
+	// Handle empty state (e.g. fresh environment or no local state)
+	if len(bytes.TrimSpace(jsonBytes)) == 0 {
+		return &TerraformState{}, nil
+	}
+
 	var state TerraformState
 	if err := json.Unmarshal(jsonBytes, &state); err != nil {
 		return nil, fmt.Errorf("failed to parse terraform state: %w", err)
