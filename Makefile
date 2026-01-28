@@ -10,7 +10,7 @@ all: lint test build
 
 build:
 	@echo " -> Building $(BINARY_NAME)..."
-	go build -o $(BINARY_NAME) cmd/cloudslash/main.go
+	go build -o $(BINARY_NAME) cmd/cloudslash-cli/main.go
 
 test:
 	@echo " -> Running Unit & Integration Tests (with Race Detection)..."
