@@ -12,6 +12,7 @@ cloudslash-out/
 # OS Junk
 .DS_Store
 Thumbs.db
+.!*
 
 # Dependencies
 **/node_modules/
