@@ -55,7 +55,7 @@ Example:
 		}
 
 		// Run Engine
-		_, g, swarmEngine, err := engine.Run(config)
+		_, g, swarmEngine, err := engine.Run(cmd.Context(), config)
 		if err != nil {
 			fmt.Printf("Error running scan: %v\n", err)
 			os.Exit(1)
@@ -156,6 +156,7 @@ func init() {
 	scanCmd.Flags().Bool("headless", false, "Run without TUI (for CI/CD)")
 	scanCmd.Flags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL for Reporting")
 	scanCmd.Flags().StringVar(&config.SlackChannel, "slack-channel", "", "Override Slack Channel")
+	scanCmd.Flags().IntVar(&config.MaxConcurrency, "max-workers", 0, "Limit concurrency (default: auto)")
 }
 
 func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provenance.ProvenanceRecord) {

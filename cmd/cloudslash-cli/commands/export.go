@@ -20,7 +20,7 @@ Default output directory: ./cloudslash-out/`,
 		fmt.Println("Initializing Forensic Export...")
 		config.Headless = true
 		// Run scan to extract data.
-		_, _, _, err := engine.Run(config)
+		_, _, _, err := engine.Run(cmd.Context(), config)
 		if err != nil {
 			fmt.Printf("\n[ERROR] Export Failed: %v\n", err)
 			return

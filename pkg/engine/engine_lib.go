@@ -35,41 +35,44 @@ type Config struct {
 	Headless         bool
 	DisableCWMetrics bool
 	Verbose          bool
+	MaxConcurrency   int
 	Heuristics       internalconfig.HeuristicConfig
 }
 
-func Run(cfg Config) (bool, *graph.Graph, *swarm.Engine, error) {
+func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, error) {
 
 	if !cfg.Headless {
 		fmt.Printf("%s %s [%s]\n", version.AppName, version.Current, version.License)
 	}
 
 	// Recover from panics.
+	// Recover from panics.
+	var err error
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("\n[CRITICAL FAILURE]")
-			fmt.Printf("Error: %v\n", r)
-			
 			// Log stack trace
 			crashFile := fmt.Sprintf("crash_log_%d.txt", time.Now().Unix())
 			f, _ := os.Create(crashFile)
 			defer f.Close()
 			fmt.Fprintf(f, "Crash Time: %s\nError: %v\n", time.Now(), r)
 			
-			fmt.Printf("Details saved to %s\n", crashFile)
-			fmt.Println("Please report this issue.")
-			os.Exit(1)
+			// Return error instead of crashing
+			err = fmt.Errorf("CRITICAL FAILURE: %v (details in %s)", r, crashFile)
+			fmt.Printf("\n[RECOVERED] %v\n", err)
 		}
 	}()
 
 	// Initialize headless mode context.
+	// ctx is now passed in.
 
-	ctx := context.Background()
 	var g *graph.Graph
 	var engine *swarm.Engine
 
 	g = graph.NewGraph()
 	engine = swarm.NewEngine()
+	if cfg.MaxConcurrency > 0 {
+		engine.MaxWorkers = cfg.MaxConcurrency
+	}
 	engine.Start(ctx)
 
 	var doneChan <-chan struct{}
@@ -85,7 +88,7 @@ func Run(cfg Config) (bool, *graph.Graph, *swarm.Engine, error) {
 		<-doneChan
 	}
 
-	return true, g, engine, nil
+	return true, g, engine, err
 }
 
 func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) {

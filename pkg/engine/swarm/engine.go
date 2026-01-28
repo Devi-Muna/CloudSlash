@@ -14,9 +14,10 @@ type Engine struct {
 	tasks  chan Task
 	wg     sync.WaitGroup
 	quit   chan struct{}
-	active int
-	mu     sync.Mutex
-	stats  Stats
+	active     int
+	MaxWorkers int // 0 = unlimited (managed by AIMD)
+	mu         sync.Mutex
+	stats      Stats
 }
 
 type Stats struct {
@@ -68,6 +69,9 @@ func (e *Engine) loop(ctx context.Context) {
 			return
 		case <-ticker.C:
 			target := e.aimd.GetConcurrency()
+			if e.MaxWorkers > 0 && target > e.MaxWorkers {
+				target = e.MaxWorkers
+			}
 			current := e.activeCount()
 
 			if current < target {
