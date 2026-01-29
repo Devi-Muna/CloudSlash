@@ -191,6 +191,8 @@ Standardizes the lifecycle of remediation to prevent catastrophic data loss.
 
 CloudSlash embeds a **Common Expression Language (CEL)** engine, enabling custom compliance policies that execute continuously during scans. Unlike static analysis tools, these rules operate on the _live_ dependency graph.
 
+> **Architecture Note:** CloudSlash includes powerful **Built-in Heuristics** (detailed in the Deep Dive below) for complex algorithmic analysis (e.g., detecting hollow NAT gateways or zombie clusters). The Policy Engine complements this by enabling you to define specific **Governance Rules** (e.g., "Ban gp2 volumes") without modifying the core codebase.
+
 **Example `rules.yaml`:**
 
 ```yaml
@@ -241,6 +243,53 @@ CloudSlash stands apart by focusing on _root cause resolution_ rather than just 
 | **IaC Awareness**      | **Terraform AST Parsing**        | None                    | None               | None                    |
 | **Dependency Mapping** | **Full Graph Visualization**     | None                    | None               | None                    |
 | **Cost**               | **OSS / Self-Hosted**            | Enterprise Support plan | OSS                | $$ SaaS Subscription    |
+
+---
+
+---
+
+## Programmatic SDK Usage
+
+CloudSlash has been re-architected as a modular Go library (`pkg/engine`). The CLI/TUI is simply a consumer of this core SDK. You can import the engine directly to embed CloudSlash's unique waste detection logic into your own internal tools, IDPs (Backstage), or CI pipelines.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log/slog"
+
+    "github.com/DrSkyle/cloudslash/pkg/engine"
+)
+
+func main() {
+    // 1. Configure the Analysis Engine
+    config := engine.Config{
+        Region:           "us-east-1",
+        Headless:         true,  // Disable TUI
+        JsonLogs:         true,  // Structured logging
+        DisableCWMetrics: false, // Enable full CloudWatch lookups
+    }
+
+    // 2. Execute the Scan (returns the live Dependency Graph)
+    success, graph, _, err := engine.Run(context.Background(), config)
+    if err != nil {
+        slog.Error("Scan failed", "error", err)
+        return
+    }
+
+    if success {
+        // 3. Programmatically access detected waste
+        fmt.Printf("Analysis Complete. Found %d total nodes.\n", len(graph.Nodes))
+        for _, node := range graph.Nodes {
+            if node.IsWaste {
+                fmt.Printf(" [WASTE] %s ($%.2f/mo) - %s\n", node.ID, node.Cost, node.WasteReason)
+            }
+        }
+    }
+}
+```
 
 ---
 
