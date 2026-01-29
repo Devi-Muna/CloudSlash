@@ -17,7 +17,7 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// 1. Collect all Active AMIs
+	// Collect all Active AMIs to validate snapshot lineage.
 	activeAMIs := make(map[string]bool)
 	for _, node := range g.Nodes {
 		if node.Type == "AWS::EC2::AMI" {
@@ -25,7 +25,7 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 	}
 
-	// 2. Scan Snapshots
+	// Scan Snapshots for orphaned references.
 	for id, node := range g.Nodes {
 		if node.Type != "AWS::EC2::Snapshot" {
 			continue

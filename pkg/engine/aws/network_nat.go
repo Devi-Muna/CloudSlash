@@ -55,10 +55,10 @@ func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 			
 			s.Graph.AddNode(id, "aws_nat_gateway", props)
 			
-			// 1. Check connection metrics.
+			// Fetch connection metrics.
 			go s.checkTraffic(ctx, id, props)
 			
-			// 2. Analyze network topology.
+			// Analyze network topology for idle associations.
 			go s.checkEmptyRoom(ctx, id, vpcId)
 		}
 	}
@@ -116,7 +116,7 @@ func (s *NATScanner) checkTraffic(ctx context.Context, id string, props map[stri
 
 // checkEmptyRoom verifies if the NAT serves any ACTIVE instance.
 func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId string) {
-	// 1. Find Route Tables pointing to this NAT
+	// Find Route Tables pointing to this NAT Gateway.
 	routeReq := &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("vpc-id"), Values: []string{vpcId}},
@@ -154,7 +154,7 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 		return
 	}
 	
-	// 2. Scan Subnets for Active ENIs
+	// Scan Subnets for Active ENIs (excluding the NAT itself).
 	activeENICount := 0
 	var emptySubnetIds []string
 	

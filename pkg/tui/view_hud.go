@@ -9,7 +9,7 @@ import (
 )
 
 func (m Model) viewHUD() string {
-	// 1. Status Indicator
+	// Status Indicator.
 	status := "IDLE"
 	statusColor := subtle
 	if m.scanning {
@@ -23,13 +23,13 @@ func (m Model) viewHUD() string {
 		status = fmt.Sprintf("SCANNING%s", dots)
 	}
 
-	// 2. Waste Ticker
+	// Waste Ticker.
 	savings := fmt.Sprintf("$%.2f/mo", m.totalSavings)
 	if m.totalSavings > 0 {
 		savings += fmt.Sprintf(" ($%.0f/yr)", m.totalSavings*12)
 	}
 
-	// 3. Risk Score (Mock logic for now, or derived from graph)
+	// Risk Score (Mock logic for now, or derived from graph).
 	riskLevel := "LOW"
 	riskColor := subtle
 	if m.totalSavings > 100 {

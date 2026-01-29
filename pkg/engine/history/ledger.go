@@ -16,14 +16,34 @@ type Snapshot struct {
 	Vector         Vector            `json:"-"`               // Derived state vector.
 }
 
+// Backend defines storage for snapshots.
+type Backend interface {
+	Append(s Snapshot) error
+	Load(n int) ([]Snapshot, error)
+}
+
+// CurrentBackend is the active storage.
+var CurrentBackend Backend = &FileBackend{}
+
 // Append adds a snapshot to the ledger.
 func Append(s Snapshot) error {
+	return CurrentBackend.Append(s)
+}
+
+// LoadWindow returns recent snapshots.
+func LoadWindow(n int) ([]Snapshot, error) {
+	return CurrentBackend.Load(n)
+}
+
+// FileBackend implements filesystem storage.
+type FileBackend struct{}
+
+func (b *FileBackend) Append(s Snapshot) error {
 	path, err := GetLedgerPath()
 	if err != nil {
 		return err
 	}
 
-	// Create directory.
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
@@ -35,22 +55,18 @@ func Append(s Snapshot) error {
 	}
 	defer f.Close()
 
-	// Marshal to JSON.
 	data, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
 
-	// Append newline.
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// LoadWindow returns recent snapshots.
-func LoadWindow(n int) ([]Snapshot, error) {
+func (b *FileBackend) Load(n int) ([]Snapshot, error) {
 	path, err := GetLedgerPath()
 	if err != nil {
 		return nil, err
@@ -58,7 +74,7 @@ func LoadWindow(n int) ([]Snapshot, error) {
 
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
-		return []Snapshot{}, nil // Return empty if file missing.
+		return []Snapshot{}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -67,13 +83,10 @@ func LoadWindow(n int) ([]Snapshot, error) {
 
 	var history []Snapshot
 	scanner := bufio.NewScanner(f)
-	
-	// Read all snapshots.
-	
 	for scanner.Scan() {
 		var s Snapshot
 		if err := json.Unmarshal(scanner.Bytes(), &s); err != nil {
-			continue // Skip corrupt lines
+			continue
 		}
 		history = append(history, s)
 	}
@@ -82,7 +95,6 @@ func LoadWindow(n int) ([]Snapshot, error) {
 		return nil, err
 	}
 
-	// Return last N items.
 	if len(history) > n {
 		return history[len(history)-n:], nil
 	}

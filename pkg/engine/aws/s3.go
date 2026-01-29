@@ -54,7 +54,7 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 		name := *bucket.Name
 		arn := fmt.Sprintf("arn:aws:s3:::bucket/%s", name)
 
-		// 1. Resolve Region to avoid 301 Redirect errors
+		// Resolve Region to avoid 301 Redirect errors
 		region := "us-east-1" // Default
 		loc, err := s.Client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{Bucket: &name})
 		if err == nil && loc.LocationConstraint != "" {
@@ -65,7 +65,7 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 			}
 		}
 		
-		// 2. Get Region-Specific Client
+		// Get Region-Specific Client
 		regionalClient := s.getRegionalClient(region)
 
 		props := map[string]interface{}{

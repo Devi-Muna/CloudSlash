@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/engine/aws"
 	internalconfig "github.com/DrSkyle/cloudslash/pkg/config"
 	"github.com/DrSkyle/cloudslash/pkg/engine/forensics"
+	"github.com/DrSkyle/cloudslash/pkg/engine/policy"
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 	"github.com/DrSkyle/cloudslash/pkg/engine/heuristics"
 	"github.com/DrSkyle/cloudslash/pkg/engine/history"
@@ -22,6 +24,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/engine/swarm"
 	"github.com/DrSkyle/cloudslash/pkg/providers/tf"
 	"github.com/DrSkyle/cloudslash/pkg/version"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -36,35 +39,44 @@ type Config struct {
 	DisableCWMetrics bool
 	Verbose          bool
 	MaxConcurrency   int
+	JsonLogs         bool
+	RulesFile        string
+	HistoryURL       string // "s3://bucket/key" or empty for local
 	Heuristics       internalconfig.HeuristicConfig
 }
 
 func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, error) {
 
-	if !cfg.Headless {
+	// Initialize Logger
+	var handler slog.Handler
+	if cfg.JsonLogs {
+		handler = slog.NewJSONHandler(os.Stdout, nil)
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, nil)
+	}
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+
+	if !cfg.Headless && !cfg.JsonLogs {
 		fmt.Printf("%s %s [%s]\n", version.AppName, version.Current, version.License)
 	}
 
-	// Recover from panics.
-	// Recover from panics.
+	// Ensure graceful shutdown on panic.
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
-			// Log stack trace
+			// Log stack trace to file (Legacy Requirement)
 			crashFile := fmt.Sprintf("crash_log_%d.txt", time.Now().Unix())
 			f, _ := os.Create(crashFile)
 			defer f.Close()
 			fmt.Fprintf(f, "Crash Time: %s\nError: %v\n", time.Now(), r)
-			
-			// Return error instead of crashing
+
 			err = fmt.Errorf("CRITICAL FAILURE: %v (details in %s)", r, crashFile)
-			fmt.Printf("\n[RECOVERED] %v\n", err)
+			slog.Error("CRITICAL FAILURE", "error", r, "crash_file", crashFile)
 		}
 	}()
 
-	// Initialize headless mode context.
-	// ctx is now passed in.
-
+	// Initialize graph and engine.
 	var g *graph.Graph
 	var engine *swarm.Engine
 
@@ -73,6 +85,18 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 	if cfg.MaxConcurrency > 0 {
 		engine.MaxWorkers = cfg.MaxConcurrency
 	}
+
+	// Initialize History Backend
+	if strings.HasPrefix(cfg.HistoryURL, "s3://") {
+		backend, err := history.NewS3Backend(cfg.HistoryURL)
+		if err != nil {
+			slog.Error("Failed to initialize S3 History Backend", "error", err)
+		} else {
+			history.CurrentBackend = backend
+			slog.Info("Using S3 History Backend", "url", cfg.HistoryURL)
+		}
+	}
+
 	engine.Start(ctx)
 
 	var doneChan <-chan struct{}
@@ -117,6 +141,16 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 
 	if err := heuristicEngine.Run(ctx, g); err != nil {
 		fmt.Printf("Heuristic run failed: %v\n", err)
+	}
+
+	// ---------------------------------------------------------
+	// ENTERPRISE POLICY ENGINE (CEL)
+	// ---------------------------------------------------------
+	if cfg.RulesFile != "" {
+		slog.Info("Initializing Policy Engine", "rules_file", cfg.RulesFile)
+		if err := runPolicyEngine(ctx, cfg.RulesFile, g); err != nil {
+			slog.Error("Policy Engine failed", "error", err)
+		}
 	}
 
 	hEngine2 := heuristics.NewEngine()
@@ -337,6 +371,16 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			fmt.Printf("Time Machine Analysis failed: %v\n", err)
 		}
 
+		// ---------------------------------------------------------
+		// ENTERPRISE POLICY ENGINE (CEL)
+		// ---------------------------------------------------------
+		if cfg.RulesFile != "" {
+			slog.Info("Initializing Policy Engine", "rules_file", cfg.RulesFile)
+			if err := runPolicyEngine(ctx, cfg.RulesFile, g); err != nil {
+				slog.Error("Policy Engine failed", "error", err)
+			}
+		}
+
 		detective := forensics.NewDetective(ctClient)
 		detective.InvestigateGraph(ctx, g)
 
@@ -439,7 +483,7 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 		}
 		return nil, fmt.Errorf("failed to verify identity: %v", err)
 	}
-	fmt.Printf(" [Profile: %s] Connected to AWS Account: %s\n", profile, identity)
+	slog.Info("Connected to AWS", "profile", profile, "account", identity)
 
 	// Scanners
 	ec2Scanner := aws.NewEC2Scanner(awsClient.Config, g)
@@ -497,7 +541,7 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 
 // performSignalAnalysis analyzes cost trends.
 func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
-	// 1. Create state snapshot.
+	// Snapshot current state.
 	s := history.Snapshot{
 		Timestamp:      time.Now().Unix(),
 		ResourceCounts: make(map[string]int),
@@ -515,18 +559,18 @@ func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
 	}
 	g.Mu.RUnlock()
 
-	// 2. Persist
+	// Persist
 	if err := history.Append(s); err != nil {
 		// Non-critical failure, just log to debug if needed
 	}
 
-	// 3. Analyze history window.
+	// Analyze history window.
 	window, err := history.LoadWindow(10)
 	if err == nil {
 		// Analyze with zero budget baseline.
 		res := history.Analyze(window, 0)
 
-		// 4. Log alerts.
+		// Alert on critical signals.
 		if len(res.Alerts) > 0 {
 			fmt.Println("\n[ COST ANOMALY DETECTED ]")
 			for _, alert := range res.Alerts {
@@ -546,4 +590,71 @@ func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
 			
 		}
 	}
+}
+
+// Helper to execute the CEL policy engine.
+func runPolicyEngine(ctx context.Context, rulesFile string, g *graph.Graph) error {
+	// Read Rules YAML
+	data, err := os.ReadFile(rulesFile)
+	if err != nil {
+		return fmt.Errorf("failed to read rules file: %w", err)
+	}
+
+	type RuleConfig struct {
+		Rules []policy.DynamicRule `yaml:"rules"`
+	}
+	var config RuleConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse rules yaml: %w", err)
+	}
+
+	// 2. Initialize CEL Engine
+	engine, err := policy.NewCELEngine()
+	if err != nil {
+		return err
+	}
+
+	// 3. Compile Rules
+	slog.Info("Compiling Rules", "count", len(config.Rules))
+	if err := engine.Compile(config.Rules); err != nil {
+		return err
+	}
+
+	// 4. Evaluate against Graph Nodes
+	g.Mu.Lock()
+	defer g.Mu.Unlock()
+
+	violations := 0
+	for _, node := range g.Nodes {
+		// Convert Node properties to map[string]interface{}.
+		// Note: node.Properties is already map[string]interface{} but specific fields (ID, Type, Cost) need mapping.
+		input := map[string]interface{}{
+			"id":   node.ID,
+			"kind": node.Type, // "type" is reserved in CEL, use "kind"
+			"cost": node.Cost,
+			"tags": node.Properties["Tags"], // Assuming Tags is parsed
+			// Flatten properties into input as well? 
+			// For simplicity, let's expose 'props'
+			"props": node.Properties,
+		}
+
+		matches, err := engine.Evaluate(input)
+		if err != nil {
+			continue // Log?
+		}
+
+		if len(matches) > 0 {
+			// Mark as Waste or Policy Violation
+			node.IsWaste = true
+			violations++
+			
+			// Append Reason
+			for _, ruleID := range matches {
+				node.WasteReason += fmt.Sprintf("[Policy:%s] ", ruleID)
+			}
+		}
+	}
+	
+	slog.Info("Policy Scan Complete", "violations", violations)
+	return nil
 }

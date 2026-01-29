@@ -31,7 +31,7 @@ func (h *LambdaHeuristic) Analyze(g *graph.Graph) {
 }
 
 func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
-	// 1. Inactivity Check
+	// Check for inactivity (invocations == 0) over the last 90 days.
 	invocations := getFloat(node, "SumInvocations90d")
 	lastModStr, _ := node.Properties["LastModified"].(string)
 	
@@ -51,7 +51,7 @@ func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
 		node.Justification = "Inactive Function: 0 Invocations in 90d. Last Modified > 90d."
 	}
 
-	// 2. Version Pruner
+	// Prune old versions (keep top 3 recent + aliased).
 	versions, _ := node.Properties["AllVersions"].([]string)
 	aliases, _ := node.Properties["AliasVersions"].(map[string]bool)
 	

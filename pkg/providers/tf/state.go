@@ -29,6 +29,12 @@ type Instance struct {
 
 // ParseStateFile reads state file.
 func ParseStateFile(path string) (*State, error) {
+	// Safety Check: Is state locked?
+	lockPath := fmt.Sprintf("%s.lock.info", path)
+	if _, err := os.Stat(lockPath); err == nil {
+		return nil, fmt.Errorf("terraform state is locked (lock file found: %s). Aborting to prevent race condition", lockPath)
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read state file: %v", err)

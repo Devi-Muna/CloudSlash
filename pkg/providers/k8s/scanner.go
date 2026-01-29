@@ -26,7 +26,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		return nil // Graceful skip if no client
 	}
 
-	// --- STEP 1: THE SOURCE (List Nodes & Group by EKS NodeGroup) ---
+	// List Nodes & Group by EKS NodeGroup.
 	nodes, err := s.Client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list k8s nodes: %v", err)
@@ -57,7 +57,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		nodeGroups[ngName].NodeNames = append(nodeGroups[ngName].NodeNames, node.Name)
 	}
 
-	// Optimized STEP 2: List ALL Pods once
+	// List ALL Pods once to optimize performance.
 	allPods, err := s.Client.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list all pods: %v", err)
@@ -80,14 +80,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			pods := podsByNode[nodeName]
 
 			for _, pod := range pods {
-				// --- STEP 3: THE GREAT FILTER ---
-
-				// 1. Zombie Pod Check
+				// Zombie Pod Check.
 				if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 					continue
 				}
 
-				// 2. Infra Check (DaemonSet)
+				// Infra Check (DaemonSet).
 				isDaemonSet := false
 				for _, ref := range pod.OwnerReferences {
 					if ref.Kind == "DaemonSet" {
@@ -99,12 +97,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					continue
 				}
 
-				// 3. Mirror Check
+				// Mirror Check.
 				if _, isMirror := pod.Annotations["kubernetes.io/config.mirror"]; isMirror {
 					continue
 				}
 
-				// 4. Namespace Safety Net
+				// Namespace Safety Net.
 				if pod.Namespace == "kube-system" {
 					continue
 				}
@@ -114,7 +112,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			}
 		}
 
-		// --- ADD TO GRAPH ---
+		// Add Node Group to Graph.
 		id := fmt.Sprintf("arn:aws:eks:unknown:unknown:nodegroup/%s", ngName)
 
 		props := map[string]interface{}{

@@ -9,19 +9,19 @@ import (
 )
 
 func TestProvenanceFlow(t *testing.T) {
-	// 1. Setup Temp Dir
+	// Setup Temp Dir
 	dir, err := os.MkdirTemp("", "cloudslash-prov-test")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(dir)
 
-	// 2. Init Git Repo
+	// Initialize Git Environment.
 	runCmd(t, dir, "git", "init")
 	runCmd(t, dir, "git", "config", "user.email", "jdoe@example.com")
 	runCmd(t, dir, "git", "config", "user.name", "Jane Doe")
 
-	// 3. Create TF File
+	// Create Terraform File.
 	tfContent := `
 resource "aws_instance" "test" {
   ami           = "ami-12345678"
@@ -31,11 +31,11 @@ resource "aws_instance" "test" {
 	tfPath := filepath.Join(dir, "main.tf")
 	os.WriteFile(tfPath, []byte(tfContent), 0644)
 
-	// 4. Commit
+	// Commit initial state.
 	runCmd(t, dir, "git", "add", "main.tf")
 	runCmd(t, dir, "git", "commit", "-m", "Initial commit")
 
-	// 5. Modify Resource
+	// Modify Resource to create history.
 	// We change line 4 (instance_type)
 	newContent := `
 resource "aws_instance" "test" {
@@ -47,7 +47,7 @@ resource "aws_instance" "test" {
 	runCmd(t, dir, "git", "add", "main.tf")
 	runCmd(t, dir, "git", "commit", "-m", "Resize instance")
 
-	// 6. Test HCL Parser
+	// Verify HCL Parser finds the resource.
 	loc, err := FindResourceInDir(dir, "aws_instance", "test")
 	if err != nil {
 		t.Fatalf("FindResourceInDir failed: %v", err)
@@ -57,7 +57,7 @@ resource "aws_instance" "test" {
 		t.Logf("Found resource at lines %d-%d", loc.StartLine, loc.EndLine)
 	}
 
-	// 7. Test Git Blame (Mocked)
+	// Test Git Blame (Mocked)
 	// We override execCmd to call the TestHelperProcess
 	execCmd = fakeExecCommand
 	defer func() { execCmd = exec.Command }()

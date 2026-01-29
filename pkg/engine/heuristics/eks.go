@@ -35,13 +35,13 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 			continue
 		}
 
-		// 1. Status Check
+		// Check: Status must be ACTIVE.
 		status, _ := node.Properties["Status"].(string)
 		if status != "ACTIVE" {
 			continue
 		}
 
-		// 2. Age Check (> 7 Days)
+		// Check: Cluster Age (> 7 Days).
 		createdAt, ok := node.Properties["CreatedAt"].(time.Time)
 		if !ok {
 			continue
@@ -50,7 +50,7 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error
 			continue
 		}
 
-		// 3. Karpenter Integration
+		// Check: Karpenter Integration.
 		karpenter, _ := node.Properties["KarpenterEnabled"].(bool)
 		if karpenter {
 			continue // Skip clusters with active autoscaling.

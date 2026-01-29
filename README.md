@@ -1,6 +1,6 @@
 # CloudSlash
 
-![Version v2.0.0](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square) ![License AGPLv3](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square)
+![Version v2.1.1](https://img.shields.io/badge/version-v2.1.1-blue?style=flat-square) ![License AGPLv3](https://img.shields.io/badge/license-AGPLv3-lightgrey?style=flat-square) ![Build Status](https://img.shields.io/badge/build-passing-success?style=flat-square) [![Go Report Card](https://goreportcard.com/badge/github.com/DrSkyle/CloudSlash)](https://goreportcard.com/report/github.com/DrSkyle/CloudSlash) [![Go Reference](https://pkg.go.dev/badge/github.com/DrSkyle/CloudSlash.svg)](https://pkg.go.dev/github.com/DrSkyle/CloudSlash)
 
 > **"Infrastructure that heals itself."**
 
@@ -185,6 +185,48 @@ Standardizes the lifecycle of remediation to prevent catastrophic data loss.
 
 ---
 
+## Enterprise Capabilities
+
+### 1. Governance as Code (Policy Engine)
+
+CloudSlash embeds a **Common Expression Language (CEL)** engine, enabling custom compliance policies that execute continuously during scans. Unlike static analysis tools, these rules operate on the _live_ dependency graph.
+
+**Example `rules.yaml`:**
+
+```yaml
+rules:
+  - id: "enforce_gp3"
+    condition: "kind == 'AWS::EC2::Volume' && props.VolumeType == 'gp2'"
+    action: "violation"
+  - id: "detect_unattached_eip"
+    condition: "kind == 'AWS::EC2::EIP' && !has(props.InstanceId)"
+    action: "warn"
+```
+
+**Flexible Policy Execution:**
+Operators can maintain multiple distinct policy files (e.g., `audit.yaml`, `strict-security.yaml`) and apply them selectively at runtime. This enables different compliance standards for Dev/Test vs. Production environments.
+
+```bash
+# Execute a specific security policy and output structured JSON for SIEM ingestion
+cloudslash scan --rules security-audit-v2.yaml --json > audit_artifact.json
+```
+
+### 2. Heterogeneous Fleet Optimization
+
+Beyond standard bin-packing, the **Heterogeneous Solver** implements a sophisticated "Workhorse + Dust" algorithm for Kubernetes rightsizing:
+
+1.  **Workhorse Identification**: Mathematically selects the most cost-efficient instance family for the bulk of the cluster's workload.
+2.  **Dust Aggregation**: Identifies "dust" (small, fragmented pods) that would otherwise force an expensive scale-up.
+3.  **Mixed-Instance Packing**: Provisions a specific, smaller instance type solely for the dust, creating a mixed fleet that achieves >95% utilization.
+
+### 3. Enterprise Hardening & Security
+
+- **Terraform State Locking**: Automatically detects `terraform.tfstate.lock.info` and strictly aborts operations to prevent race conditions in CI/CD pipelines.
+- **Input Sanitization**: All generated remediation scripts (`safe_cleanup.sh`) undergo rigorous Regex validation to prevent shell injection attacks from malicious upstream resource IDs.
+- **Structured Observability**: Full support for JSON structured logging via the `--json` flag, allowing direct ingestion into Datadog, Splunk, or ELK stacks without parsing logic.
+
+---
+
 ## Competitive Analysis
 
 CloudSlash stands apart by focusing on _root cause resolution_ rather than just _reporting_.
@@ -228,6 +270,21 @@ make build
 
 ---
 
+## Permissions & Security
+
+### Least Privilege Setup
+
+Don't want to give CloudSlash full admin? No problem.
+Run this to generate the _exact_ minimal JSON policy needed:
+
+```bash
+cloudslash permissions > policy.json
+```
+
+Attach that policy to your IAM Role. It's read-only and scoped tightly.
+
+---
+
 ## Configuration
 
 The tool utilizes the standard AWS Credential Chain (`~/.aws/credentials` or `ENV` vars). Ensure your environment is configured for the target account:
@@ -237,7 +294,17 @@ export AWS_PROFILE=production
 export AWS_REGION=us-east-1
 ```
 
-For persistent configuration, create a `cloudslash.yaml` in your root directory.
+For persistent configuration, create a `cloudslash.yaml` in your root directory (`~/.cloudslash/cloudslash.yaml` or current dir).
+
+```yaml
+# ~/.cloudslash/cloudslash.yaml
+region: "us-east-1"
+json_logs: true # Machine-readable logs
+rules_file: "my_rules.yaml" # Path to policy rules
+max_workers: 20 # Speed up scans
+```
+
+CloudSlash respects precedence: `CLI Flags` > `ENV Vars` > `Config File` > `Defaults`.
 
 ---
 
@@ -277,6 +344,8 @@ cloudslash scan [flags]
 
 - `--headless`: Disables the TUI. Recommended for CI/CD pipelines.
 - `--region <list>`: Comma-separated target regions (e.g., `us-east-1,eu-central-1`).
+- `--json`: Enable structured JSON logging for observability tools (Datadog, Splunk).
+- `--rules <file>`: Load custom policy rules (CEL) to flag specific violations.
 - `--no-metrics`: Skip CloudWatch API calls (faster, but less accurate).
 
 **Interactive TUI Controls:**

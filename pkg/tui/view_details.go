@@ -14,10 +14,10 @@ func (m Model) viewDetails() string {
 	}
 	node := m.wasteItems[m.cursor]
 
-	// 1. Header
+	// Render Header.
 	header := detailsHeaderStyle.Render(fmt.Sprintf("%s : %s", node.Type, node.ID))
 
-	// 2. Properties List
+	// Properties List.
 	var props []string
 	// Sort keys for deterministic display
 	var keys []string
@@ -33,7 +33,7 @@ func (m Model) viewDetails() string {
 		props = append(props, line)
 	}
 
-	// 3. Cost & Risk Section (Simulated "Intel")
+	// Cost & Risk Section (Simulated "Intel").
 	cost := fmt.Sprintf("MONTHLY WASTE: $%.2f", node.Cost)
 	risk := fmt.Sprintf("RISK SCORE:    %d/100", node.RiskScore)
 
@@ -66,13 +66,13 @@ func (m Model) viewDetails() string {
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#F05D5E")).Render("BLAME:         "+fmt.Sprintf("%v", node.Properties["Owner"])),
 	)
 
-	// 4. Source Location (if available)
+	// Source Location (if available).
 	source := "Source: Unknown (Not managed by Terraform)"
 	if node.SourceLocation != "" {
 		source = fmt.Sprintf("Source: %s", node.SourceLocation)
 	}
 
-	// 5. Actions Footer
+	// Keyboard shortcuts footer.
 	actions := []string{
 		"[I]gnore Resource",
 		"[O]pen in Console",

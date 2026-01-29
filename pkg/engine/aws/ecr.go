@@ -113,7 +113,7 @@ func (s *ECRScanner) ScanRepositories(ctx context.Context) error {
 			repoName := *repo.RepositoryName
 			repoArn := *repo.RepositoryArn
 
-			// 1. Check Lifecycle Policy
+			// Check for Lifecycle Policy
 			hasPolicy := false
 			policyInput := &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)}
 			if _, err := s.Client.GetLifecyclePolicy(ctx, policyInput); err == nil {
@@ -128,7 +128,7 @@ func (s *ECRScanner) ScanRepositories(ctx context.Context) error {
 
 			wasteBytes := int64(0)
 
-			// 2. Analyze Images (Optimization: Focus on repos without lifecycle policies).
+			// Analyze Images if no lifecycle policy is present.
 			if !hasPolicy {
 				wasteBytes = s.analyzeImages(ctx, repoName)
 			}

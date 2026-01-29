@@ -3,6 +3,7 @@ package remediation
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -20,6 +21,8 @@ type Generator struct {
 func NewGenerator(g *graph.Graph) *Generator {
 	return &Generator{Graph: g}
 }
+
+var idRegex = regexp.MustCompile("^[a-zA-Z0-9._-]+$")
 
 // GenerateSafeDeleteScript creates a shell script for safe cleanup.
 func (g *Generator) GenerateSafeDeleteScript(path string) error {
@@ -46,6 +49,11 @@ func (g *Generator) GenerateSafeDeleteScript(path string) error {
 
 		// Extract resource ID from ARN.
 		resourceID := extractResourceID(node.ID)
+
+		if !idRegex.MatchString(resourceID) {
+			fmt.Fprintf(f, "# SKIPPING MALFORMED ID (Potential Injection): %s\n", resourceID)
+			continue
+		}
 
 		switch node.Type {
 		case "AWS::EC2::Instance":

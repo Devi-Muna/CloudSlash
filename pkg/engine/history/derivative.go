@@ -27,17 +27,16 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	current := history[len(history)-1]
 	prev := history[len(history)-2]
 
-	// 1. Calculate time delta.
+	// Calculate derivatives using finite difference method.
 	timeDelta := float64(current.Timestamp - prev.Timestamp) / 3600.0
 	if timeDelta == 0 {
 		return AnalysisResult{CurrentBurnRate: current.TotalMonthlyCost}
 	}
 
-	// 2. Calculate velocity.
 	costDelta := current.TotalMonthlyCost - prev.TotalMonthlyCost
 	velocity := costDelta / timeDelta
 
-	// 3. Calculate acceleration.
+	// Calculate second-order derivative (acceleration).
 	acceleration := 0.0
 	if len(history) >= 3 {
 		prev2 := history[len(history)-3]
@@ -48,12 +47,10 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 		}
 	}
 
-	// 4. Project future burn.
+	// Project future burn (taylor expansion approximation).
 	projectedBurn := current.TotalMonthlyCost + (velocity * 24) + (0.5 * acceleration * 24 * 24)
 
-	// 5. Calculate Time-To-Bankrupt.
-	
-	
+	// Estimate Time-To-Bankrupt if a budget exists.
 	var ttb time.Duration = -1
 	if budget > 0 && velocity > 0 {
 		remainingHeadroom := budget - current.TotalMonthlyCost
@@ -65,7 +62,7 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 		}
 	}
 
-	// 6. Generate alerts.
+	// Generate alerts based on thresholds.
 	var alerts []string
 
 	// Check velocity threshold.

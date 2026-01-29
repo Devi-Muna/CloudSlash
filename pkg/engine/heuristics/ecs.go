@@ -39,14 +39,14 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 
 	for _, cluster := range clusters {
 
-		// Check 1: Capacity Exists
+		// Check 1: Capacity Exists.
 		regInstances, _ := cluster.Properties["RegisteredContainerInstancesCount"].(int)
 		if regInstances == 0 {
 			// Fargate-only or empty clusters invoke no direct EC2 costs.
 			continue
 		}
 
-		// Check 2: Workload is Zero
+		// Check 2: Workload is Zero (No running or pending tasks).
 		runningTasks, _ := cluster.Properties["RunningTasksCount"].(int)
 		pendingTasks, _ := cluster.Properties["PendingTasksCount"].(int)
 
@@ -54,7 +54,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			continue
 		}
 
-		// Check 3: Services are Dormant
+		// Check 3: Active Services are Dormant.
 		activeServices, _ := cluster.Properties["ActiveServicesCount"].(int)
 		if activeServices > 0 {
 			// Active services indicate intent.

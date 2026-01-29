@@ -1,0 +1,7 @@
+rules:
+  - id: "experimental_rule"
+    condition: "kind == 'AWS::EC2::Instance' && cost > 0.0"
+    action: "warn"
+  - id: "eip_unattached"
+    condition: "kind == 'AWS::EC2::EIP' && !has(props.InstanceId)"
+    action: "violation"

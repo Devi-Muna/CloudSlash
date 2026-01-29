@@ -14,7 +14,7 @@ func (h *AgedAMIHeuristic) Name() string {
 }
 
 func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
-	// Phase 1: Identify candidates (Read-Only).
+	// Identify candidates (Read-Only).
 	// Gather candidates first to avoid holding a Lock while calling MarkWaste.
 	g.Mu.RLock()
 	var candidates []string
@@ -64,13 +64,13 @@ func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	}
 	g.Mu.RUnlock()
 
-	// PASS 2: Mark Waste (Write)
+	// Mark waste for identified candidates.
 	for _, arn := range candidates {
 		// Use MarkWaste to respect 'cloudslash:ignore' tags
 		// This handles internal locking and tag validation
 		g.MarkWaste(arn, 40)
 
-		// Phase 3: Enrich Metadata (Write)
+		// Enrich Metadata
 		// If MarkWaste succeeded (wasn't ignored), we add details.
 		// Re-acquire lock to safely modify node properties.
 		node := g.GetNode(arn)

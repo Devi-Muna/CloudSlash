@@ -20,13 +20,13 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	// Simulate network latency.
 	time.Sleep(100 * time.Millisecond)
 
-	// 1. Stopped Instance (Unused)
+	// Stopped Instance (Unused).
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:instance/i-0mock1234567890", "AWS::EC2::Instance", map[string]interface{}{
 		"State":      "stopped",
 		"LaunchTime": time.Now().Add(-60 * 24 * time.Hour), // 60 days old
 	})
 
-	// 2. Unattached Volume (Auditor Test)
+	// Unattached Volume (Auditor Test).
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890", "AWS::EC2::Volume", map[string]interface{}{
 		"State": "available",
 		"Size":  100, // GB
@@ -39,14 +39,14 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// 3. Unused Volume (Attached to stopped instance)
+	// Unused Volume (Attached to stopped instance).
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockZombie", "AWS::EC2::Volume", map[string]interface{}{
 		"State":               "in-use",
 		"AttachedInstanceId":  "i-0mock1234567890",
 		"DeleteOnTermination": false,
 	})
 
-	// 4. Idle NAT Gateway
+	// Idle NAT Gateway.
 	// Triggers NetworkAnalysisHeuristic
 	natArn := "arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"
 	s.Graph.AddNode(natArn, "aws_nat_gateway", map[string]interface{}{
@@ -57,7 +57,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region":           "us-east-1",
 	})
 
-	// 5. Mock Snapshot (Time Machine Test)
+	// Mock Snapshot (Time Machine Test).
 	// Parent volume is vol-0mock1234567890 (which is waste)
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild", "AWS::EC2::Snapshot", map[string]interface{}{
 		"State":      "completed",
@@ -65,7 +65,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"VolumeSize": 100,
 	})
 
-	// 5b. Safe-Release Elastic IP
+	// Safe-Release Elastic IP (No Cost).
 	// Triggers NetworkAnalysisHeuristic
 	eipArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mock123"
 	s.Graph.AddNode(eipArn, "aws_eip", map[string]interface{}{
@@ -75,7 +75,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"FoundInDNS":    false, // Safe
 	})
 
-	// 5c. Unattached EIP
+	// Unattached EIP (Waste).
 	eipDangerArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger"
 	s.Graph.AddNode(eipDangerArn, "aws_eip", map[string]interface{}{
 		"PublicIp":      "203.0.113.99",
@@ -85,7 +85,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"DNSZone":       "production.com",
 	})
 
-	// 5d. S3 Lifecycle Gap
+	// S3 Lifecycle Gap (Missing Abort Rule).
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket-iceberg", "AWS::S3::Bucket", map[string]interface{}{
 		"Name":              "mock-bucket-iceberg",
 		"HasAbortLifecycle": false,
@@ -228,12 +228,12 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// 5. Stale S3 Multipart Upload
+	// Stale S3 Multipart Upload.
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket/upload-1", "AWS::S3::MultipartUpload", map[string]interface{}{
 		"Initiated": time.Now().Add(-10 * 24 * time.Hour), // 10 days old
 	})
 
-	// 7. ECS: Idle Cluster (The Money Saver)
+	// ECS: Idle Cluster (The Money Saver).
 	clusterArn := "arn:aws:ecs:us-east-1:123456789012:cluster/production-unused"
 	s.Graph.AddNode(clusterArn, "AWS::ECS::Cluster", map[string]interface{}{
 		"Name":                              "production-unused",
@@ -252,7 +252,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 	s.Graph.AddTypedEdge(clusterArn, clusterArn+"/container-instance/ci-mock-1", graph.EdgeType("HAS_INSTANCE"), 1)
 
-	// 8. ECS: Empty Service (Crash Loop)
+	// ECS: Empty Service (Crash Loop).
 	serviceArn := "arn:aws:ecs:us-east-1:123456789012:service/frontend-cluster/payment-service-broken"
 	s.Graph.AddNode(serviceArn, "AWS::ECS::Service", map[string]interface{}{
 		"Name":           "payment-service-broken",

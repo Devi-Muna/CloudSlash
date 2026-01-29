@@ -6,7 +6,7 @@ func AnalyzeReachability(g *Graph) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	// 1. Identify Roots (Ingress Points)
+	// Identify Roots (Ingress Points).
 	var queue []uint32
 	for _, node := range g.Nodes {
 		// Initialize all nodes as Dark Matter.
@@ -18,7 +18,7 @@ func AnalyzeReachability(g *Graph) {
 		}
 	}
 
-	// 2. BFS Flood Fill
+	// BFS Flood Fill.
 	visited := make(map[uint32]bool)
 	for _, id := range queue {
 		visited[id] = true
@@ -43,7 +43,7 @@ func AnalyzeReachability(g *Graph) {
 				}
 				targetNode := g.Nodes[targetIdx]
 
-				// 3. The Constraint Check
+				// Apply Constraint Check.
 				if canTraverse(g.Nodes[currentIdx], targetNode, edge) {
 					targetNode.Reachability = ReachabilityReachable
 					visited[targetIdx] = true
@@ -53,7 +53,7 @@ func AnalyzeReachability(g *Graph) {
 		}
 	}
 
-	// 4. Reporting (Optional Debug)
+	// Reporting phase (optional Debug)
 	// countDark := 0
 	// for _, n := range g.Nodes {
 	// 	if n.Reachability == ReachabilityDarkMatter {

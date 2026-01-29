@@ -43,6 +43,7 @@ type Node struct {
 	Type           string
 	Properties     map[string]interface{}
 	IsWaste        bool
+	WasteReason    string
 	Justified      bool
 	Justification  string
 	Ignored        bool

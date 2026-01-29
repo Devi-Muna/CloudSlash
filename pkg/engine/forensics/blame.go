@@ -23,7 +23,7 @@ func NewDetective(ct *aws.CloudTrailClient) *Detective {
 // 2. Check CloudTrail (if initialized).
 // 3. Return "UNCLAIMED".
 func (d *Detective) IdentifyOwner(ctx context.Context, node *graph.Node) string {
-	// 1. Tag Check
+	// Check common tagging patterns (Owner, Creator, etc).
 	if node.Properties != nil {
 		tags := []string{"Owner", "owner", "CreatedBy", "created_by", "Creator", "creator", "Contact", "contact", "User", "user"}
 		for _, t := range tags {
@@ -40,7 +40,7 @@ func (d *Detective) IdentifyOwner(ctx context.Context, node *graph.Node) string 
 		}
 	}
 
-	// 2. CloudTrail Check
+	// Attempt lookup via CloudTrail events.
 	if d.CT != nil {
 		// Extract Resource ID (strip ARN if needed)
 		resourceID := node.ID

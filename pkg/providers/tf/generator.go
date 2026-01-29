@@ -286,12 +286,12 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 	}
 	defer f.Close()
 
-	// 1. Header
+	// Generate Header.
 	fmt.Fprintf(f, "#!/bin/bash\n")
 	fmt.Fprintf(f, "# CloudSlash Resource Deletion Sequence (%s)\n", version.Current)
 	fmt.Fprintf(f, "# WARNING: This script will DESTROY resources. Use with caution.\n\n")
 
-	// 2. Collect Waste Nodes
+	// Collect Waste Nodes.
 	g.Graph.Mu.RLock()
 	var wasteNodes []*graph.Node
 	for _, n := range g.Graph.Nodes {
@@ -306,7 +306,7 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 		return nil
 	}
 
-	// 3. Topological Sort (Reverse Dependency Order)
+	// Topological Sort (Reverse Dependency Order).
 	// Reverse topological sort for safe deletion.
 	
 	creationOrder, err := g.Graph.TopologicalSort(wasteNodes)
@@ -322,7 +322,7 @@ func (g *Generator) GenerateDeletionScript(path string) error {
 		sortedVertices[len(creationOrder)-1-i] = n
 	}
 
-	// 4. Generate Commands
+	// Generate Commands.
 	fmt.Fprintf(f, "echo 'Initializing Deletion Sequence...'\n")
 	fmt.Fprintf(f, "echo 'Found %d resources to terminate.'\n\n", len(sortedVertices))
 

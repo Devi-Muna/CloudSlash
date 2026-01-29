@@ -56,11 +56,7 @@ func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 				"EngineVersion":  *cluster.EngineVersion,
 				"NumCacheNodes":  cluster.NumCacheNodes,
 			}
-			// Fetch metrics:
-			// 1. Connections
-			// 2. Cache Hits/Misses
-			// 3. CPU Utilization
-			// 4. Network In
+			// Fetch comprehensive metrics (Connections, Hits/Misses, CPU, Network).
 			
 			go s.enrichClusterMetrics(ctx, id, cluster.CacheNodeType, props)
 		}

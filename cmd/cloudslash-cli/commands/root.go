@@ -47,6 +47,22 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.RequiredTags, "required-tags", "", "Required tags (comma-separated)")
 	rootCmd.PersistentFlags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL")
 	rootCmd.PersistentFlags().BoolVarP(&config.Verbose, "verbose", "v", false, "Enable Matrix Mode (Visual API Logging)")
+	rootCmd.PersistentFlags().BoolVar(&config.JsonLogs, "json", false, "Enable JSON Logging (Machine Mode)")
+	rootCmd.PersistentFlags().BoolVar(&config.DisableCWMetrics, "no-metrics", false, "Skip CloudWatch API calls (faster, but less accurate)")
+	rootCmd.PersistentFlags().StringVar(&config.RulesFile, "rules", "", "Path to YAML Policy Rules")
+	rootCmd.PersistentFlags().StringVar(&config.HistoryURL, "history-url", "", "S3 URL for Shared History (e.g. s3://bucket/key)")
+	
+	// Bind Flags to Viper (Precedence: Flag > Env > Config > Default)
+	viper.BindPFlag("region", rootCmd.PersistentFlags().Lookup("region"))
+	viper.BindPFlag("tfstate", rootCmd.PersistentFlags().Lookup("tfstate"))
+	viper.BindPFlag("all_profiles", rootCmd.PersistentFlags().Lookup("all-profiles"))
+	viper.BindPFlag("required_tags", rootCmd.PersistentFlags().Lookup("required-tags"))
+	viper.BindPFlag("slack_webhook", rootCmd.PersistentFlags().Lookup("slack-webhook"))
+	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("json_logs", rootCmd.PersistentFlags().Lookup("json"))
+	viper.BindPFlag("no_metrics", rootCmd.PersistentFlags().Lookup("no-metrics"))
+	viper.BindPFlag("rules_file", rootCmd.PersistentFlags().Lookup("rules"))
+	viper.BindPFlag("history_url", rootCmd.PersistentFlags().Lookup("history-url"))
 
 	// Hidden Flags
 	rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
@@ -61,6 +77,18 @@ func init() {
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
 		}
+
+		// Load configuration values, prioritizing Viper sources (Env/Flag/Config).
+		config.Region = viper.GetString("region")
+		config.TFStatePath = viper.GetString("tfstate")
+		config.AllProfiles = viper.GetBool("all_profiles")
+		config.RequiredTags = viper.GetString("required_tags")
+		config.SlackWebhook = viper.GetString("slack_webhook")
+		config.Verbose = viper.GetBool("verbose")
+		config.JsonLogs = viper.GetBool("json_logs")
+		config.DisableCWMetrics = viper.GetBool("no_metrics")
+		config.RulesFile = viper.GetString("rules_file")
+		config.HistoryURL = viper.GetString("history_url")
 	}
 
 	rootCmd.AddCommand(CleanupCmd)
@@ -75,17 +103,17 @@ func checkUpdate() {
 }
 
 func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			viper.SetConfigFile(filepath.Join(home, ".cloudslash.yaml"))
-			viper.SetConfigType("yaml")
-		}
+	viper.SetConfigName("cloudslash") // name of config file (without extension)
+	viper.SetConfigType("yaml")       // REQUIRED if the config file does not have the extension in the name
+	viper.AddConfigPath(".")          // optionally look for config in the working directory
+	viper.AddConfigPath("$HOME/.cloudslash")
+	
+	viper.SetEnvPrefix("CLOUDSLASH")
+	viper.AutomaticEnv() // read in environment variables that match
+
+	if err := viper.ReadInConfig(); err == nil {
+		// Config loaded successfully.
 	}
-	viper.AutomaticEnv()
-	viper.ReadInConfig()
 }
 
 func renderFutureGlassHelp(cmd *cobra.Command) {
@@ -132,11 +160,11 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 }
 
 func safeWriteConfig() {
-	// 1. Try SafeWrite (creates if creates if missing, fails if exists)
+	// Attempt to create config file if missing.
 	if err := viper.SafeWriteConfig(); err != nil {
-		// 2. If already exists, try Overwrite
+		// If exists, overwrite.
 		if err2 := viper.WriteConfig(); err2 != nil {
-			// 3. Fallback: Force create file at explicit path
+			// Fallback: Force create file at explicit path
 			path := viper.ConfigFileUsed()
 			if path != "" {
 				f, createErr := os.Create(path)

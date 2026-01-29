@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -14,11 +16,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/pricing/types"
 )
 
+type PriceRecord struct {
+	Price     float64 `json:"price"`
+	Timestamp int64   `json:"timestamp"`
+}
+
 // Client wraps the AWS Pricing Client.
 type Client struct {
-	svc   *pricing.Client
-	cache map[string]float64
-	mu    sync.RWMutex
+	svc       *pricing.Client
+	cache     map[string]PriceRecord
+	mu        sync.RWMutex
+	cachePath string
+	ttl       time.Duration
 }
 
 // NewClient creates a new Pricing Client.
@@ -30,10 +39,37 @@ func NewClient(ctx context.Context) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{
-		svc:   pricing.NewFromConfig(cfg),
-		cache: make(map[string]float64),
-	}, nil
+	// Resolve cache path
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	cacheDir := filepath.Join(home, ".cloudslash")
+	os.MkdirAll(cacheDir, 0755)
+	
+	c := &Client{
+		svc:       pricing.NewFromConfig(cfg),
+		cache:     make(map[string]PriceRecord),
+		cachePath: filepath.Join(cacheDir, "pricing.json"),
+		ttl:       15 * 24 * time.Hour, // 15 Days
+	}
+	
+	c.loadCache()
+	return c, nil
+}
+
+func (c *Client) loadCache() {
+	data, err := os.ReadFile(c.cachePath)
+	if err == nil {
+		json.Unmarshal(data, &c.cache)
+	}
+}
+
+func (c *Client) saveCache() {
+	data, err := json.MarshalIndent(c.cache, "", "  ")
+	if err == nil {
+		os.WriteFile(c.cachePath, data, 0644)
+	}
 }
 
 // GetEBSPrice returns the monthly cost for a given volume type and size in GB.
@@ -41,21 +77,27 @@ func (c *Client) GetEBSPrice(ctx context.Context, region, volumeType string, siz
 	cacheKey := fmt.Sprintf("ebs-%s-%s", region, volumeType)
 
 	c.mu.RLock()
-	pricePerGB, ok := c.cache[cacheKey]
+	record, ok := c.cache[cacheKey]
 	c.mu.RUnlock()
 
-	if !ok {
+	valid := ok && time.Since(time.Unix(record.Timestamp, 0)) < c.ttl
+
+	if !valid {
 		var err error
-		pricePerGB, err = c.fetchEBSPrice(ctx, region, volumeType)
+		price, err := c.fetchEBSPrice(ctx, region, volumeType)
 		if err != nil {
 			return 0, err
 		}
+		
 		c.mu.Lock()
-		c.cache[cacheKey] = pricePerGB
+		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
+		c.saveCache() // Persist immediately
 		c.mu.Unlock()
+		
+		return price * float64(sizeGB), nil
 	}
 
-	return pricePerGB * float64(sizeGB), nil
+	return record.Price * float64(sizeGB), nil
 }
 
 func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (float64, error) {
@@ -130,21 +172,26 @@ func (c *Client) GetEC2InstancePrice(ctx context.Context, region, instanceType s
 	cacheKey := fmt.Sprintf("ec2-%s-%s", region, instanceType)
 
 	c.mu.RLock()
-	pricePerHour, ok := c.cache[cacheKey]
+	record, ok := c.cache[cacheKey]
 	c.mu.RUnlock()
 
-	if !ok {
+	valid := ok && time.Since(time.Unix(record.Timestamp, 0)) < c.ttl
+
+	if !valid {
 		var err error
-		pricePerHour, err = c.fetchEC2Price(ctx, region, instanceType)
+		price, err := c.fetchEC2Price(ctx, region, instanceType)
 		if err != nil {
 			return 0, err
 		}
 		c.mu.Lock()
-		c.cache[cacheKey] = pricePerHour
+		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
+		c.saveCache()
 		c.mu.Unlock()
+		
+		return price * 730, nil
 	}
 
-	return pricePerHour * 730, nil // 730 hours/month average
+	return record.Price * 730, nil // 730 hours/month average
 }
 
 func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string) (float64, error) {
@@ -211,26 +258,30 @@ func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64
 	cacheKey := fmt.Sprintf("nat-%s", region)
 
 	c.mu.RLock()
-	pricePerHour, ok := c.cache[cacheKey]
+	record, ok := c.cache[cacheKey]
 	c.mu.RUnlock()
+	
+	valid := ok && time.Since(time.Unix(record.Timestamp, 0)) < c.ttl
 
-	if !ok {
+	if !valid {
 		// Check cache with short timeout to prevent blocking.
 		tCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
 		var err error
-		pricePerHour, err = c.fetchNATPrice(tCtx, region)
+		price, err := c.fetchNATPrice(tCtx, region)
 		if err != nil {
 			// Return default pricing on timeout.
 			return 0.045 * 730, nil
 		}
 		c.mu.Lock()
-		c.cache[cacheKey] = pricePerHour
+		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
+		c.saveCache()
 		c.mu.Unlock()
+		return price * 730, nil
 	}
 
-	return pricePerHour * 730, nil
+	return record.Price * 730, nil
 }
 
 func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, error) {

@@ -55,13 +55,13 @@ func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 			
 			s.Graph.AddNode(arn, "aws_alb", props)
 			
-			// 1. Check request count metric.
+			// Check request volume metrics.
 			go s.checkRequests(ctx, arn, props)
 			
-			// 2. Check listener configurations.
+			// Verify listener configuration (Redirects vs Forwarding).
 			go s.checkListeners(ctx, arn)
 			
-			// 3. Check WAF association.
+			// Check for WAF association.
 			go s.checkWAF(ctx, arn)
 		}
 	}

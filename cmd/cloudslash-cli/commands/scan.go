@@ -157,6 +157,7 @@ func init() {
 	scanCmd.Flags().StringVar(&config.SlackWebhook, "slack-webhook", "", "Slack Webhook URL for Reporting")
 	scanCmd.Flags().StringVar(&config.SlackChannel, "slack-channel", "", "Override Slack Channel")
 	scanCmd.Flags().IntVar(&config.MaxConcurrency, "max-workers", 0, "Limit concurrency (default: auto)")
+	scanCmd.Flags().StringVar(&config.RulesFile, "rules", "", "Path to YAML Policy Rules (e.g. dynamic_rules.yaml)")
 }
 
 func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provenance.ProvenanceRecord) {
