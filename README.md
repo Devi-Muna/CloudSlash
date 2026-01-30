@@ -13,43 +13,27 @@ It functions as a forensic auditor and autonomous agent, correlating disparate d
 ---
 ## Installation
 
-### Homebrew (macOS/Linux)
+CloudSlash is distributed as a single static binary. No external dependencies (Python, Node.js, JVM) are required.
+
+### automated Install (macOS & Linux)
 
 ```bash
-brew tap DrSkyle/tap
-brew install cloudslash
+curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
 ```
 
-### Go Install
+### Windows (PowerShell)
 
-```bash
-go install github.com/DrSkyle/CloudSlash/cmd/cloudslash-cli@latest
+```powershell
+irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex
 ```
 
-### From Source
+### Manual Build
 
 ```bash
 git clone https://github.com/DrSkyle/CloudSlash.git
 cd CloudSlash
 make build
 ```
-
-### Quick Start
-
-```bash
-# Automated Install (Legacy)
-curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
-```
-
-### Windows Users
-
-CloudSlash requires Linux primitives (Bash, SSH, Terraform). **Native Windows (PowerShell/CMD) is not supported.**
-
-**How to run on Windows:**
-
-1.  **Install WSL2**: `wsl --install`
-2.  Open Ubuntu/Debian terminal.
-3.  Run the **Linux installer** inside WSL.
 
 ---
 ## Executive Summary
