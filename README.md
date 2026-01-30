@@ -12,12 +12,12 @@ It functions as a forensic auditor and autonomous agent, correlating disparate d
 
 ---
 
-## 💻 Installation
+## Installation
 
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap DrSkyle/cloudslash
+brew tap DrSkyle/tap
 brew install cloudslash
 ```
 
@@ -42,7 +42,7 @@ make build
 curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
 ```
 
-### Windows Users ⚠️
+### Windows Users
 
 CloudSlash requires Linux primitives (Bash, SSH, Terraform). **Native Windows (PowerShell/CMD) is not supported.**
 
