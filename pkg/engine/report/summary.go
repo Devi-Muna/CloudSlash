@@ -105,20 +105,23 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 	fmt.Fprintf(f, "```\n\n")
 
 	// Phase 2 instructions.
-	fmt.Fprintf(f, "### Phase 2: Remediation Options\n\n")
+	fmt.Fprintf(f, "### Phase 2: Remediation (The Lazarus Protocol)\n")
+	fmt.Fprintf(f, "The following script initiates the **Purgatory Protocol**:\n")
+	fmt.Fprintf(f, "1. Creates a **Tombstone** (State Preservation) for every resource.\n")
+	fmt.Fprintf(f, "2. Stops instances and detaches volumes (Soft Delete).\n")
+	fmt.Fprintf(f, "3. Tags resources with `CloudSlash:Status=Purgatory`.\n\n")
 
-	fmt.Fprintf(f, "#### Option A: Safe Deletion (Recommended)\n")
-	fmt.Fprintf(f, "Performs 'Soft Delete' where possible (Stop Instance, Snapshot Volume).\n")
 	fmt.Fprintf(f, "```bash\n")
 	fmt.Fprintf(f, "# REVIEW FIRST: cat cloudslash-out/safe_cleanup.sh\n")
 	fmt.Fprintf(f, "bash cloudslash-out/safe_cleanup.sh\n")
 	fmt.Fprintf(f, "```\n\n")
-	
-	fmt.Fprintf(f, "#### Option B: Hard Termination (Use with Caution)\n")
-	fmt.Fprintf(f, "Permanently destroys resources. **No snapshots.**\n")
+
+	fmt.Fprintf(f, "### Phase 3: Recovery (Undo)\n")
+	fmt.Fprintf(f, "If a valid resource was accidentally targeted, use the **Resurrection Script** to restore it immediately using its Tombstone.\n\n")
+
 	fmt.Fprintf(f, "```bash\n")
-	fmt.Fprintf(f, "# REVIEW FIRST: cat cloudslash-out/resource_deletion.sh\n")
-	fmt.Fprintf(f, "bash cloudslash-out/resource_deletion.sh\n")
+	fmt.Fprintf(f, "# RESTORE: cat cloudslash-out/undo_cleanup.sh\n")
+	fmt.Fprintf(f, "bash cloudslash-out/undo_cleanup.sh\n")
 	fmt.Fprintf(f, "```\n\n")
 	
 	fmt.Fprintf(f, "---\n")

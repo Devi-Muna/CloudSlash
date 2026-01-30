@@ -58,3 +58,9 @@ internal/heuristics/integration_test.go
 # Logs
 gift_licenses.log
 cmd/gift_licenses.log
+
+# Ephemeral User Files
+RELEASE_NOTES.md
+.cloudslash/
+rules.yaml
+cloudslash.yaml

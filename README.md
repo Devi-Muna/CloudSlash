@@ -540,6 +540,17 @@ CloudSlash generates a self-contained HTML dashboard for stakeholders, featuring
 ![Executive Dashboard](assets/dashboard.png)
 ![Cost Flow](assets/sankey.png)
 
+### 4. Manifest of Artifacts (Output Reference)
+
+Upon completion of an audit cycle, CloudSlash generates a suite of remediation artifacts within the configured output directory (default: `cloudslash-out/`). These artifacts serve as the interface for operationalizing the audit findings.
+
+- **`waste_report.json`**: A machine-readable structural analysis of identified inefficiencies. This file is intended for ingestion by downstream observability platforms or custom automation pipelines.
+- **`safe_cleanup.sh`**: The primary remediation executable. This script implements the "Purgatory Protocol," performing non-destructive actions (instance stoppage, volume detachment, snapshot creation) to neutralize cost accumulation while preserving data integrity.
+- **`fix_terraform.sh`**: A state reconciliation script designed to remove identified "Zombie Resources" from the Terraform state. Execution of this script prevents state drift errors during subsequent infrastructure modification.
+- **`undo_cleanup.sh`**: The recovery executable for the Lazarus Protocol. This script reverses the actions of `safe_cleanup.sh`, restoring resources to their operational state using the preserved metadata.
+- **`restore.tf`**: A Terraform configuration file containing generated `import` blocks. This facilitates the re-assimilation of previously deleted or detached resources back into Terraform management.
+- **`waste.tf` & `import.sh`**: Advanced Terraform-native remediation artifacts. These files allow for the importation of unmanaged waste resources into a temporary Terraform state, enabling destruction via standard `terraform destroy` workflows rather than direct API calls.
+
 ---
 
 ## Support the Project
