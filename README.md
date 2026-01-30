@@ -11,7 +11,47 @@ It functions as a forensic auditor and autonomous agent, correlating disparate d
 ![CloudSlash TUI](assets/cloudslashtui.png)
 
 ---
+## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap DrSkyle/tap
+brew install cloudslash
+```
+
+### Go Install
+
+```bash
+go install github.com/DrSkyle/CloudSlash/cmd/cloudslash-cli@latest
+```
+
+### From Source
+
+```bash
+git clone https://github.com/DrSkyle/CloudSlash.git
+cd CloudSlash
+make build
+```
+
+### Quick Start
+
+```bash
+# Automated Install (Legacy)
+curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
+```
+
+### Windows Users
+
+CloudSlash requires Linux primitives (Bash, SSH, Terraform). **Native Windows (PowerShell/CMD) is not supported.**
+
+**How to run on Windows:**
+
+1.  **Install WSL2**: `wsl --install`
+2.  Open Ubuntu/Debian terminal.
+3.  Run the **Linux installer** inside WSL.
+
+---
 ## Executive Summary
 
 Modern cloud environments suffer from "Resource Sprawl"—ghost assets that incur significant financial cost but deliver zero business value. Traditional tools (CloudHealth, Vantage, Trusted Advisor) provide **visibility** but lack **actuation**. They tell you _that_ you are wasting money, but rarely tell you _why_, _who_ caused it, or _how_ to fix it safely.
@@ -199,32 +239,6 @@ CloudSlash stands apart by focusing on _root cause resolution_ rather than just 
 | **IaC Awareness**      | **Terraform AST Parsing**        | None                    | None               | None                    |
 | **Dependency Mapping** | **Full Graph Visualization**     | None                    | None               | None                    |
 | **Cost**               | **OSS / Self-Hosted**            | Enterprise Support plan | OSS                | $$ SaaS Subscription    |
-
----
-
-## Installation
-
-CloudSlash is distributed as a single static binary. No external dependencies (Python, Node.js, JVM) are required.
-
-### automated Install (macOS & Linux)
-
-```bash
-curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
-```
-
-### Windows (PowerShell)
-
-```powershell
-irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex
-```
-
-### Manual Build
-
-```bash
-git clone https://github.com/DrSkyle/CloudSlash.git
-cd CloudSlash
-make build
-```
 
 ---
 
