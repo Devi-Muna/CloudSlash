@@ -25,7 +25,7 @@ func NewLambdaScanner(cfg aws.Config, g *graph.Graph) *LambdaScanner {
 	}
 }
 
-// ScanFunctions discovers functions and usage metrics.
+// ScanFunctions discovers Lambda functions and usage metrics.
 // Analyzes metrics over a 90-day window.
 func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 	paginator := lambda.NewListFunctionsPaginator(s.Client, &lambda.ListFunctionsInput{})
@@ -43,17 +43,17 @@ func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 			props := map[string]interface{}{
 				"Service":      "Lambda",
 				"Runtime":      string(fn.Runtime),
-				"LastModified": *fn.LastModified, // "2023-01-01T..." string
+				"LastModified": *fn.LastModified, // Timestamp string.
 				"CodeSize":     fn.CodeSize,
 				"MemorySize":   fn.MemorySize,
 			}
 
 			s.Graph.AddNode(name, "aws_lambda_function", props)
 
-			// 1. Check for stale functions.
+			// Check for function staleness (code rot).
 			go s.checkCodeRot(ctx, name, props)
 
-			// 2. Check for version accumulation.
+			// Check for version accumulation.
 			go s.scanVersionsAndAliases(ctx, name, arn)
 		}
 	}
@@ -66,7 +66,7 @@ func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props
 	if !exists { return }
 
 	endTime := time.Now()
-	startTime := endTime.Add(-90 * 24 * time.Hour) // 90 Days
+	startTime := endTime.Add(-90 * 24 * time.Hour) // 90-day window.
 
 	queries := []cwtypes.MetricDataQuery{
 		{
@@ -104,7 +104,7 @@ func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props
 }
 
 func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName string, funcArn string) {
-	// 1. Get Aliases (Whitelist)
+	// Retrieve aliases to whitelist active versions.
 	aliases := make(map[string]bool) // Key: Version ID
 	
 	aPaginator := lambda.NewListAliasesPaginator(s.Client, &lambda.ListAliasesInput{FunctionName: aws.String(funcName)})
@@ -117,7 +117,7 @@ func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName str
 		}
 	}
 
-	// 2. Retrieve all versions.
+	// Retrieve all function versions.
 	vPaginator := lambda.NewListVersionsByFunctionPaginator(s.Client, &lambda.ListVersionsByFunctionInput{FunctionName: aws.String(funcName)})
 	
 	var versions []string

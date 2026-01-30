@@ -26,7 +26,7 @@ func NewS3Scanner(cfg aws.Config, g *graph.Graph) *S3Scanner {
 	}
 }
 
-// getRegionalClient ensures we talk to the region where the bucket actually lives.
+// getRegionalClient provides a client configured for the bucket's specific region.
 func (s *S3Scanner) getRegionalClient(region string) *s3.Client {
 	if region == "" {
 		return s.Client
@@ -34,7 +34,7 @@ func (s *S3Scanner) getRegionalClient(region string) *s3.Client {
 	if client, ok := s.RegionalClients[region]; ok {
 		return client
 	}
-	// Create new client for this region
+	// Initialize a new client for the target region.
 	cfg := s.BaseConfig.Copy()
 	cfg.Region = region
 	client := s3.NewFromConfig(cfg)
@@ -54,18 +54,18 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 		name := *bucket.Name
 		arn := fmt.Sprintf("arn:aws:s3:::bucket/%s", name)
 
-		// Resolve Region to avoid 301 Redirect errors
+		// Resolve bucket region to prevent redirection errors.
 		region := "us-east-1" // Default
 		loc, err := s.Client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{Bucket: &name})
 		if err == nil && loc.LocationConstraint != "" {
 			region = string(loc.LocationConstraint)
-			// Handle legacy "EU" constraint mapping to eu-west-1
+			// Map legacy "EU" location constraint to "eu-west-1".
 			if region == "EU" {
 				region = "eu-west-1"
 			}
 		}
 		
-		// Get Region-Specific Client
+		// Obtain region-specific client.
 		regionalClient := s.getRegionalClient(region)
 
 		props := map[string]interface{}{
@@ -74,13 +74,13 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 			"CreationDate": bucket.CreationDate,
 		}
 
-		// Check for lifecycle rules using REGIONAL client
+		// Check for lifecycle rules.
 		hasAbortRule := s.hasAbortLifecycle(ctx, regionalClient, name)
 		props["HasAbortLifecycle"] = hasAbortRule
 		
 		s.Graph.AddNode(arn, "AWS::S3::Bucket", props)
 
-		// Scan for incomplete multipart uploads if no abort rule exists.
+		// Scan for incomplete multipart uploads if no abort lifecycle exists.
 		if !hasAbortRule {
 			if err := s.scanMultipartUploads(ctx, regionalClient, name, arn); err != nil {
 				fmt.Printf("Failed to scan multipart uploads for bucket %s (%s): %v\n", name, region, err)
@@ -130,7 +130,7 @@ func (s *S3Scanner) scanMultipartUploads(ctx context.Context, client *s3.Client,
 			}
 
 			s.Graph.AddNode(arn, "AWS::S3::MultipartUpload", props)
-			s.Graph.AddEdge(arn, bucketARN) // Link to bucket
+			s.Graph.AddEdge(arn, bucketARN) // Link to parent bucket.
 		}
 	}
 	return nil

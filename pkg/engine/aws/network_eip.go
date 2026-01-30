@@ -24,7 +24,7 @@ func NewEIPScanner(cfg aws.Config, g *graph.Graph) *EIPScanner {
 	}
 }
 
-// ScanAddresses discovers Elastic IPs.
+// ScanAddresses discovers Elastic IP addresses (EIPs).
 func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 	out, err := s.Client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if err != nil {
@@ -33,7 +33,7 @@ func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 
 	for _, addr := range out.Addresses {
 		ip := *addr.PublicIp
-		id := *addr.AllocationId // or PublicIp if EC2-Classic (unlikely)
+		id := *addr.AllocationId
 
 		props := map[string]interface{}{
 			"Service": "EIP",
@@ -45,20 +45,20 @@ func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 			props["AssociationId"] = *addr.AssociationId
 			if addr.InstanceId != nil {
 				props["InstanceId"] = *addr.InstanceId
-				// Could check instance state here, but Heuristic does it.
+
 			}
 		}
 
 		s.Graph.AddNode(id, "aws_eip", props)
 		
-		// Verify DNS usage to prevent conflicts.
+		// Verify DNS usage to prevent dangling records.
 		go s.checkDNS(ctx, id, ip)
 	}
 	return nil
 }
 
 func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
-	// 1. List Hosted Zones
+	// List Hosted Zones.
 	zonesPaginator := route53.NewListHostedZonesPaginator(s.R53Client, &route53.ListHostedZonesInput{})
 	
 	foundInDNS := false
@@ -69,9 +69,8 @@ func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 		if err != nil { break }
 		
 		for _, zone := range page.HostedZones {
-			// 2. Search Records in Zone
-			// List all record sets.
-			// Scan all records as Route53 API lacks value-based filtering.
+			// Search records within zone.
+			// Scan records (Route53 lacks value filtering).
 			
 			recPaginator := route53.NewListResourceRecordSetsPaginator(s.R53Client, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: zone.Id,

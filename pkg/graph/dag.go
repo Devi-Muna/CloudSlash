@@ -63,6 +63,17 @@ type ScopeError struct {
 	Error string
 }
 
+type GraphOp struct {
+	Kind       string // "Node" or "Edge"
+	ID         string
+	Type       string
+	Props      map[string]interface{}
+	SourceID   string
+	TargetID   string
+	EdgeType   EdgeType
+	Weight     int
+}
+
 type Graph struct {
 	Mu           sync.RWMutex
 	Nodes        []*Node
@@ -70,19 +81,55 @@ type Graph struct {
 	ReverseEdges [][]Edge
 	idMap        map[string]uint32
 	Metadata     GraphMetadata
+	
+	// Pipeline Architecture
+	opChan    chan GraphOp
+	buildDone chan struct{}
 }
 
 func NewGraph() *Graph {
-	return &Graph{
+	g := &Graph{
 		Nodes:        make([]*Node, 0, 1000),
 		Edges:        make([][]Edge, 0, 1000),
 		ReverseEdges: make([][]Edge, 0, 1000),
 		idMap:        make(map[string]uint32),
 		Metadata:     GraphMetadata{Partial: false},
+		opChan:       make(chan GraphOp, 10000), // Buffered Channel
+		buildDone:    make(chan struct{}),
 	}
+	
+	// Start the Single-Threaded Builder (The Actor)
+	g.StartBuilder()
+	return g
+}
+
+func (g *Graph) StartBuilder() {
+	go func() {
+		defer close(g.buildDone)
+		for op := range g.opChan {
+			g.Mu.Lock()
+			switch op.Kind {
+			case "Node":
+				g.unsafeAddNode(op.ID, op.Type, op.Props)
+			case "Edge":
+				g.unsafeAddEdge(op.SourceID, op.TargetID, op.EdgeType, op.Weight)
+			}
+			g.Mu.Unlock()
+		}
+	}()
+}
+
+// CloseAndWait seals the ingestion pipeline and waits for the builder to finish.
+// After this returns, the graph is immutable and safe for parallel reads.
+func (g *Graph) CloseAndWait() {
+	close(g.opChan)
+	<-g.buildDone
 }
 
 func (g *Graph) AddError(scope string, err error) {
+	// Metadata updates still need locks if accessed during scan, 
+	// or we could add them to the pipeline opChan too. 
+	// For simplicity and safety, we keep the lock here.
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 	
@@ -91,6 +138,15 @@ func (g *Graph) AddError(scope string, err error) {
 		Scope: scope,
 		Error: err.Error(),
 	})
+}
+
+// GetNodes returns a snapshot of all current nodes.
+func (g *Graph) GetNodes() []*Node {
+	g.Mu.RLock()
+	defer g.Mu.RUnlock()
+	nodes := make([]*Node, len(g.Nodes))
+	copy(nodes, g.Nodes)
+	return nodes
 }
 
 // GetID returns the internal integer ID for a given string ID (ARN).
@@ -132,14 +188,20 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 	if id == "" {
 		return
 	}
-	g.Mu.Lock()
-	defer g.Mu.Unlock()
+	// Zero-Lock Push
+	g.opChan <- GraphOp{
+		Kind:  "Node",
+		ID:    id,
+		Type:  resourceType,
+		Props: props,
+	}
+}
 
-	// Deduplicate resource type string.
+// unsafeAddNode implements the logic without locks, running in the builder goroutine.
+func (g *Graph) unsafeAddNode(id, resourceType string, props map[string]interface{}) {
 	resourceType = intern.String(resourceType)
 
 	if idx, exists := g.idMap[id]; exists {
-		// Update existing node properties.
 		node := g.Nodes[idx]
 		for k, v := range props {
 			node.Properties[k] = v
@@ -148,7 +210,6 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 			node.Type = resourceType
 		}
 	} else {
-		// Initialize new node.
 		newIdx := uint32(len(g.Nodes))
 		g.idMap[id] = newIdx
 		g.Nodes = append(g.Nodes, &Node{
@@ -157,7 +218,6 @@ func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
 			Type:       resourceType,
 			Properties: props,
 		})
-		// Resize edge slices.
 		g.Edges = append(g.Edges, nil)
 		g.ReverseEdges = append(g.ReverseEdges, nil)
 	}
@@ -171,11 +231,22 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 	if sourceID == "" || targetID == "" {
 		return
 	}
+	// Zero-Lock Push
+	g.opChan <- GraphOp{
+		Kind:     "Edge",
+		SourceID: sourceID,
+		TargetID: targetID,
+		EdgeType: edgeType,
+		Weight:   weight,
+	}
+}
 
-	g.Mu.Lock()
-	defer g.Mu.Unlock()
+// unsafeAddEdge implements logic without locks.
+func (g *Graph) unsafeAddEdge(sourceID, targetID string, edgeType EdgeType, weight int) {
+	// Verify nodes exist. If scanners yield edges before nodes (which happens),
+	// we must auto-vivify the nodes as "Unknown".
+	// Since we are single-threaded here, this is safe.
 
-	// Ensure nodes exist in graph.
 	srcIdx, ok := g.idMap[sourceID]
 	if !ok {
 		srcIdx = uint32(len(g.Nodes))

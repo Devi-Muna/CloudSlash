@@ -26,7 +26,7 @@ func NewRedshiftScanner(cfg aws.Config, g *graph.Graph) *RedshiftScanner {
 	}
 }
 
-// ScanClusters discovers clusters and usage metrics.
+// ScanClusters discovers Redshift clusters and metrics.
 // Analyzes metrics over a 24-hour window.
 func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 	paginator := redshift.NewDescribeClustersPaginator(s.Client, &redshift.DescribeClustersInput{})
@@ -51,11 +51,11 @@ func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 			// Add to Graph
 			s.Graph.AddNode(id, "aws_redshift_cluster", props)
 
-			// Enrich with Metrics
+			// Enrich with CloudWatch metrics.
 			go s.enrichClusterMetrics(ctx, id, props)
 			
-			// Optimization: Reserve Instance coverage check pending implementation.
-			// Default to On-Demand until RI matching is added.
+			// Note: RI coverage check pending implementation.
+			// Default to On-Demand pricing.
 		}
 	}
 	return nil
@@ -69,7 +69,7 @@ func (s *RedshiftScanner) enrichClusterMetrics(ctx context.Context, clusterID st
 	}
 
 	endTime := time.Now()
-	startTime := endTime.Add(-24 * time.Hour) // 24 Hours
+	startTime := endTime.Add(-24 * time.Hour) // 24-hour window.
 
 	queries := []cwtypes.MetricDataQuery{
 		{
@@ -80,7 +80,7 @@ func (s *RedshiftScanner) enrichClusterMetrics(ctx context.Context, clusterID st
 					MetricName: aws.String("QueriesCompletedPerSecond"),
 					Dimensions: []cwtypes.Dimension{{Name: aws.String("ClusterIdentifier"), Value: aws.String(clusterID)}},
 				},
-				Period: aws.Int32(3600), // 1 hour buckets
+				Period: aws.Int32(3600), // 1-hour granularity.
 				Stat:   aws.String("Sum"),
 			},
 		},

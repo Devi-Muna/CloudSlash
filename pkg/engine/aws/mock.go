@@ -344,9 +344,11 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		})
 		// Manually set cost for reporting
 		node := s.Graph.GetNode(arn)
-		s.Graph.Mu.Lock()
-		node.Cost = 70.08 // roughly monthly
-		s.Graph.Mu.Unlock()
+		if node != nil {
+			s.Graph.Mu.Lock()
+			node.Cost = 70.08 // roughly monthly
+			s.Graph.Mu.Unlock()
+		}
 	}
 
 	// Scenario 11: High Performance Compute (HPC) simulation for Autonomy Engine.
@@ -360,9 +362,11 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 			"Zone":         "us-east-1b", // Safer zone
 		})
 		node := s.Graph.GetNode(arn)
-		s.Graph.Mu.Lock()
-		node.Cost = 600.00
-		s.Graph.Mu.Unlock()
+		if node != nil {
+			s.Graph.Mu.Lock()
+			node.Cost = 600.00
+			s.Graph.Mu.Unlock()
+		}
 	}
 
 	return nil

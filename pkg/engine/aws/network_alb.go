@@ -29,7 +29,7 @@ func NewALBScanner(cfg aws.Config, g *graph.Graph) *ALBScanner {
 	}
 }
 
-// ScanALBs discovers Application Load Balancers and metrics.
+// ScanALBs discovers Application Load Balancers (ALBs) and usage metrics.
 func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 	paginator := elasticloadbalancingv2.NewDescribeLoadBalancersPaginator(s.Client, &elasticloadbalancingv2.DescribeLoadBalancersInput{})
 
@@ -38,8 +38,7 @@ func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 		if err != nil { return err }
 
 		for _, lb := range page.LoadBalancers {
-			// Only scan Application Load Balancers.
-			// NLBs are handled separately due to metric differences.
+			// Filter for Application Load Balancers.
 			if lb.Type != elbv2types.LoadBalancerTypeEnumApplication {
 				continue
 			}
@@ -58,10 +57,10 @@ func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 			// Check request volume metrics.
 			go s.checkRequests(ctx, arn, props)
 			
-			// Verify listener configuration (Redirects vs Forwarding).
+			// Analyze listener configuration.
 			go s.checkListeners(ctx, arn)
 			
-			// Check for WAF association.
+			// Check for associated WAF.
 			go s.checkWAF(ctx, arn)
 		}
 	}
@@ -72,11 +71,11 @@ func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[st
 	node := s.Graph.GetNode(arn)
 	if node == nil { return }
 	
-	// Extract Resource ID for CloudWatch from ARN.
-	// Expected format: app/load-balancer-name/id
+	// Parse Resource ID from ARN.
+	// Format: app/load-balancer-name/id
 	resourceId := ""
 	
-	// Better: use manual parsing for robustness.
+	// Robust manual parsing.
 	parts := -1
 	for i := 0; i < len(arn)-13; i++ {
 		if arn[i:i+13] == "loadbalancer/" {
@@ -139,7 +138,7 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 	}
 	
 	for _, l := range out.Listeners {
-		// Check Default Actions
+		// Check default actions.
 		isRedirect := false
 		for _, act := range l.DefaultActions {
 			if act.Type == elbv2types.ActionTypeEnumRedirect {
@@ -161,7 +160,7 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 }
 
 func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
-	// Check WAFv2 association (Regional Scope).
+	// Check WAFv2 association (Regional).
 	out, err := s.WAFClient.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{
 		ResourceArn: aws.String(arn),
 	})
@@ -171,7 +170,7 @@ func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
 	
 	if err == nil && out.WebACL != nil {
 		hasWAF = true
-		// Estimate WAF costs.
+		// Add estimated WAF cost.
 		wafCost = 5.0
 	}
 	

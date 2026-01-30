@@ -60,25 +60,25 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 
 				s.Graph.AddNode(arn, "AWS::EC2::Instance", props)
 
-				// Link to VPC
+				// Link the instance to its VPC.
 				if instance.VpcId != nil {
 					vpcARN := fmt.Sprintf("arn:aws:ec2:region:account:vpc/%s", *instance.VpcId)
 					s.Graph.AddTypedEdge(vpcARN, arn, graph.EdgeTypeContains, 100)
 				}
 
-				// Link to Subnet
+				// Link the instance to its subnet.
 				if instance.SubnetId != nil {
 					subnetARN := fmt.Sprintf("arn:aws:ec2:region:account:subnet/%s", *instance.SubnetId)
 					s.Graph.AddTypedEdge(subnetARN, arn, graph.EdgeTypeContains, 100)
 				}
 
-				// Link to Security Groups
+				// Link the instance to its security groups.
 				for _, sg := range instance.SecurityGroups {
 					sgARN := fmt.Sprintf("arn:aws:ec2:region:account:security-group/%s", *sg.GroupId)
 					s.Graph.AddTypedEdge(arn, sgARN, graph.EdgeTypeSecuredBy, 100)
 				}
 
-				// Link to AMI (Usage)
+				// Link the instance to its source AMI.
 				if instance.ImageId != nil {
 					amiARN := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", *instance.ImageId)
 					s.Graph.AddTypedEdge(arn, amiARN, graph.EdgeTypeUses, 100)
@@ -87,18 +87,16 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 		}
 	}
 
-	// Post-Scan: Synchronize specs for all discovered instance types.
-	// This ensures the solver has accurate capacity data (vCPU/RAM) for every workload,
-	// rather than relying on the static fallback catalog.
+	// Synchronize instance type specifications for Solver accuracy.
 	var observedTypes []string
 	for k := range uniqueTypes {
 		observedTypes = append(observedTypes, k)
 	}
 
 	if len(observedTypes) > 0 {
-		// Await synchronization to ensure downstream consumers have data.
+		// Await spec synchronization.
 		if err := UpdateSpecsCache(ctx, s.Client, observedTypes); err != nil {
-			// Non-fatal. Fallback logic exists.
+			// Log warning on failure; fallback logic will be used.
 			fmt.Printf("Warning: Spec sync failed (using static catalog): %v\n", err)
 		}
 	}
@@ -114,7 +112,7 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 			return fmt.Errorf("failed to describe volumes: %v", err)
 		}
 
-		// Batch collect IDs to check modification status.
+		// Batch volume IDs for efficient modification checks.
 		var volIDs []string
 		for _, v := range page.Volumes {
 			volIDs = append(volIDs, *v.VolumeId)
@@ -132,18 +130,18 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 				"VolumeType": string(volume.VolumeType),
 				"CreateTime": volume.CreateTime,
 				"Tags":       parseTags(volume.Tags),
-				"IsModifying": modMap[id], // Check if volume is currently optimizing.
+				"IsModifying": modMap[id], // Indicate if the volume is currently undergoing modification.
 			}
 
 			s.Graph.AddNode(arn, "AWS::EC2::Volume", props)
 
-			// Link to Attachments
+			// Link the volume to attached instances.
 			for _, att := range volume.Attachments {
 				if att.InstanceId != nil {
 					instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", *att.InstanceId)
 					s.Graph.AddTypedEdge(arn, instanceARN, graph.EdgeTypeAttachedTo, 100)
 
-					// Store attachment details.
+					// Store attachment metadata.
 					props["DeleteOnTermination"] = att.DeleteOnTermination
 					props["AttachedInstanceId"] = *att.InstanceId
 				}
@@ -157,8 +155,8 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 	out := make(map[string]bool)
 	if len(volIDs) == 0 { return out }
 	
-	// API accepts list of IDs.
-	// Pagination is handled by the caller or assumed to fit within request limits.
+	// Provide a list of volume IDs to the API.
+	// Assume pagination is handled by the caller.
 	
 	resp, err := s.Client.DescribeVolumesModifications(ctx, &ec2.DescribeVolumesModificationsInput{
 		VolumeIds: volIDs,
@@ -168,7 +166,7 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 		return out
 	}
 	
-	// Check for modifying or optimizing states.
+	// Check for active modification states.
 	for _, mod := range resp.VolumesModifications {
 		state := mod.ModificationState
 		if state == types.VolumeModificationStateModifying || state == types.VolumeModificationStateOptimizing {
@@ -277,7 +275,7 @@ func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 			"Tags":         parseTags(img.Tags),
 		}
 
-			// Parse ISO8601 creation timestamp for waste analysis.
+			// Parse creation timestamp.
 			if img.CreationDate != nil {
 				t, err := time.Parse("2006-01-02T15:04:05.000Z", *img.CreationDate)
 				if err == nil {
@@ -288,7 +286,7 @@ func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 			}
 		s.Graph.AddNode(arn, "AWS::EC2::AMI", props)
 
-		// Link to Snapshots (Lineage)
+		// Link AMI to its source snapshots.
 		for _, bdm := range img.BlockDeviceMappings {
 			if bdm.Ebs != nil && bdm.Ebs.SnapshotId != nil {
 				snapARN := fmt.Sprintf("arn:aws:ec2:region:account:snapshot/%s", *bdm.Ebs.SnapshotId)

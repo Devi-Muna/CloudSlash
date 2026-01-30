@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
     
 Identify. Audit. Optimize.`,
 	Version: version.Current,
-	// Run: nil (Forces help output).
+	// Run is nil to force help output.
 	Run: nil,
 }
 
@@ -40,7 +40,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Persistent Flags
+	// Define persistent flags available to all commands.
 	rootCmd.PersistentFlags().StringVar(&config.Region, "region", "us-east-1", "AWS Region")
 	rootCmd.PersistentFlags().StringVar(&config.TFStatePath, "tfstate", "terraform.tfstate", "Path to web.tfstate")
 	rootCmd.PersistentFlags().BoolVar(&config.AllProfiles, "all-profiles", false, "Scan all AWS profiles")
@@ -51,8 +51,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.DisableCWMetrics, "no-metrics", false, "Skip CloudWatch API calls (faster, but less accurate)")
 	rootCmd.PersistentFlags().StringVar(&config.RulesFile, "rules", "", "Path to YAML Policy Rules")
 	rootCmd.PersistentFlags().StringVar(&config.HistoryURL, "history-url", "", "S3 URL for Shared History (e.g. s3://bucket/key)")
-	
-	// Bind Flags to Viper (Precedence: Flag > Env > Config > Default)
+	rootCmd.PersistentFlags().StringVar(&config.OutputDir, "output-dir", "cloudslash-out", "Directory for artifacts")
+	rootCmd.PersistentFlags().StringVar(&config.OtelEndpoint, "otel-endpoint", "", "OpenTelemetry Exporter Endpoint (HTTP)")
+
+	// Bind command flags to Viper configuration. Precedence: Flag > Env > Config > Default.
 	viper.BindPFlag("region", rootCmd.PersistentFlags().Lookup("region"))
 	viper.BindPFlag("tfstate", rootCmd.PersistentFlags().Lookup("tfstate"))
 	viper.BindPFlag("all_profiles", rootCmd.PersistentFlags().Lookup("all-profiles"))
@@ -63,8 +65,10 @@ func init() {
 	viper.BindPFlag("no_metrics", rootCmd.PersistentFlags().Lookup("no-metrics"))
 	viper.BindPFlag("rules_file", rootCmd.PersistentFlags().Lookup("rules"))
 	viper.BindPFlag("history_url", rootCmd.PersistentFlags().Lookup("history-url"))
+	viper.BindPFlag("output_dir", rootCmd.PersistentFlags().Lookup("output-dir"))
+	viper.BindPFlag("otel_endpoint", rootCmd.PersistentFlags().Lookup("otel-endpoint"))
 
-	// Hidden Flags
+	// Define hidden flags.
 	rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
 	rootCmd.PersistentFlags().MarkHidden("mock")
 
@@ -73,12 +77,12 @@ func init() {
 	})
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Just version check
+		// Check for updates if running a primary command.
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
 		}
 
-		// Load configuration values, prioritizing Viper sources (Env/Flag/Config).
+		// Load configuration values from Viper sources.
 		config.Region = viper.GetString("region")
 		config.TFStatePath = viper.GetString("tfstate")
 		config.AllProfiles = viper.GetBool("all_profiles")
@@ -89,6 +93,8 @@ func init() {
 		config.DisableCWMetrics = viper.GetBool("no_metrics")
 		config.RulesFile = viper.GetString("rules_file")
 		config.HistoryURL = viper.GetString("history_url")
+		config.OutputDir = viper.GetString("output_dir")
+		config.OtelEndpoint = viper.GetString("otel_endpoint")
 	}
 
 	rootCmd.AddCommand(CleanupCmd)
@@ -103,13 +109,13 @@ func checkUpdate() {
 }
 
 func initConfig() {
-	viper.SetConfigName("cloudslash") // name of config file (without extension)
+	viper.SetConfigName("cloudslash") // Name of config file (without extension)
 	viper.SetConfigType("yaml")       // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath(".")          // optionally look for config in the working directory
+	viper.AddConfigPath(".")          // Look for config in the working directory
 	viper.AddConfigPath("$HOME/.cloudslash")
 	
 	viper.SetEnvPrefix("CLOUDSLASH")
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv() // Read in environment variables that match
 
 	if err := viper.ReadInConfig(); err == nil {
 		// Config loaded successfully.
@@ -162,9 +168,9 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 func safeWriteConfig() {
 	// Attempt to create config file if missing.
 	if err := viper.SafeWriteConfig(); err != nil {
-		// If exists, overwrite.
+		// If it exists, overwrite it.
 		if err2 := viper.WriteConfig(); err2 != nil {
-			// Fallback: Force create file at explicit path
+			// Fallback: Force create file at explicit path.
 			path := viper.ConfigFileUsed()
 			if path != "" {
 				f, createErr := os.Create(path)
@@ -175,7 +181,7 @@ func safeWriteConfig() {
 					fmt.Printf("Error creating config file: %v\n", createErr)
 				}
 			} else {
-				// If path is empty, try manual home construction
+				// If path is empty, construct manually in home directory.
 				home, _ := os.UserHomeDir()
 				path = filepath.Join(home, ".cloudslash.yaml")
 				f, _ := os.Create(path)

@@ -31,7 +31,14 @@ jobs:
 
   integration-test:
     name: Mock Integration
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     needs: quality-check
     steps:
       - uses: actions/checkout@v3
@@ -50,11 +57,22 @@ jobs:
       - name: Verify Artifacts
         run: |
           ls -l cloudslash-out/
-          if [ ! -f "cloudslash-out/waste_report.csv" ]; then exit 1; fi
-          if [ ! -f "cloudslash-out/waste.tf" ]; then exit 1; fi
+          if [ ! -f "cloudslash-out/waste_report.csv" ]; then echo "Missing CSV"; exit 1; fi
+          if [ ! -f "cloudslash-out/waste.tf" ]; then echo "Missing TF"; exit 1; fi
 
       - name: Verify Hardening (Lock Check)
         run: |
           touch terraform.tfstate.lock.info
           touch terraform.tfstate
-          ! ./cloudslash scan --mock --tfstate terraform.tfstate # Should FAIL
+          if ./cloudslash scan --mock --tfstate terraform.tfstate; then
+            echo "Failed: Scan should have aborted on lock file"
+            exit 1
+          else
+            echo "Success: Lock file detected"
+          fi
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: cloudslash-${{ matrix.os }}
+          path: cloudslash*

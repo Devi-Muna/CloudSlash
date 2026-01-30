@@ -8,7 +8,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-// StorageOptimizationHeuristic
+// StorageOptimizationHeuristic detects storage inefficiency.
 type StorageOptimizationHeuristic struct{}
 
 func (h *StorageOptimizationHeuristic) Name() string { return "StorageOptimization" }

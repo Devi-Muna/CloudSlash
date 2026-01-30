@@ -1,0 +1,14 @@
+{
+  "resource_id": "eipalloc-0mock123",
+  "resource_type": "aws_eip",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "AssociationId": "",
+    "FoundInDNS": false,
+    "PublicIp": "203.0.113.10",
+    "Reason": "Safe to Release: Unused EIP (Not in Route53).",
+    "Region": "us-east-1",
+    "Warning": "Verify external DNS manually."
+  }
+}

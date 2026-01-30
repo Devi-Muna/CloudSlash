@@ -1,21 +1,21 @@
 package tetris
 
-// Dimensions represents CPU and RAM.
-// CPU is in millicores (1000m = 1 vCPU).
-// RAM is in MiB.
+// Dimensions defines compute resources.
+// CPU in millicores.
+// RAM in MiB.
 type Dimensions struct {
 	CPU float64
 	RAM float64
 }
 
-// Item represents a workload (e.g., K8s Pod).
+// Item represents a deployable workload.
 type Item struct {
 	ID         string
 	Dimensions Dimensions
-	Group      string // e.g. "frontend", "backend" - for future Affinity rules
+	Group      string // Group for affinity rules.
 }
 
-// Bin represents a compute node (e.g., EC2 Instance).
+// Bin represents a resource container.
 type Bin struct {
 	ID       string
 	Capacity Dimensions
@@ -23,7 +23,7 @@ type Bin struct {
 	Used     Dimensions
 }
 
-// AddItem attempts to place an item in the bin. Returns true if successful.
+// AddItem places an item inside the bin.
 func (b *Bin) AddItem(item *Item) bool {
 	if b.Used.CPU+item.Dimensions.CPU > b.Capacity.CPU {
 		return false
@@ -38,7 +38,7 @@ func (b *Bin) AddItem(item *Item) bool {
 	return true
 }
 
-// Waste returns the unused dimensions.
+// Waste calculates unused capacity.
 func (b *Bin) Waste() Dimensions {
 	return Dimensions{
 		CPU: b.Capacity.CPU - b.Used.CPU,
@@ -46,8 +46,7 @@ func (b *Bin) Waste() Dimensions {
 	}
 }
 
-// Efficiency returns the packing density (0.0 - 1.0).
-// Simpler average of CPU and RAM utilization.
+// Efficiency calculates resource utilization.
 func (b *Bin) Efficiency() float64 {
 	cpuEff := b.Used.CPU / b.Capacity.CPU
 	ramEff := b.Used.RAM / b.Capacity.RAM

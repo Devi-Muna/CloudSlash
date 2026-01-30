@@ -14,8 +14,8 @@ func (h *AgedAMIHeuristic) Name() string {
 }
 
 func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
-	// Identify candidates (Read-Only).
-	// Gather candidates first to avoid holding a Lock while calling MarkWaste.
+	// Identify candidates.
+	// Gather candidates to avoid lock contention.
 	g.Mu.RLock()
 	var candidates []string
 
@@ -27,10 +27,10 @@ func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			continue
 		}
 
-		// Check Age
+		// Check creation age.
 		creationTime, ok := node.Properties["CreateTime"].(time.Time)
 		if !ok {
-			// Try fallback to string if legacy scanners used
+			// Fallback: Parse string date.
 			dateStr, ok := node.Properties["CreationDate"].(string)
 			if !ok || dateStr == "" {
 				continue
@@ -46,7 +46,7 @@ func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			continue // Less than 90 days old
 		}
 
-		// Check Active Usage via Reverse Edges
+		// Check usages.
 		isUsed := false
 		if int(id) < len(g.ReverseEdges) {
 			upstream := g.ReverseEdges[id]
@@ -64,15 +64,14 @@ func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	}
 	g.Mu.RUnlock()
 
-	// Mark waste for identified candidates.
+	// Mark candidates as waste.
 	for _, arn := range candidates {
-		// Use MarkWaste to respect 'cloudslash:ignore' tags
-		// This handles internal locking and tag validation
+		// MarkWaste respects ignore tags.
 		g.MarkWaste(arn, 40)
 
-		// Enrich Metadata
-		// If MarkWaste succeeded (wasn't ignored), we add details.
-		// Re-acquire lock to safely modify node properties.
+		// Enrich metadata.
+		// Add details if not ignored.
+		// Re-acquire lock.
 		node := g.GetNode(arn)
 		if node != nil {
 			g.Mu.Lock()

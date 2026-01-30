@@ -36,6 +36,8 @@ func TestZombieEBSHeuristic(t *testing.T) {
 		"AttachedInstanceId": "i-running",
 	})
 
+	g.CloseAndWait()
+
 	// 3. Run Heuristic
 	h := &UnattachedVolumeHeuristic{}
 	if err := h.Run(ctx, g); err != nil {
@@ -81,6 +83,8 @@ func TestS3MultipartHeuristic(t *testing.T) {
 	g.AddNode("upload-new", "AWS::S3::MultipartUpload", map[string]interface{}{
 		"Initiated": time.Now().Add(-1 * 24 * time.Hour), // 1 day old
 	})
+
+	g.CloseAndWait()
 
 	// 3. Run Heuristic
 	h := &S3MultipartHeuristic{}

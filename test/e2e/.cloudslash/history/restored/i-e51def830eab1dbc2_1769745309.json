@@ -1,0 +1,16 @@
+{
+  "resource_id": "i-e51def830eab1dbc2",
+  "resource_type": "AWS::EC2::Instance",
+  "timestamp": 1769745131,
+  "region": "unknown",
+  "soul": {
+    "LaunchTime": "2026-01-30T03:52:08Z",
+    "Owner": "UNCLAIMED",
+    "Reason": "Compliance Violation: Missing Tags: Test=Production",
+    "State": "running",
+    "Tags": {
+      "Test": "Lazarus"
+    },
+    "Type": "t3.micro"
+  }
+}

@@ -29,7 +29,7 @@ func NewCloudWatchLogsClient(cfg aws.Config, g *graph.Graph, disableMetrics bool
 	}
 }
 
-// ScanLogGroups scans for Log Groups and populates the graph.
+// ScanLogGroups discovers CloudWatch Log Groups.
 func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 	paginator := cloudwatchlogs.NewDescribeLogGroupsPaginator(c.Client, &cloudwatchlogs.DescribeLogGroupsInput{})
 	for paginator.HasMorePages() {
@@ -40,7 +40,7 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 
 		for _, group := range page.LogGroups {
 			arn := *group.Arn
-			// Strip trailing :* if present (sometimes ARN has :*)
+			// Normalize ARN by removing wildcards.
 			// arn:aws:logs:region:account:log-group:name:*
 			if len(arn) > 2 && arn[len(arn)-2:] == ":*" {
 				arn = arn[:len(arn)-2]
@@ -60,12 +60,12 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 				props["Retention"] = *group.RetentionInDays
 			}
 
-			// Check incoming bytes metric if enabled.
+			// Check incoming bytes metric.
 			incomingBytes := float64(-1)
 
 			if !c.DisableMetrics && storedBytes > 0 {
-				// Optimization: Skip metric check for empty log groups.
-				// Analyzes last 30 days.
+				// Skip metric retrieval for empty log groups.
+				// 30-day analysis window.
 				now := time.Now()
 				start := now.Add(-30 * 24 * time.Hour)
 
@@ -77,7 +77,7 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 					},
 					StartTime:  &start,
 					EndTime:    &now,
-					Period:     aws.Int32(30 * 24 * 60 * 60), // One single datapoint for 30 days
+					Period:     aws.Int32(30 * 24 * 60 * 60), // Single 30-day datapoint.
 					Statistics: []cwtypes.Statistic{cwtypes.StatisticSum},
 				})
 
@@ -88,7 +88,7 @@ func (c *CloudWatchLogsClient) ScanLogGroups(ctx context.Context) error {
 				} else if err != nil {
 					// Metric check failed.
 				} else {
-					// No datapoints usually means 0
+					// Missing datapoints imply zero usage.
 					incomingBytes = 0
 				}
 			}

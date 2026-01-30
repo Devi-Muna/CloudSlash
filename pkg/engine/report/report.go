@@ -12,7 +12,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/version"
 )
 
-// ReportData holds data for the HTML template.
+// ReportData contains data for the static report template.
 type ReportData struct {
 	GeneratedAt      string
 	Version          string
@@ -29,7 +29,7 @@ type ReportData struct {
 	ChartValuesJSON template.JS
 }
 
-// WasteItem represents a simplified node for the report.
+// WasteItem represents a finding in the report.
 type WasteItem struct {
 	ID        string
 	Type      string
@@ -75,7 +75,7 @@ const htmlTemplate = `
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Glassmorphism Logic */
+        /* Glassmorphism styles. */
         .glass-panel {
             background: var(--bg-glass);
             backdrop-filter: blur(24px);
@@ -536,7 +536,7 @@ const htmlTemplate = `
 </html>
 `
 
-// GenerateHTML creates the report file.
+// GenerateHTML renders the static report.
 func GenerateHTML(g *graph.Graph, outputPath string) error {
 	data := ReportData{
 		GeneratedAt: time.Now().Format(time.RFC822),
@@ -544,7 +544,7 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 		License:     version.License,
 	}
 
-	// Aggregate for Charts
+	// Aggregate chart data.
 	costByType := make(map[string]float64)
 
 	g.Mu.RLock()
@@ -572,11 +572,11 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 				Reason:    reason, // Default reason
 				Cost:      node.Cost,
 				RiskScore: node.RiskScore,
-				SrcLoc:    node.SourceLocation, // Populate Source Location
+				SrcLoc:    node.SourceLocation, // Include source location.
 			}
 
 			if node.Justified {
-				item.Reason = node.Justification // Override reason with justification
+				item.Reason = node.Justification // Use justification as reason.
 				data.JustifiedItems = append(data.JustifiedItems, item)
 			} else {
 				data.TotalWaste++
@@ -590,7 +590,7 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 
 	data.ProjectedSavings = data.TotalWasteCost * 12
 
-	// Prepare Chart Data (Sorted by Cost)
+	// Prepare and sort chart data.
 	type costEntry struct {
 		Type string
 		Cost float64
@@ -608,14 +608,7 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 		values = append(values, c.Cost)
 	}
 
-	// JSON Marshal helper (manual simple string built to avoid import complexities inside template calc)
-	// Actually template.JS requires strings.
-	// For simplicity, we'll simple json via fmt or just import encoding/json above?
-	// Let's import encoding/json to be safe.
-
-	// wait I need to add import encoding/json
-
-	// Quick Fix: manual json construction for array of strings/floats is easy.
+	// Manually construct JSON arrays for template.
 	// Labels: ["Item1", "Item2"]
 	labelsStr := "["
 	for i, l := range labels {
@@ -638,12 +631,12 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 	data.ChartLabelsJSON = template.JS(labelsStr)
 	data.ChartValuesJSON = template.JS(valuesStr)
 
-	// Sort Items by Cost descending
+	// Sort items by cost.
 	sort.Slice(data.WasteItems, func(i, j int) bool {
 		return data.WasteItems[i].Cost > data.WasteItems[j].Cost
 	})
 
-	// Helper for numeric conversion
+	// Numeric conversion helper.
 	toFloat := func(v interface{}) float64 {
 		switch i := v.(type) {
 		case int:
@@ -657,7 +650,7 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 		}
 	}
 
-	// Register Math Functions
+	// Template math functions.
 	funcMap := template.FuncMap{
 		"sub": func(a, b interface{}) float64 { return toFloat(a) - toFloat(b) },
 		"mul": func(a, b interface{}) float64 { return toFloat(a) * toFloat(b) },

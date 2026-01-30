@@ -8,8 +8,10 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-type WasteConfidence float64
+// WasteConfidence represents the certainty of a finding.
+type WasteConfidence int
 
+// HeuristicResult captures the outcome of an analysis.
 type HeuristicResult struct {
 	IsWaste    bool
 	Confidence WasteConfidence
@@ -17,25 +19,30 @@ type HeuristicResult struct {
 	Reason     string
 }
 
+// WeightedHeuristic defines the interface for analysis modules.
 type WeightedHeuristic interface {
 	Name() string
 	Run(ctx context.Context, g *graph.Graph) error
 }
 
+// Engine manages and executes heuristics.
 type Engine struct {
 	heuristics []WeightedHeuristic
 }
 
+// NewEngine initializes the heuristic engine.
 func NewEngine() *Engine {
 	return &Engine{
 		heuristics: []WeightedHeuristic{},
 	}
 }
 
+// Register adds a heuristic.
 func (e *Engine) Register(h WeightedHeuristic) {
 	e.heuristics = append(e.heuristics, h)
 }
 
+// Run executes all registered heuristics concurrently.
 func (e *Engine) Run(ctx context.Context, g *graph.Graph) error {
 	var wg sync.WaitGroup
 	errs := make(chan error, len(e.heuristics))
@@ -54,7 +61,7 @@ func (e *Engine) Run(ctx context.Context, g *graph.Graph) error {
 	close(errs)
 
 	for err := range errs {
-		// Stop on first error for now
+		// Return first error.
 		return err
 	}
 

@@ -44,6 +44,8 @@ func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
 		},
 	})
 
+	g.CloseAndWait()
+
 	// 2. Run Heuristic
 	err := heuristic.Run(ctx, g)
 	if err != nil {

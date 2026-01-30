@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,37 +23,45 @@ type PriceRecord struct {
 	Timestamp int64   `json:"timestamp"`
 }
 
-// Client wraps the AWS Pricing Client.
+// Client wraps the AWS Pricing API.
 type Client struct {
-	svc       *pricing.Client
-	cache     map[string]PriceRecord
-	mu        sync.RWMutex
-	cachePath string
-	ttl       time.Duration
+	logger         *slog.Logger
+	svc            *pricing.Client
+	cache          map[string]PriceRecord
+	mu             sync.RWMutex
+	cachePath      string
+	ttl            time.Duration
+	discountFactor float64
 }
 
-// NewClient creates a new Pricing Client.
-// The AWS Pricing API is region-specific and may not be available in all regions.
-func NewClient(ctx context.Context) (*Client, error) {
-	// Set region to us-east-1 for pricing queries.
+// NewClient initializes the pricing client.
+// Resolves cache path and defaults.
+func NewClient(ctx context.Context, logger *slog.Logger, cacheDir string, manualDiscountRate float64) (*Client, error) {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+
+	if cacheDir == "" {
+		cacheDir = os.TempDir()
+	}
+	os.MkdirAll(cacheDir, 0755)
+
+	// Use us-east-1 for global pricing queries.
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	if err != nil {
 		return nil, err
 	}
 
-	// Resolve cache path
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	cacheDir := filepath.Join(home, ".cloudslash")
-	os.MkdirAll(cacheDir, 0755)
-	
+	cal := NewCalibrator(logger, cacheDir, manualDiscountRate)
+	factor := cal.GetDiscountFactor(ctx)
+
 	c := &Client{
-		svc:       pricing.NewFromConfig(cfg),
-		cache:     make(map[string]PriceRecord),
-		cachePath: filepath.Join(cacheDir, "pricing.json"),
-		ttl:       15 * 24 * time.Hour, // 15 Days
+		logger:         logger,
+		svc:            pricing.NewFromConfig(cfg),
+		cache:          make(map[string]PriceRecord),
+		cachePath:      filepath.Join(cacheDir, "pricing.json"),
+		ttl:            15 * 24 * time.Hour, // 15 Days
+		discountFactor: factor,
 	}
 	
 	c.loadCache()
@@ -72,7 +82,7 @@ func (c *Client) saveCache() {
 	}
 }
 
-// GetEBSPrice returns the monthly cost for a given volume type and size in GB.
+// GetEBSPrice estimates EBS monthly cost.
 func (c *Client) GetEBSPrice(ctx context.Context, region, volumeType string, sizeGB int) (float64, error) {
 	cacheKey := fmt.Sprintf("ebs-%s-%s", region, volumeType)
 
@@ -91,7 +101,7 @@ func (c *Client) GetEBSPrice(ctx context.Context, region, volumeType string, siz
 		
 		c.mu.Lock()
 		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
-		c.saveCache() // Persist immediately
+		c.saveCache() // Persist cache.
 		c.mu.Unlock()
 		
 		return price * float64(sizeGB), nil
@@ -101,9 +111,7 @@ func (c *Client) GetEBSPrice(ctx context.Context, region, volumeType string, siz
 }
 
 func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (float64, error) {
-	// Map usage types to pricing API values.
-
-	// Filter products by attributes.
+	// Filter products.
 	filters := []types.Filter{
 		{
 			Type:  types.FilterTypeTermMatch,
@@ -122,7 +130,7 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 		},
 	}
 
-	// Add volume type filter
+	// Add volume type.
 	var volTypeVal string
 	switch volumeType {
 	case "gp2":
@@ -138,7 +146,7 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 	case "standard":
 		volTypeVal = "Magnetic"
 	default:
-		// Unknown volume types default to a safe value to ensure cost estimation continuity.
+		// Default fallback cost.
 		return 0.1, nil
 	}
 
@@ -151,7 +159,7 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 	input := &pricing.GetProductsInput{
 		ServiceCode: aws.String("AmazonEC2"),
 		Filters:     filters,
-		MaxResults:  aws.Int32(1), // Retrieve single specific product match
+		MaxResults:  aws.Int32(1), // Retrieve single match
 	}
 
 	out, err := c.svc.GetProducts(ctx, input)
@@ -163,11 +171,11 @@ func (c *Client) fetchEBSPrice(ctx context.Context, region, volumeType string) (
 		return 0, fmt.Errorf("no pricing found for %s %s", region, volumeType)
 	}
 
-	// Use helper
+	// Parse price.
 	return parsePriceFromJSON(out.PriceList[0])
 }
 
-// GetEC2InstancePrice returns the monthly cost for a given instance type.
+// GetEC2InstancePrice estimates EC2 monthly cost.
 func (c *Client) GetEC2InstancePrice(ctx context.Context, region, instanceType string) (float64, error) {
 	cacheKey := fmt.Sprintf("ec2-%s-%s", region, instanceType)
 
@@ -188,10 +196,10 @@ func (c *Client) GetEC2InstancePrice(ctx context.Context, region, instanceType s
 		c.saveCache()
 		c.mu.Unlock()
 		
-		return price * 730, nil
+		return price * 730 * c.discountFactor, nil
 	}
 
-	return record.Price * 730, nil // 730 hours/month average
+	return record.Price * 730 * c.discountFactor, nil // Assumes 730h/month.
 }
 
 func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string) (float64, error) {
@@ -252,8 +260,7 @@ func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string)
 	return parsePriceFromJSON(out.PriceList[0])
 }
 
-// GetNATGatewayPrice returns the monthly cost for a NAT Gateway.
-// Pricing based on NatGateway-Hours usage type.
+// GetNATGatewayPrice estimates NAT Gateway monthly cost.
 func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64, error) {
 	cacheKey := fmt.Sprintf("nat-%s", region)
 
@@ -264,14 +271,14 @@ func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64
 	valid := ok && time.Since(time.Unix(record.Timestamp, 0)) < c.ttl
 
 	if !valid {
-		// Check cache with short timeout to prevent blocking.
+		// Short timeout check.
 		tCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
 		var err error
 		price, err := c.fetchNATPrice(tCtx, region)
 		if err != nil {
-			// Return default pricing on timeout.
+			// Default timeout fallback.
 			return 0.045 * 730, nil
 		}
 		c.mu.Lock()
@@ -321,14 +328,13 @@ func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, err
 	return parsePriceFromJSON(out.PriceList[0])
 }
 
-// GetEIPPrice returns the monthly cost for an unassociated Elastic IP.
-// Pricing based on unattached EIP hourly rate.
+// GetEIPPrice estimates unattached EIP monthly cost.
 func (c *Client) GetEIPPrice(ctx context.Context, region string) (float64, error) {
 	return 0.005 * 730, nil
 }
 
 func parsePriceFromJSON(jsonStr string) (float64, error) {
-	// Define structs for pricing JSON parsing.
+	// Pricing JSON structures.
 	type PriceDimension struct {
 		PricePerUnit map[string]string `json:"pricePerUnit"`
 	}

@@ -30,7 +30,7 @@ func (s *RDSScanner) ScanInstances(ctx context.Context) error {
 		}
 
 		for _, instance := range page.DBInstances {
-			// id := *instance.DBInstanceIdentifier // Unused
+
 			arn := *instance.DBInstanceArn
 
 			props := map[string]interface{}{

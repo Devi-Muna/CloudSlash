@@ -15,14 +15,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// S3Backend implements S3 storage.
+// S3Backend implements S3-based history storage.
 type S3Backend struct {
 	Bucket string
 	Key    string
 	Client *s3.Client
 }
 
-// NewS3Backend creates a new S3 backend.
+// NewS3Backend initializes an S3 backend.
 func NewS3Backend(s3URL string) (*S3Backend, error) {
 	u, err := url.Parse(s3URL)
 	if err != nil {
@@ -45,12 +45,12 @@ func NewS3Backend(s3URL string) (*S3Backend, error) {
 }
 
 func (b *S3Backend) Append(s Snapshot) error {
-	// Load existing snapshot data.
-	// S3 uses read-modify-write as it lacks native append support.
+	// Retrieve existing history.
+	// Note: S3 requires read-modify-write for append operations.
 	
 	existing, err := b.readAll()
 	if err != nil {
-		// If 404, start new
+		// Initialize empty history on 404.
 		existing = []Snapshot{}
 	}
 
@@ -58,7 +58,7 @@ func (b *S3Backend) Append(s Snapshot) error {
 
 
 	
-	// Write back
+	// Upload updated history.
 	var buf bytes.Buffer
 	for _, snap := range existing {
 		data, _ := json.Marshal(snap)
@@ -98,7 +98,7 @@ func (b *S3Backend) readAll() ([]Snapshot, error) {
 	defer resp.Body.Close()
 
 	var history []Snapshot
-	// Read full body
+	// Read object content.
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

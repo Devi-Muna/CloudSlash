@@ -1,0 +1,16 @@
+{
+  "resource_id": "vol-0mockGp2",
+  "resource_type": "AWS::EC2::Volume",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "FixRecommendation": "Run 'cloudslash cleanup' to generate remediation scripts.",
+    "IsGP2": true,
+    "IsModifying": false,
+    "Reason": "EBS Modernizer: Legacy gp2 volume detected. [PERFORMANCE] 2.0x Speed Boost (Switch to gp3). Save $10.00/mo.",
+    "Region": "us-east-1",
+    "Size": 500,
+    "State": "in-use",
+    "VolumeType": "gp2"
+  }
+}

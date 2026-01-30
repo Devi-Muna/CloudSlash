@@ -12,7 +12,7 @@ import (
 	awsecs "github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-// IdleClusterHeuristic detects ECS Clusters with active container instances but no running tasks.
+// IdleClusterHeuristic detects active clusters with no tasks.
 type IdleClusterHeuristic struct {
 	Config internalconfig.IdleClusterConfig
 }
@@ -22,7 +22,7 @@ func (h *IdleClusterHeuristic) Name() string { return "IdleClusterHeuristic" }
 func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	g.Mu.RLock()
 	var clusters []*graph.Node
-	// Index instances by Cluster ARN.
+	// Index instances.
 	instancesByCluster := make(map[string][]*graph.Node)
 
 	for _, node := range g.Nodes {
@@ -39,14 +39,14 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 
 	for _, cluster := range clusters {
 
-		// Check 1: Capacity Exists.
+		// Check 1: Capacity validation.
 		regInstances, _ := cluster.Properties["RegisteredContainerInstancesCount"].(int)
 		if regInstances == 0 {
-			// Fargate-only or empty clusters invoke no direct EC2 costs.
+			// Skip empty/Fargate clusters.
 			continue
 		}
 
-		// Check 2: Workload is Zero (No running or pending tasks).
+		// Check 2: Zero workload.
 		runningTasks, _ := cluster.Properties["RunningTasksCount"].(int)
 		pendingTasks, _ := cluster.Properties["PendingTasksCount"].(int)
 
@@ -54,15 +54,14 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			continue
 		}
 
-		// Check 3: Active Services are Dormant.
+		// Check 3: Zero active services.
 		activeServices, _ := cluster.Properties["ActiveServicesCount"].(int)
 		if activeServices > 0 {
-			// Active services indicate intent.
+			// Active services imply intent.
 			continue
 		}
 
-		// Verify that all instances in the cluster have been uptime long enough to rule out scaling events.
-		// If runningTasks == 0 AND Instance Uptime > Threshold, we consider it waste.
+		// Verify instance uptime stability.
 		isWaste := true
 
 		instances := instancesByCluster[cluster.ID]
@@ -72,28 +71,27 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			uptimeThreshold = 1 * time.Hour // Default
 		}
 
-		// Logic: If ANY instance is fresh (< threshold), the cluster might be scaling up.
-		// If ALL instances are old (> threshold), it is identified as waste.
+		// Check for recent scaling activity.
+		// Confirm stability.
 		
 		if len(instances) == 0 {
-			// Inconsistency: regInstances > 0 but no nodes found. Safest is to skip.
+			// Skip inconsistent state.
 			isWaste = false
 		} else {
 			for _, inst := range instances {
 				registeredAt, ok := inst.Properties["RegisteredAt"].(time.Time)
 				if ok {
 					if time.Since(registeredAt) > uptimeThreshold {
-						// Old instance found.
+						// Instance stable.
 					} else {
-						// Found a fresh instance. Abort waste flag.
+						// Fresh instance detected. Abort.
 						isWaste = false
 						break
 					}
 				}
 			}
 
-				// All instances were checked and none were below the uptime threshold.
-				// This confirms the cluster has been idle for at least the threshold duration.
+				// Cluster is stably idle.
 		}
 
 		if isWaste {
@@ -107,7 +105,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 	return nil
 }
 
-// EmptyServiceHeuristic detects services with a desired count > 0 but running count == 0.
+// EmptyServiceHeuristic detects stuck services.
 type EmptyServiceHeuristic struct {
 	ECR *aws.ECRScanner
 	ECS *aws.ECSScanner
@@ -130,15 +128,15 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		running, _ := service.Properties["RunningCount"].(int)
 
 		if desired > 0 && running == 0 {
-			// Service is stuck. Attempt to diagnose the cause from events.
+			// Diagnose stuck service.
 			events, _ := service.Properties["Events"].([]string)
 			diagnosis := "Reason: Service is failing to start tasks."
 
-			// Regex/String Match
+			// Analyze failure events.
 			for _, event := range events {
 				if strings.Contains(event, "unable to place a task") {
 					diagnosis = "Reason: Insufficient Capacity (Infrastructure Issue)."
-					break // strong signal
+					break
 				}
 				if strings.Contains(event, "task failed to start") {
 					diagnosis = "Reason: Application Crash (Code Issue)."
@@ -153,21 +151,20 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				}
 			}
 
-			// Check if the service failure is due to a missing ECR image.
-			// Resolves the TaskDefinition to find the container image URI.
+			// Check for missing ECR image.
 			if h.ECS != nil && h.ECR != nil {
 				taskDefARN, _ := service.Properties["TaskDefinition"].(string)
 				if taskDefARN != "" {
-					// 1. Describe Task Definition to get Image URI.
-					// Note: Only performing this for broken services to avoid N+1 issues.
+					// Describe Task Definition.
+					// Optimization: Only check broken services.
 					tdOut, err := h.ECS.Client.DescribeTaskDefinition(ctx, &awsecs.DescribeTaskDefinitionInput{
 						TaskDefinition: &taskDefARN,
 					})
 					if err == nil && tdOut.TaskDefinition != nil && len(tdOut.TaskDefinition.ContainerDefinitions) > 0 {
-						// Check first container image
+						// Check primary container.
 						imageURI := *tdOut.TaskDefinition.ContainerDefinitions[0].Image
 						if imageURI != "" {
-							// 2. Check ECR
+							// Verify ECR image existence.
 							exists, err := h.ECR.CheckImageExists(ctx, imageURI)
 							if err == nil && !exists {
 								diagnosis = "Reason: Broken Artifact. Image not found in ECR."

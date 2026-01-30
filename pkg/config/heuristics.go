@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-// HeuristicConfig holds all heuristic-related configurations.
+// HeuristicConfig holds configuration for all heuristic rules.
 type HeuristicConfig struct {
 	IdleCluster IdleClusterConfig `mapstructure:"idle_cluster"`
 	UnattachedVolume   UnattachedVolumeConfig   `mapstructure:"unattached_volume"`
@@ -23,7 +23,7 @@ type S3MultipartConfig struct {
 	AgeThreshold time.Duration `mapstructure:"age_threshold"`
 }
 
-// DefaultHeuristicConfig returns default configuration values.
+// DefaultHeuristicConfig returns the default configuration for heuristics.
 func DefaultHeuristicConfig() HeuristicConfig {
 	return HeuristicConfig{
 		IdleCluster: IdleClusterConfig{

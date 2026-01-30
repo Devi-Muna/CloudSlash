@@ -8,10 +8,10 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-// DataForensicsHeuristic identifies underutilized data layer resources.
+// DataForensicsHeuristic identifies underutilized data resources.
 type DataForensicsHeuristic struct{}
 
-// Name returns the unique identifier for the heuristic.
+// Name returns the heuristic identifier.
 func (h *DataForensicsHeuristic) Name() string {
 	return "DataForensics"
 }
@@ -38,9 +38,9 @@ func (h *DataForensicsHeuristic) Analyze(g *graph.Graph) {
 }
 
 func (h *DataForensicsHeuristic) analyzeElasticache(node *graph.Node) {
-	// Tri-Metric Analysis:
-	// Checks for zero operations (hits/misses), low network activity, and idle CPU.
-	// This combination strongly indicates an unused cache cluster.
+	// Tri-metric analysis:
+	// Checks for zero ops, low network, and idle CPU.
+	// Indicates unused cache cluster.
 	
 	hits := getFloat(node, "SumHits7d")
 	misses := getFloat(node, "SumMisses7d")
@@ -55,14 +55,14 @@ func (h *DataForensicsHeuristic) analyzeElasticache(node *graph.Node) {
 		node.IsWaste = true
 		node.RiskScore = 9 // High confidence due to zero activity across all metrics.
 		node.Properties["Reason"] = "Idle Cache Cluster: Zero hits/misses, negligible network, and idle CPU."
-		// Estimated cost based on node configuration.
+		// Estimated cost.
 		node.Cost = 50.0
 	}
 }
 
 func (h *DataForensicsHeuristic) analyzeRedshift(node *graph.Node) {
-	// Checks if the cluster has processed any queries in the last 24 hours.
-	// Zero queries suggests the cluster can be paused to save costs.
+	// Checks for processed queries (24h).
+	// Zero queries suggest pausing.
 	
 	queries := getFloat(node, "SumQueries24h")
 	conns := getFloat(node, "MaxConnections24h")
@@ -82,13 +82,13 @@ func (h *DataForensicsHeuristic) analyzeRedshift(node *graph.Node) {
 }
 
 func (h *DataForensicsHeuristic) analyzeDynamoDB(node *graph.Node) {
-	// Checks for significantly over-provisioned capacity.
-	// Low utilization (< 15%) indicates wasted spend on provisioned throughput.
+	// Checks for over-provisioned capacity.
+	// Utilization < 15% indicates waste.
 	
 	rcu := getFloat(node, "ProvisionedRCU")
 	wcu := getFloat(node, "ProvisionedWCU")
 	
-	if rcu == 0 || wcu == 0 { return } // Valid if On-Demand or error
+	if rcu == 0 || wcu == 0 { return } // Skip On-Demand.
 	
 	consumedRCU := getFloat(node, "AvgConsumedRCU30d")
 	consumedWCU := getFloat(node, "AvgConsumedWCU30d")
@@ -98,7 +98,7 @@ func (h *DataForensicsHeuristic) analyzeDynamoDB(node *graph.Node) {
 	
 	minUtil := math.Min(utilR, utilW)
 	
-	// Free Tier Check (< 25 units total provisioned is roughly free tier range)
+	// Skip Free Tier candidates.
 	if rcu <= 25 && wcu <= 25 {
 		return // Ignore
 	}
@@ -112,7 +112,7 @@ func (h *DataForensicsHeuristic) analyzeDynamoDB(node *graph.Node) {
 		if hasAS {
 			node.Properties["Reason"] = fmt.Sprintf("Auto-Scaling Misconfiguration: Utilization %.1f%%. Recommendation: Lower minimum capacity.", minUtil)
 		} else {
-			// Suggest switching to On-Demand for low/sporadic usage patterns.
+			// Suggest On-Demand switch.
 			node.Properties["Reason"] = fmt.Sprintf("Excessive Provisioned Capacity: Utilization %.1f%%. Recommendation: Switch to On-Demand.", minUtil)
 		}
 		

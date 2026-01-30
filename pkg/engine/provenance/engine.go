@@ -9,7 +9,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/providers/terraform"
 )
 
-// Engine orchestrates the provenance lookup.
+// Engine manages provenance lookup.
 type Engine struct {
 	RepoRoot string
 }
@@ -18,11 +18,10 @@ func NewEngine(root string) *Engine {
 	return &Engine{RepoRoot: root}
 }
 
-// Attribute attempts to find the author and commit for a given AWS resource ID.
-// It uses the Terraform State to bridge the gap between AWS ID and Source Code.
+// Attribute resolves resource authorship.
 func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (*ProvenanceRecord, error) {
-	// Bridge AWS ID to Source using Terraform State.
-	// Search TF State for the resource ID
+	// Bridge AWS ID to source via Terraform state.
+	// Lookup ID in state.
 	addr, err := terraform.FindAddressByID(state, resourceID)
 	if err != nil {
 		return nil, fmt.Errorf("state lookup failed: %w", err)
@@ -31,12 +30,11 @@ func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (
 		return nil, fmt.Errorf("resource ID %s not found in state", resourceID)
 	}
 
-	// Extract the resource type and name from the address string.
-	// Standard format: type.name (e.g. aws_instance.worker)
+	// Parse resource address.
 	
 	var resType, resName string
 	
-	// Clean off index if present
+	// Strip index.
 	cleanAddr := addr
 	if idx := strings.Index(cleanAddr, "["); idx != -1 {
 		cleanAddr = cleanAddr[:idx]
@@ -50,21 +48,19 @@ func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (
 		return nil, fmt.Errorf("could not parse type/name from address: %s", cleanAddr)
 	}
 
-	// Locate resource definition within the source repository.
-	// Search RepoRoot for the resource definition.
+	// Locate resource definition.
 	loc, err := FindResourceInDir(e.RepoRoot, resType, resName)
 	if err != nil {
-	// Fallback to error if not found.
 		return nil, fmt.Errorf("AST lookup failed: %w", err)
 	}
 
-	// Match temporal data using Git blame.
+	// Resolve Git blame.
 	blame, err := GetBlame(loc.FilePath, loc.StartLine, loc.EndLine)
 	if err != nil {
 		return nil, fmt.Errorf("git blame failed: %w", err)
 	}
 
-	// Construct final record.
+	// Build record.
 	rec := &ProvenanceRecord{
 		ResourceID: resourceID,
 		TFAddress:  addr,
@@ -77,7 +73,7 @@ func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (
 		Message:    blame.Message,
 	}
 	
-	// Statute of Limitations
+	// Check statute of limitations (1 year).
 	if time.Since(blame.Date) > 365*24*time.Hour {
 		rec.IsLegacy = true
 	}

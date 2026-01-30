@@ -10,16 +10,14 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
-// ResourceLocation holds the file path and line numbers for a resource definition.
+// ResourceLocation defines a resource block position.
 type ResourceLocation struct {
 	FilePath  string
 	StartLine int
 	EndLine   int
 }
 
-// FindResource scans a directory of .tf files to find a specific resource block.
-// resourceType: e.g. "aws_instance"
-// resourceName: e.g. "worker"
+// FindResourceInDir scans directory for a resource.
 func FindResourceInDir(dir string, resourceType, resourceName string) (*ResourceLocation, error) {
 	parser := hclparse.NewParser()
 
@@ -36,7 +34,7 @@ func FindResourceInDir(dir string, resourceType, resourceName string) (*Resource
 		path := filepath.Join(dir, f.Name())
 		hclFile, diags := parser.ParseHCLFile(path)
 		if diags.HasErrors() {
-			// Log error but continue scanning other files? For now, we just skip broken files.
+			// Skip broken files.
 			continue
 		}
 
@@ -59,7 +57,7 @@ func findInFile(f *hcl.File, wantType, wantName string) *ResourceLocation {
 			resName := block.Labels[1]
 
 			if resType == wantType && resName == wantName {
-				// HCL ranges are 1-based, perfect for editors and git blame
+				// HCL ranges are 1-based.
 				rng := block.DefRange
 				return &ResourceLocation{
 					StartLine: rng.Start.Line,
@@ -71,7 +69,7 @@ func findInFile(f *hcl.File, wantType, wantName string) *ResourceLocation {
 	return nil
 }
 
-// Schema to basically match any top-level block structure so we can iterate.
+// Schema matches top-level blocks.
 var schema = &hcl.BodySchema{
 	Blocks: []hcl.BlockHeaderSchema{
 		{Type: "resource", LabelNames: []string{"type", "name"}},

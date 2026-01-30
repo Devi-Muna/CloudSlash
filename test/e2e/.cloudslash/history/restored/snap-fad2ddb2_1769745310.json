@@ -1,0 +1,15 @@
+{
+  "resource_id": "snap-fad2ddb2",
+  "resource_type": "AWS::EC2::Snapshot",
+  "timestamp": 1769745132,
+  "region": "unknown",
+  "soul": {
+    "Description": "Auto-created snapshot for AMI ami-0e44d51e3d626379b",
+    "Owner": "UNCLAIMED",
+    "Reason": "Compliance Violation: Missing Tags: Test=Production",
+    "State": "completed",
+    "Tags": {},
+    "VolumeId": "vol-5521789d",
+    "VolumeSize": 15
+  }
+}

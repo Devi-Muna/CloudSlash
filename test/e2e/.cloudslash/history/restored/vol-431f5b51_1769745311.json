@@ -1,0 +1,20 @@
+{
+  "resource_id": "vol-431f5b51",
+  "resource_type": "AWS::EC2::Volume",
+  "timestamp": 1769745132,
+  "region": "unknown",
+  "soul": {
+    "AttachedInstanceId": "i-e51def830eab1dbc2",
+    "CreateTime": "2026-01-30T03:52:08Z",
+    "DeleteOnTermination": false,
+    "FixRecommendation": "Run 'cloudslash cleanup' to generate remediation scripts.",
+    "IsGP2": true,
+    "IsModifying": false,
+    "Owner": "UNCLAIMED",
+    "Reason": "EBS Modernizer: Legacy gp2 volume detected. [PERFORMANCE] 30.0x Speed Boost (Switch to gp3). Save $0.16/mo.; Compliance: Missing Test=Production",
+    "Size": 8,
+    "State": "in-use",
+    "Tags": {},
+    "VolumeType": "gp2"
+  }
+}

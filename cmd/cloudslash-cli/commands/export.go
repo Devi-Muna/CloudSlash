@@ -19,7 +19,7 @@ Default output directory: ./cloudslash-out/`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Initializing Forensic Export...")
 		config.Headless = true
-		// Run scan to extract data.
+		// Execute the scan to extract forensic data.
 		_, _, _, err := engine.Run(cmd.Context(), config)
 		if err != nil {
 			fmt.Printf("\n[ERROR] Export Failed: %v\n", err)

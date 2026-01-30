@@ -10,7 +10,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-// ExportItem matches the JSON/CSV structure.
+// ExportItem represents a single row in the export.
 type ExportItem struct {
 	ResourceID       string  `json:"resource_id"`
 	Type             string  `json:"type"`
@@ -23,11 +23,11 @@ type ExportItem struct {
 	Action           string  `json:"action"`
 }
 
-// GenerateCSV writes waste items to a CSV file.
+// GenerateCSV exports findings to CSV.
 func GenerateCSV(g *graph.Graph, path string) error {
 	items := extractItems(g)
 
-	// Sort by Cost Descending
+	// Sort by cost (descending).
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].MonthlyCost > items[j].MonthlyCost
 	})
@@ -41,7 +41,7 @@ func GenerateCSV(g *graph.Graph, path string) error {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	// SSSS+ Header
+	// Write CSV header.
 	header := []string{
 		"ResourceID",
 		"Type",
@@ -77,7 +77,7 @@ func GenerateCSV(g *graph.Graph, path string) error {
 	return nil
 }
 
-// GenerateJSON writes certain waste items to a JSON file.
+// GenerateJSON exports findings to JSON.
 func GenerateJSON(g *graph.Graph, path string) error {
 	items := extractItems(g)
 
@@ -113,7 +113,7 @@ func extractItems(g *graph.Graph) []ExportItem {
 
 			reason, _ := node.Properties["Reason"].(string)
 			
-			// Extract Name Tag
+			// Extract Name tag.
 			nameTag := ""
 			if tags, ok := node.Properties["Tags"].(map[string]string); ok {
 				if n, exists := tags["Name"]; exists {
@@ -121,7 +121,7 @@ func extractItems(g *graph.Graph) []ExportItem {
 				}
 			}
 
-			// Determine Action
+			// Determine recommended action.
 			action := "DELETE"
 			if node.RiskScore < 50 {
 				action = "REVIEW"

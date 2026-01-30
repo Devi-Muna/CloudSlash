@@ -142,8 +142,11 @@ func TestScanVolumes(t *testing.T) {
 				t.Fatalf("ScanVolumes failed: %v", err)
 			}
 
-			if len(g.Nodes) != tt.wantNodeCount {
-				t.Errorf("Expected %d nodes, got %d", tt.wantNodeCount, len(g.Nodes))
+			g.CloseAndWait()
+			nodes := g.GetNodes()
+
+			if len(nodes) != tt.wantNodeCount {
+				t.Errorf("Expected %d nodes, got %d", tt.wantNodeCount, len(nodes))
 			}
 
 			if tt.checkNode != nil {

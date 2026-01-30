@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// BlameInfo contains the raw git blame data for a specific line.
+// BlameInfo holds line attribution data.
 type BlameInfo struct {
 	Author  string
 	Email   string
@@ -16,15 +16,13 @@ type BlameInfo struct {
 	Message string
 }
 
-// execCmd allows mocking exec.Command for testing
+// execCmd mock injection.
 var execCmd = exec.Command
 
-// GetBlame returns the provenance for a given file and line range.
-// It attributes the resource to the commit that introduced/modified the key lines.
+// GetBlame retrieves attribution data.
 func GetBlame(filePath string, startLine, endLine int) (*BlameInfo, error) {
-	// Execute git blame via porcelain format for parsing reliability.
-	// Targets the specific start line of the resource block to identify the author.
-	// Assumes the start line represents the definition origin.
+	// Execute git blame (porcelain).
+	// Target specific line.
 	
 	args := []string{"blame", "-L", fmt.Sprintf("%d,%d", startLine, startLine), "--porcelain", filePath}
 	cmd := execCmd("git", args...)
@@ -40,7 +38,7 @@ func parsePorcelain(output string) (*BlameInfo, error) {
 	lines := strings.Split(output, "\n")
 	info := &BlameInfo{}
 	
-	// The first line is the hash
+	// Parse hash.
 	if len(lines) > 0 {
 		parts := strings.Fields(lines[0])
 		if len(parts) >= 1 {

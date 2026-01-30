@@ -25,6 +25,9 @@ func TestTopologicalSort(t *testing.T) {
 	g.AddEdge("instance", "subnet")
 	g.AddEdge("subnet", "vpc")
 
+	// Wait for graph build (Pipeline architecture)
+	g.CloseAndWait()
+
 	nodes := []*Node{
 		g.GetNode("vpc"),
 		g.GetNode("subnet"),
@@ -58,6 +61,8 @@ func TestCycleDetection(t *testing.T) {
 
 	g.AddEdge("A", "B")
 	g.AddEdge("B", "A")
+
+	g.CloseAndWait()
 
 	nodes := []*Node{g.GetNode("A"), g.GetNode("B")}
 

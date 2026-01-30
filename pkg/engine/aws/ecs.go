@@ -38,7 +38,7 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 		return nil
 	}
 
-	// Chunk cluster description requests to respect API limits (100 per call).
+	// Batch cluster description requests (limit 100).
 	chunkSize := 100
 	for i := 0; i < len(clusterARNs); i += chunkSize {
 		end := i + chunkSize
@@ -58,7 +58,7 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 
 		for _, cluster := range output.Clusters {
 			s.addClusterNode(cluster)
-			// For each cluster, we also want to scan its services and container instances
+			// Scan services and container instances for each cluster.
 			if err := s.ScanServices(ctx, *cluster.ClusterArn); err != nil {
 				fmt.Printf("Error scanning services for cluster %s: %v\n", *cluster.ClusterName, err)
 			}
@@ -126,12 +126,12 @@ func (s *ECSScanner) ScanServices(ctx context.Context, clusterArn string) error 
 
 func (s *ECSScanner) addServiceNode(service types.Service, clusterArn string) {
 	events := []string{}
-	// Store recent events for analysis.
+	// Capture recent service events.
 	for i := 0; i < len(service.Events) && i < 3; i++ {
 		events = append(events, *service.Events[i].Message)
 	}
 
-	// Get Task Definition ARN to link or inspect later (for image check)
+	// Retrieve Task Definition ARN for image analysis.
 	taskDef := ""
 	if service.TaskDefinition != nil {
 		taskDef = *service.TaskDefinition
@@ -187,7 +187,7 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 
 		for _, ci := range output.ContainerInstances {
 			// Add Container Instance Node
-			// Map container instance to EC2 instance for uptime cross-referencing.
+			// Map container instance to its underlying EC2 instance.
 			ec2InstanceID := *ci.Ec2InstanceId
 
 			// Capture registration time for uptime analysis.
@@ -200,10 +200,9 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 			})
 			s.Graph.AddTypedEdge(clusterArn, *ci.ContainerInstanceArn, graph.EdgeType("HAS_INSTANCE"), 1)
 
-			// Link to EC2 Instance Node if exists (for cross-reference)
+			// Create edge to EC2 instance node.
 			ec2Arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", ec2InstanceID)
-			// Construct ARN for cross-reference. Note that region/account are inferred from context.
-			// Ideally we use a consistent ARN builder. For now, we store the EC2 ID in properties for the heuristic to look up.
+			// Construct EC2 ARN for cross-referencing.
 			_ = ec2Arn
 		}
 	}

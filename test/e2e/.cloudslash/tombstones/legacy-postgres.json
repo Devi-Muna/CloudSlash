@@ -1,0 +1,12 @@
+{
+  "resource_id": "legacy-postgres",
+  "resource_type": "AWS::RDS::DBInstance",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "DBInstanceIdentifier": "legacy-postgres",
+    "Reason": "RDS Instance is stopped",
+    "Region": "us-east-1",
+    "Status": "stopped"
+  }
+}

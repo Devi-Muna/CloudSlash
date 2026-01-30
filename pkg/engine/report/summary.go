@@ -9,7 +9,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/version"
 )
 
-// GenerateExecutiveSummary creates the executive summary.
+// GenerateExecutiveSummary generates the markdown executive summary.
 func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accountID string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -49,17 +49,17 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 
 	annualSavings := totalWasteCost * 12
 
-	// Write report sections.
+	// Generate report sections.
 	fmt.Fprintf(f, "# CloudSlash Strategic Infrastructure Audit\n\n")
 	
-	// Write metadata.
+	// Metadata section.
 	fmt.Fprintf(f, "| **Scan Metadata** | |\n")
 	fmt.Fprintf(f, "| :--- | :--- |\n")
 	fmt.Fprintf(f, "| **Date** | %s |\n", time.Now().Format("Jan 02, 2006"))
 	fmt.Fprintf(f, "| **Account ID** | `%s` |\n", accountID)
 	fmt.Fprintf(f, "| **Scan Ref** | `%s` |\n\n", scanID)
 
-	// Write executive overview.
+	// Executive Overview.
 	fmt.Fprintf(f, "## 1. Executive Overview\n\n")
 	fmt.Fprintf(f, "CloudSlash has completed a comprehensive analysis of the AWS infrastructure. The audit identified **%d unattached or idle resources** contributing to unnecessary operational overhead.\n\n", totalWasteCount)
 	
@@ -69,7 +69,7 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 	
 	fmt.Fprintf(f, "> ** Strategic Insight:** Immediate remediation of these resources will reduce the cloud billing baseline by approximately **$%.0f** annually without impacting active workloads.\n\n", annualSavings)
 
-	// Write waste breakdown.
+	// Cost Inefficiency Breakdown.
 	fmt.Fprintf(f, "## 2. Cost Inefficiency Breakdown\n\n")
 	fmt.Fprintf(f, " inefficiency is distributed across the following core infrastructure vectors:\n\n")
 	
@@ -89,7 +89,7 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 	}
 	fmt.Fprintf(f, "\n")
 
-	// Write action plan.
+	// Remediation Strategy.
 	fmt.Fprintf(f, "## 3. Recommended Remediation Strategy\n\n")
 	fmt.Fprintf(f, "> [!CAUTION]\n")
 	fmt.Fprintf(f, "> **CRITICAL: VALIDATION REQUIRED.**\n")
@@ -104,7 +104,7 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 	fmt.Fprintf(f, "bash cloudslash-out/fix_terraform.sh\n")
 	fmt.Fprintf(f, "```\n\n")
 
-	// Write phase 2.
+	// Phase 2 instructions.
 	fmt.Fprintf(f, "### Phase 2: Remediation Options\n\n")
 
 	fmt.Fprintf(f, "#### Option A: Safe Deletion (Recommended)\n")
@@ -127,7 +127,7 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 	return nil
 }
 
-// Summary contains high-level scan stats.
+// Summary contains high-level analysis statistics.
 type Summary struct {
 	Region       string
 	TotalScanned int

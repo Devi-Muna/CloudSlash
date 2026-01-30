@@ -24,11 +24,11 @@ func NewECRScanner(cfg aws.Config, g *graph.Graph) *ECRScanner {
 	}
 }
 
-// CheckImageExists verifies if a specific image tag exists in ECR.
-// Returns true if exists, false if not found.
-// imageURI format: <account_id>.dkr.ecr.<region>.amazonaws.com/<repo_name>:<tag>
+// CheckImageExists verifies the existence of a specific image tag.
+// Returns true if the image exists.
+// format: <account_id>.dkr.ecr.<region>.amazonaws.com/<repo_name>:<tag>
 func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (bool, error) {
-	// Parse Image URI
+	// Parse the image URI.
 	// Format: 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:latest
 	parts := strings.Split(imageURI, "/")
 	if len(parts) < 2 {
@@ -54,8 +54,8 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 	repoName = pathParts[0]
 	imageTag = pathParts[1]
 
-	// Verify registry access permissions.
-	// Assumes access to the registry in the current account or region.
+	// Verify registry access.
+	// Assumes registry access in the current context.
 
 	// We can verify registryId from the domain if needed, but BatchGetImage defaults to default registry if not specified,
 	// which might be wrong if image is in another account.
@@ -80,14 +80,14 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 
 	output, err := s.Client.BatchGetImage(ctx, input)
 	if err != nil {
-		// If repo not found, image definitely doesn't exist
+		// Repo not found implies image not found.
 		if strings.Contains(err.Error(), "RepositoryNotFoundException") {
 			return false, nil
 		}
 		return false, err
 	}
 
-	// If images found, it exists
+	// Images found implies existence.
 	if len(output.Images) > 0 {
 		return true, nil
 	}
@@ -100,7 +100,7 @@ func (s *ECRScanner) CheckImageExists(ctx context.Context, imageURI string) (boo
 	return false, nil
 }
 
-// ScanRepositories scans ECR repositories for Lifecycle Policies and Untagged Images.
+// ScanRepositories checks repositories for lifecycle policies and untagged images.
 func (s *ECRScanner) ScanRepositories(ctx context.Context) error {
 	paginator := ecr.NewDescribeRepositoriesPaginator(s.Client, &ecr.DescribeRepositoriesInput{})
 	for paginator.HasMorePages() {
@@ -113,22 +113,22 @@ func (s *ECRScanner) ScanRepositories(ctx context.Context) error {
 			repoName := *repo.RepositoryName
 			repoArn := *repo.RepositoryArn
 
-			// Check for Lifecycle Policy
+			// Check for active lifecycle policy.
 			hasPolicy := false
 			policyInput := &ecr.GetLifecyclePolicyInput{RepositoryName: aws.String(repoName)}
 			if _, err := s.Client.GetLifecyclePolicy(ctx, policyInput); err == nil {
 				hasPolicy = true
 			} else {
-				// Graceful 403 Handling
+				// Handle access denial gracefully.
 				if strings.Contains(err.Error(), "AccessDenied") {
-					// Warn on access error without failing scan.
+					// Log warning on access error.
 					// We cannot determine policy status, so we proceed cautiously.
 				}
 			}
 
 			wasteBytes := int64(0)
 
-			// Analyze Images if no lifecycle policy is present.
+			// Analyze images if no lifecycle policy exists.
 			if !hasPolicy {
 				wasteBytes = s.analyzeImages(ctx, repoName)
 			}
@@ -158,19 +158,19 @@ func (s *ECRScanner) analyzeImages(ctx context.Context, repoName string) int64 {
 		}
 
 		for _, img := range page.ImageDetails {
-			// Logic: Untagged AND (Unpulled OR Pulled > 90d ago)
+			// Identify untagged images that are unpulled or stale (> 90 days).
 			isUntagged := len(img.ImageTags) == 0
 
 			if isUntagged {
-				// Check Pull Time
+				// Check last pull time.
 				isOld := true
 				if img.LastRecordedPullTime != nil {
-					// If pulled recently, it's NOT old
+					// Recent pull indicates active usage.
 					if time.Since(*img.LastRecordedPullTime) < 90*24*time.Hour {
 						isOld = false
 					}
 				} else {
-					// Identify untagged and stale images.
+					// Identify stale images.
 					// If LastRecordedPullTime is missing, treat as never pulled (stale).
 				}
 

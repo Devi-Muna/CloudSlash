@@ -24,6 +24,9 @@ func TestMarkWaste_AdvancedSuppression(t *testing.T) {
 		"Tags": map[string]string{"cloudslash:ignore": "2099-01-01"},
 	})
 
+	// Wait for graph build (Pipeline architecture)
+	g.CloseAndWait()
+
 	// Set Costs manually as they aren't computed here
 	// Set Costs manually as they aren't computed here
 	g.GetNode(nodeCostLow).Cost = 5.0

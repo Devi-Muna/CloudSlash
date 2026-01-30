@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"context"
 	"testing"
 )
 
@@ -15,12 +16,12 @@ func TestCELEngine(t *testing.T) {
 	rules := []DynamicRule{
 		{
 			ID:        "high_cost",
-			Condition: "input.cost > 1000",
+			Condition: "cost > 1000.0",
 			Action:    "alert",
 		},
 		{
 			ID:        "prod_protection",
-			Condition: "input.tags.env == 'prod' && input.action == 'delete'",
+			Condition: "tags.env == 'prod' && props.action == 'delete'",
 			Action:    "block",
 		},
 	}
@@ -31,23 +32,24 @@ func TestCELEngine(t *testing.T) {
 	}
 
 	// 4. Evaluate Scenario A: High Cost
-	dataA := map[string]interface{}{
-		"cost": 1500,
-		"tags": map[string]interface{}{"env": "dev"},
+	ctx := context.Background()
+	dataA := EvaluationContext{
+		Cost: 1500,
+		Tags: map[string]string{"env": "dev"},
 	}
-	matches, _ := engine.Evaluate(dataA)
-	if len(matches) != 1 || matches[0] != "high_cost" {
+	matches, _ := engine.Evaluate(ctx, dataA)
+	if len(matches) != 1 || matches[0].ID != "high_cost" {
 		t.Errorf("Scenario A failed. Expected ['high_cost'], got %v", matches)
 	}
 
 	// 5. Evaluate Scenario B: Protected
-	dataB := map[string]interface{}{
-		"cost":   50,
-		"action": "delete",
-		"tags":   map[string]interface{}{"env": "prod"},
+	dataB := EvaluationContext{
+		Cost: 50,
+		Tags: map[string]string{"env": "prod"},
+		Props: map[string]interface{}{"action": "delete"},
 	}
-	matches, _ = engine.Evaluate(dataB)
-	if len(matches) != 1 || matches[0] != "prod_protection" {
+	matches, _ = engine.Evaluate(ctx, dataB)
+	if len(matches) != 1 || matches[0].ID != "prod_protection" {
 		t.Errorf("Scenario B failed. Expected ['prod_protection'], got %v", matches)
 	}
 }

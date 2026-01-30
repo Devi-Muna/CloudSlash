@@ -1,0 +1,15 @@
+{
+  "resource_id": "snap-c23bee50",
+  "resource_type": "AWS::EC2::Snapshot",
+  "timestamp": 1769745131,
+  "region": "unknown",
+  "soul": {
+    "Description": "Auto-created snapshot for AMI ami-0fe77b349d804e9e6",
+    "Owner": "UNCLAIMED",
+    "Reason": "Compliance Violation: Missing Tags: Test=Production",
+    "State": "completed",
+    "Tags": {},
+    "VolumeId": "vol-c0fb3844",
+    "VolumeSize": 15
+  }
+}

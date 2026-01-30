@@ -12,15 +12,15 @@ import (
 
 var specsMu sync.RWMutex
 
-// InstanceSpecs defines the compute capacity of an instance type.
+// InstanceSpecs defines the compute capacity (vCPU, Memory) of an instance type.
 type InstanceSpecs struct {
 	VCPU   float64 // vCPUs (1 vCPU = 1000 mCPU roughly)
 	Memory float64 // MiB
 	Arch   string  // "x86_64" or "arm64"
 }
 
-// CandidateTypes defines the list of modern instance types to consider for optimization.
-// This is a curated list of current generation instances.
+// CandidateTypes lists modern instance types for optimization consideration.
+// Curated list of current-generation instances.
 var CandidateTypes = []string{
 	// General Purpose
 	"m5.large", "m5.xlarge", "m5.2xlarge",
@@ -39,9 +39,8 @@ var CandidateTypes = []string{
 	"r6g.large", "r6g.xlarge", "r6g.2xlarge",
 }
 
-// specsMap serves as a resilient cache for instance specifications.
-// It is dynamically updated via the AWS API (DescribeInstanceTypes) during runtime,
-// but retains a curated static catalog to ensure availability during API throttling or offline analysis.
+// specsMap is a resilient cache for instance specifications.
+// Dynamically updated via API; falls back to static catalog.
 var specsMap = map[string]InstanceSpecs{
 	// T3 Family (Burstable)
 	"t3.nano":   {VCPU: 2, Memory: 512, Arch: "x86_64"},
@@ -81,8 +80,8 @@ var specsMap = map[string]InstanceSpecs{
 	"r5.2xlarge": {VCPU: 8, Memory: 65536, Arch: "x86_64"},
 }
 
-// GetSpecs returns the VCPU and Memory for a given instance type.
-// Thread-safe: Uses RLock to read from the dynamic cache.
+// GetSpecs returns specifications for the given instance type.
+// Thread-safe access to the dynamic specification cache.
 func GetSpecs(instanceType string) InstanceSpecs {
 	specsMu.RLock()
 	specs, ok := specsMap[instanceType]
@@ -92,8 +91,7 @@ func GetSpecs(instanceType string) InstanceSpecs {
 		return specs
 	}
 
-	// Heuristic: Infer specs from family or default to a safe baseline.
-	// Prevents division-by-zero errors in utility calculations.
+	// Heuristic: Fallback to safe baseline to prevent division errors.
 	return InstanceSpecs{
 		VCPU:   2,
 		Memory: 8192,
@@ -101,14 +99,13 @@ func GetSpecs(instanceType string) InstanceSpecs {
 	}
 }
 
-// UpdateSpecsCache dynamically fetches instance details from AWS to ensure
-// the internal catalog is accurate for all observed workloads.
+// UpdateSpecsCache synchronizes the internal catalog with live AWS data.
 func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []string) error {
 	if len(instanceTypes) == 0 {
 		return nil
 	}
 
-	// Filter for unknown types to minimize API overhead.
+	// Filter for unknown types to optimize API usage.
 	unique := make(map[string]bool)
 	var unknownTypes []types.InstanceType
 
@@ -135,26 +132,26 @@ func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []str
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			// Log failure but safely degrade to static/heuristic mode.
+			// Log failure; system degrades gracefully to static mode.
 			fmt.Printf("Warning: Failed to sync instance specs for %v: %v\n", unknownTypes, err)
 			return err
 		}
 
 		specsMu.Lock()
 		for _, info := range page.InstanceTypes {
-			// Extract vCPU (DefaultVCpus or VCpus)
+			// Extract vCPU count.
 			vcpu := 0.0
 			if info.VCpuInfo != nil && info.VCpuInfo.DefaultVCpus != nil {
 				vcpu = float64(*info.VCpuInfo.DefaultVCpus)
 			}
 
-			// Extract Memory (SizeInMiB)
+			// Extract memory size.
 			mem := 0.0
 			if info.MemoryInfo != nil && info.MemoryInfo.SizeInMiB != nil {
 				mem = float64(*info.MemoryInfo.SizeInMiB)
 			}
 
-			// Extract Architecture
+			// Extract architecture.
 			arch := "x86_64"
 			if len(info.ProcessorInfo.SupportedArchitectures) > 0 {
 				// Prefer first reported architecture
@@ -173,12 +170,12 @@ func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []str
 	return nil
 }
 
-// PricingStrategy defines the interface for determining costs.
+// PricingStrategy defines the interface for cost estimation.
 type PricingStrategy interface {
 	GetEstimatedCost(instanceType, region string) float64
 }
 
-// StaticCostEstimator provides fallback pricing when the API is unavailable.
+// StaticCostEstimator provides fallback pricing when live data is unavailable.
 type StaticCostEstimator struct{}
 
 func (s *StaticCostEstimator) GetEstimatedCost(instanceType, region string) float64 {

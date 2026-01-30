@@ -31,15 +31,15 @@ func (h *LambdaHeuristic) Analyze(g *graph.Graph) {
 }
 
 func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
-	// Check for inactivity (invocations == 0) over the last 90 days.
+	// Check for inactivity (90d).
 	invocations := getFloat(node, "SumInvocations90d")
 	lastModStr, _ := node.Properties["LastModified"].(string)
 	
-	// Parse LastModified "2023-01-01T..."
+	// Parse modification time.
 	lastMod, err := time.Parse("2006-01-02T15:04:05.000+0000", lastModStr) 
-	// Handle potential variations in AWS timestamp formatting.
+	// Handle timestamp formats.
 	if err != nil {
-		// Fallback try simple RFC3339
+		// Fallback to RFC3339.
 		lastMod, _ = time.Parse(time.RFC3339, lastModStr)
 	}
 	
@@ -51,21 +51,20 @@ func (h *LambdaHeuristic) analyzeFunction(node *graph.Node) {
 		node.Justification = "Inactive Function: 0 Invocations in 90d. Last Modified > 90d."
 	}
 
-	// Prune old versions (keep top 3 recent + aliased).
+	// Identify stale versions.
 	versions, _ := node.Properties["AllVersions"].([]string)
 	aliases, _ := node.Properties["AliasVersions"].(map[string]bool)
 	
-	// Keep List: Top 3 (sorted?) - AWS ListVersions usually returns sorted by version?? Not valid assumption strictly, but often numerical.
-	// For simplicity, we assume generic prune count.
+	// Note: Conservative pruning estimate.
 	
-	// Calculate number of versions to prune (Total - 3 recent - Aliased versions).
+	// Estimate prune count.
 	pruneCount := 0
 	
 	for _, v := range versions {
 		if aliases[v] {
 			continue
 		}
-		// Without exact timestamp sort, we estimate count conservatively.
+		// Estimate prune count.
 		pruneCount++ 
 	}
 	if pruneCount > 5 {

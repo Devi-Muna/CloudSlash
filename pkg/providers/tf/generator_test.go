@@ -27,6 +27,8 @@ func TestGenerateDeletionScript(t *testing.T) {
 	g.AddEdge("i-1", "sub-1")
 	g.AddEdge("sub-1", "vpc-1")
 
+	g.CloseAndWait()
+
 	// Mark as Waste so they are included
 	g.GetNode("vpc-1").IsWaste = true
 	g.GetNode("sub-1").IsWaste = true

@@ -6,7 +6,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/config"
 )
 
-// RiskEngine tracks the stability of cloud resources.
+// RiskEngine models resource stability and preemption risk.
 type RiskEngine struct {
 	Config  config.RiskConfig
 	History map[string]float64
@@ -20,16 +20,16 @@ func NewRiskEngine(cfg config.RiskConfig) *RiskEngine {
 	}
 }
 
-// RecordInterruption spikes the risk for a specific pool.
+// RecordInterruption increases risk for a pool.
 func (re *RiskEngine) RecordInterruption(zone, instanceType string) {
 	re.Mu.Lock()
 	defer re.Mu.Unlock()
 	
 	key := zone + ":" + instanceType
-	re.History[key] = re.Config.InterruptionPenalty // Use configured penalty (e.g. 1.0)
+	re.History[key] = re.Config.InterruptionPenalty
 }
 
-// Decay applies the healing factor.
+// Decay normalizes risk over time.
 func (re *RiskEngine) Decay() {
 	re.Mu.Lock()
 	defer re.Mu.Unlock()
@@ -43,7 +43,7 @@ func (re *RiskEngine) Decay() {
 	}
 }
 
-// GetRisk returns the current probability of interruption.
+// GetRisk queries the current risk probability.
 func (re *RiskEngine) GetRisk(zone, instanceType string) float64 {
 	re.Mu.RLock()
 	defer re.Mu.RUnlock()

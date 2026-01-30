@@ -10,13 +10,13 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/engine/report"
 )
 
-// SlackClient handles the transmission of reports to a configured Slack Webhook.
+// SlackClient handles Slack notifications.
 type SlackClient struct {
 	WebhookURL string
 	Channel    string // Optional: Override default channel
 }
 
-// NewSlackClient initializes a new client validation.
+// NewSlackClient initializes the Slack integration.
 func NewSlackClient(webhookURL string, channel string) *SlackClient {
 	return &SlackClient{
 		WebhookURL: webhookURL,
@@ -24,7 +24,7 @@ func NewSlackClient(webhookURL string, channel string) *SlackClient {
 	}
 }
 
-// SendAnalysisReport dispatches a structured Block Kit message summarizing the scan results.
+// SendAnalysisReport sends a Block Kit summary.
 func (s *SlackClient) SendAnalysisReport(summary report.Summary) error {
 	if s.WebhookURL == "" {
 		return nil
@@ -57,15 +57,14 @@ func (s *SlackClient) SendAnalysisReport(summary report.Summary) error {
 	return nil
 }
 
-// constructPayload builds the Slack Block Kit structure.
-// Ref: https://api.slack.com/block-kit/building
+// constructPayload builds the message blocks.
 func (s *SlackClient) constructPayload(summary report.Summary) map[string]interface{} {
-	// Status Indicator
-	statusIcon := "🟢" // Healthy
+	// Determine status icon.
+	statusIcon := "🟢" // Healthy.
 	if summary.TotalSavings > 1000 {
-		statusIcon = "🔴" // Critical Savings Found
+		statusIcon = "🔴" // Critical.
 	} else if summary.TotalSavings > 0 {
-		statusIcon = "🟡" // Potential Optimization
+		statusIcon = "🟡" // Warning.
 	}
 
 	blocks := []map[string]interface{}{
@@ -111,7 +110,7 @@ func (s *SlackClient) constructPayload(summary report.Summary) map[string]interf
 		},
 	}
 
-	// Add High Impact Alert if waste is significant
+	// Add impact alert.
 	if summary.TotalSavings > 500 {
 		blocks = append(blocks, map[string]interface{}{
 			"type": "section",
@@ -134,7 +133,7 @@ func (s *SlackClient) constructPayload(summary report.Summary) map[string]interf
 }
 
 
-// SendBudgetAlert dispatches a high-priority alert for anomaly detection.
+// SendBudgetAlert sends a cost velocity alert.
 func (s *SlackClient) SendBudgetAlert(velocity float64, acceleration float64) error {
 	payload := map[string]interface{}{
 		"blocks": []map[string]interface{}{

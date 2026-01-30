@@ -14,12 +14,12 @@ type RiskConfig struct {
 	InterruptionPenalty float64 // Risk spike value on failure
 }
 
-// Defaults
+// Default constants.
 const (
 	DefaultRegion = "us-east-1"
 )
 
-// DefaultPolicyConfig returns the enterprise safe defaults.
+// DefaultPolicyConfig returns the enterprise-safe default policy values.
 func DefaultPolicyConfig() PolicyConfig {
 	return PolicyConfig{
 		MaxChurnPercent: 20.0,

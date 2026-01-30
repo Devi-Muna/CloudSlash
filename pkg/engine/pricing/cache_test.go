@@ -28,11 +28,12 @@ func TestPricingCache(t *testing.T) {
 
 	// Create client manually to inject custom paths
 	c := &Client{
-		svc:       pricing.NewFromConfig(cfg),
-		cache:     make(map[string]PriceRecord),
-		mu:        sync.RWMutex{},
-		cachePath: cacheFile,
-		ttl:       1 * time.Hour,
+		svc:            pricing.NewFromConfig(cfg),
+		cache:          make(map[string]PriceRecord),
+		mu:             sync.RWMutex{},
+		cachePath:      cacheFile,
+		ttl:            1 * time.Hour,
+		discountFactor: 1.0,
 	}
 
 	// 1. Priming: Manually inject a valid cache entry

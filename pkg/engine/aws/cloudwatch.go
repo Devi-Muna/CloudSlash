@@ -20,7 +20,7 @@ func NewCloudWatchClient(cfg aws.Config) *CloudWatchClient {
 	}
 }
 
-// GetMetricMax returns the maximum value of a metric over a period.
+// GetMetricMax calculates the maximum metric value over the specified period.
 func (c *CloudWatchClient) GetMetricMax(ctx context.Context, namespace, metricName string, dimensions []types.Dimension, startTime, endTime time.Time) (float64, error) {
 	input := &cloudwatch.GetMetricStatisticsInput{
 		Namespace:  aws.String(namespace),
@@ -47,7 +47,7 @@ func (c *CloudWatchClient) GetMetricMax(ctx context.Context, namespace, metricNa
 	return maxVal, nil
 }
 
-// GetMetricSum returns the sum of a metric over a period.
+// GetMetricSum calculates the sum of a metric over the specified period.
 func (c *CloudWatchClient) GetMetricSum(ctx context.Context, namespace, metricName string, dimensions []types.Dimension, startTime, endTime time.Time) (float64, error) {
 	input := &cloudwatch.GetMetricStatisticsInput{
 		Namespace:  aws.String(namespace),

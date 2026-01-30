@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -23,10 +24,16 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/engine/report"
 	"github.com/DrSkyle/cloudslash/pkg/engine/swarm"
 	"github.com/DrSkyle/cloudslash/pkg/providers/tf"
+	"github.com/DrSkyle/cloudslash/pkg/telemetry"
 	"github.com/DrSkyle/cloudslash/pkg/version"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 )
 
+// Config defines the engine execution parameters.
 type Config struct {
 	Region           string
 	TFStatePath      string
@@ -42,37 +49,82 @@ type Config struct {
 	JsonLogs         bool
 	RulesFile        string
 	HistoryURL       string // "s3://bucket/key" or empty for local
+	OutputDir        string // Directory for generated artifacts
 	Heuristics       internalconfig.HeuristicConfig
+	
+	// Pricing overrides.
+	DiscountRate float64 // Manual EDP/RI rate (e.g. 0.82)
+
+	// Telemetry configuration.
+	OtelEndpoint  string // "http://localhost:4318" or via env
+	SkipTelemetry bool   // Set true if embedding in an app that already has OTEL
+
+	// Dependency injection.
+	Logger   *slog.Logger
+	CacheDir string
 }
 
 func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, error) {
-
-	// Initialize Logger
-	var handler slog.Handler
-	if cfg.JsonLogs {
-		handler = slog.NewJSONHandler(os.Stdout, nil)
-	} else {
-		handler = slog.NewTextHandler(os.Stdout, nil)
+	// Set default OutputDir
+	if cfg.OutputDir == "" {
+		cfg.OutputDir = "cloudslash-out"
 	}
-	logger := slog.New(handler)
-	slog.SetDefault(logger)
+
+	// Initialize logger.
+	if cfg.Logger == nil {
+		// Fallback logger for testing.
+		var handler slog.Handler
+		if cfg.JsonLogs {
+			handler = slog.NewJSONHandler(os.Stdout, nil)
+		} else {
+			handler = slog.NewTextHandler(os.Stdout, nil)
+		}
+		cfg.Logger = slog.New(handler)
+	}
+	slog.SetDefault(cfg.Logger)
+
+	// Initialize Telemetry (Golden Signal A).
+	if !cfg.SkipTelemetry {
+		shutdown, telErr := telemetry.Init(ctx, version.AppName, version.Current, cfg.OtelEndpoint)
+		if telErr != nil {
+			slog.Warn("Failed to initialize telemetry (Mode A fallback)", "error", telErr)
+		} else {
+			defer func() {
+				slog.Debug("Flushing telemetry...")
+				shutdown(context.Background())
+			}()
+		}
+	}
 
 	if !cfg.Headless && !cfg.JsonLogs {
 		fmt.Printf("%s %s [%s]\n", version.AppName, version.Current, version.License)
 	}
 
-	// Ensure graceful shutdown on panic.
+	// Configure panic recovery.
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
-			// Log stack trace to file (Legacy Requirement)
-			crashFile := fmt.Sprintf("crash_log_%d.txt", time.Now().Unix())
-			f, _ := os.Create(crashFile)
-			defer f.Close()
-			fmt.Fprintf(f, "Crash Time: %s\nError: %v\n", time.Now(), r)
+			// Crash Handler: Intercept panics.
+			tr := otel.Tracer("cloudslash/engine")
+			// Use independent context for critical reporting.
+			_, span := tr.Start(ctx, "CriticalPanic")
+			
+			stack := debug.Stack()
+			
+			// Record Exception in OTEL
+			span.RecordError(fmt.Errorf("%v", r), trace.WithStackTrace(true))
+			span.SetStatus(codes.Error, "CRITICAL FAILURE")
+			span.SetAttributes(
+				attribute.String("crash.stack", string(stack)),
+				attribute.String("crash.reason", fmt.Sprintf("%v", r)),
+			)
+			span.End()
 
-			err = fmt.Errorf("CRITICAL FAILURE: %v (details in %s)", r, crashFile)
-			slog.Error("CRITICAL FAILURE", "error", r, "crash_file", crashFile)
+			// Return structured error
+			err = fmt.Errorf("CRITICAL FAILURE: %v", r)
+			
+			// Log to Stdout (Container/Serverless friendly)
+			slog.Error("CRITICAL FAILURE", "error", r, "stack", string(stack))
 		}
 	}()
 
@@ -86,25 +138,28 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 		engine.MaxWorkers = cfg.MaxConcurrency
 	}
 
-	// Initialize History Backend
+	// Initialize history backend.
+	// Initialize History Client
+	var backend history.Backend
 	if strings.HasPrefix(cfg.HistoryURL, "s3://") {
-		backend, err := history.NewS3Backend(cfg.HistoryURL)
+		var err error
+		backend, err = history.NewS3Backend(cfg.HistoryURL)
 		if err != nil {
 			slog.Error("Failed to initialize S3 History Backend", "error", err)
 		} else {
-			history.CurrentBackend = backend
 			slog.Info("Using S3 History Backend", "url", cfg.HistoryURL)
 		}
 	}
+	historyClient := history.NewClient(backend)
 
 	engine.Start(ctx)
 
 	var doneChan <-chan struct{}
 
 	if cfg.MockMode {
-		runMockMode(ctx, cfg, g, engine)
+		runMockMode(ctx, cfg, g, engine, historyClient)
 	} else {
-		doneChan = runRealMode(ctx, cfg, g, engine)
+		doneChan = runRealMode(ctx, cfg, g, engine, historyClient)
 	}
 
 	// Wait for scan to complete in non-headless mode (if applicable) or return.
@@ -115,11 +170,11 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 	return true, g, engine, err
 }
 
-func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) {
+func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, hClient *history.Client) {
 	mockScanner := aws.NewMockScanner(g)
 
 	// Seed mock history data.
-	history.SeedMockData()
+	hClient.SeedMockData()
 
 	mockScanner.Scan(ctx)
 
@@ -144,7 +199,7 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	}
 
 	// ---------------------------------------------------------
-	// ENTERPRISE POLICY ENGINE (CEL)
+	// Initialize Enterprise Policy Engine (CEL).
 	// ---------------------------------------------------------
 	if cfg.RulesFile != "" {
 		slog.Info("Initializing Policy Engine", "rules_file", cfg.RulesFile)
@@ -157,73 +212,98 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{})
 	hEngine2.Run(ctx, g)
 
-	os.Mkdir("cloudslash-out", 0755)
+	os.Mkdir(cfg.OutputDir, 0755)
 
-	// Output Generation
-	report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
-	report.GenerateJSON(g, "cloudslash-out/waste_report.json")
+	// Generate outputs.
+	report.GenerateCSV(g, cfg.OutputDir+"/waste_report.csv")
+	report.GenerateJSON(g, cfg.OutputDir+"/waste_report.json")
 
-	// Dashboard Generation
-	if err := report.GenerateDashboard(g, "cloudslash-out/dashboard.html"); err != nil {
+	// Generate dashboard.
+	if err := report.GenerateDashboard(g, cfg.OutputDir+"/dashboard.html"); err != nil {
 		fmt.Printf("Failed to generate dashboard: %v\n", err)
 	}
 
-	// Remediation Scripts
+	// Generate remediation scripts.
 	gen := tf.NewGenerator(g, nil)
-	gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
-	os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
+	gen.GenerateFixScript(cfg.OutputDir+"/fix_terraform.sh")
+	os.Chmod(cfg.OutputDir+"/fix_terraform.sh", 0755)
 
 	// Generate mock artifacts.
-	gen.GenerateWasteTF("cloudslash-out/waste.tf")
-	gen.GenerateImportScript("cloudslash-out/import.sh")
-	gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
+	gen.GenerateWasteTF(cfg.OutputDir+"/waste.tf")
+	gen.GenerateImportScript(cfg.OutputDir+"/import.sh")
+	gen.GenerateDestroyPlan(cfg.OutputDir+"/destroy_plan.out")
 
 	remGen := remediation.NewGenerator(g)
-	remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
-	os.Chmod("cloudslash-out/safe_cleanup.sh", 0755)
+	remGen.GenerateSafeDeleteScript(cfg.OutputDir+"/safe_cleanup.sh")
+	os.Chmod(cfg.OutputDir+"/safe_cleanup.sh", 0755)
 
-	remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
-	os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
+	remGen.GenerateIgnoreScript(cfg.OutputDir+"/ignore_resources.sh")
+	os.Chmod(cfg.OutputDir+"/ignore_resources.sh", 0755)
 
-	// Executive Summary
-	report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
+	remGen.GenerateUndoScript(cfg.OutputDir+"/undo_cleanup.sh")
+	os.Chmod(cfg.OutputDir+"/undo_cleanup.sh", 0755)
 
+	// Generate Executive Summary.
+	report.GenerateExecutiveSummary(g, cfg.OutputDir+"/executive_summary.md", fmt.Sprintf("cs-mock-%d", time.Now().Unix()), "MOCK-ACCOUNT-123")
+
+	// Generate Report Summary.
+	summary := report.Summary{
+		Region:       cfg.Region,
+		TotalScanned: len(g.Nodes),
+		TotalWaste:   0,
+		TotalSavings: 0,
+	}
+
+	g.Mu.RLock()
+	for _, n := range g.Nodes {
+		if n.IsWaste {
+			summary.TotalWaste++
+			summary.TotalSavings += n.Cost
+		}
+	}
+	g.Mu.RUnlock()
+
+	// Decorate CI/CD environment.
+	ci := report.NewCIDecorator(cfg.Logger)
+	if err := ci.Run(summary, g); err != nil {
+		cfg.Logger.Error("CI Decoration failed", "error", err)
+	}
+
+	// Send Slack notification.
 	var slackClient *notifier.SlackClient
 	if cfg.SlackWebhook != "" && cfg.Headless {
 		fmt.Println(" -> Transmitting Cost Report to Slack (MOCK)...")
 		slackClient = notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
-		
-		// Recalculate summary for Slack
-		summary := report.Summary{
-			Region:       cfg.Region,
-			TotalScanned: len(g.Nodes),
-			TotalWaste:   0,
-			TotalSavings: 0,
-		}
-		g.Mu.RLock()
-		for _, n := range g.Nodes {
-			if n.IsWaste {
-				summary.TotalWaste++
-				summary.TotalSavings += n.Cost
-			}
-		}
-		g.Mu.RUnlock()
-		
 		slackClient.SendAnalysisReport(summary)
 	}
+	// Perform historical analysis.
+	performSignalAnalysis(g, slackClient, hClient)
 
-	// Historical Analysis
-	performSignalAnalysis(g, slackClient)
+	// Execute E2E validation.
+	if os.Getenv("CLOUDSLASH_E2E") == "true" {
+		fmt.Println("[E2E] Verifying Graph Integrity...")
+		g.Mu.RLock()
+		nodeCount := len(g.Nodes)
+		g.Mu.RUnlock()
+		
+		// Expect at least 1 mock resource (we seed ~7 in mock.go)
+		if nodeCount < 5 {
+			fmt.Printf("[E2E] FAILURE: Expected >5 nodes, got %d\n", nodeCount)
+			os.Exit(1)
+		}
+		fmt.Println("[E2E] SUCCESS: Graph state valid.")
+	}
 }
 
-func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine) <-chan struct{} {
+func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.Engine, hClient *history.Client) <-chan struct{} {
 	done := make(chan struct{})
 
 	var pricingClient *pricing.Client
 	var err error
-	pricingClient, err = pricing.NewClient(ctx)
+	// Configure pricing client with discount rate.
+	pricingClient, err = pricing.NewClient(ctx, cfg.Logger, cfg.CacheDir, cfg.DiscountRate)
 	if err != nil {
-		// Log pricing client initialization error.
+		// Log pricing initialization failures.
 		// fmt.Printf("Warning: Failed to initialize Pricing Client: %v\n", err)
 	}
 
@@ -279,6 +359,9 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 	go func() {
 		defer close(done)
 		scanWg.Wait()
+		
+		// Finalize ingestion.
+		g.CloseAndWait()
 
 		if logsClient != nil {
 			logsClient.ScanLogGroups(context.Background())
@@ -288,11 +371,13 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			ecrScanner.ScanRepositories(context.Background())
 		}
 
-		// Reconcile with Terraform state.
+// Reconcile with Terraform state.
 		var state *tf.State
-		if _, err := os.Stat(cfg.TFStatePath); err == nil {
-			var err error
-			state, err = tf.ParseStateFile(cfg.TFStatePath)
+		var err error
+		// Load Terraform state.
+		state, err = tf.LoadState(context.Background(), cfg.TFStatePath)
+
+		if err == nil {
 			if err == nil {
 				detector := tf.NewDriftDetector(g, state)
 				detector.ScanForDrift()
@@ -372,7 +457,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		}
 
 		// ---------------------------------------------------------
-		// ENTERPRISE POLICY ENGINE (CEL)
+		// Initialize Enterprise Policy Engine (CEL).
 		// ---------------------------------------------------------
 		if cfg.RulesFile != "" {
 			slog.Info("Initializing Policy Engine", "rules_file", cfg.RulesFile)
@@ -385,57 +470,67 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		detective.InvestigateGraph(ctx, g)
 
 		// Generate output files.
-		os.Mkdir("cloudslash-out", 0755)
+		os.Mkdir(cfg.OutputDir, 0755)
 
 		// 1. Report Generation
-		report.GenerateCSV(g, "cloudslash-out/waste_report.csv")
-		report.GenerateJSON(g, "cloudslash-out/waste_report.json")
+		report.GenerateCSV(g, cfg.OutputDir+"/waste_report.csv")
+		report.GenerateJSON(g, cfg.OutputDir+"/waste_report.json")
 
 		// 2. Remediation & Planning
 		gen := tf.NewGenerator(g, state)
-		gen.GenerateWasteTF("cloudslash-out/waste.tf")
-		gen.GenerateImportScript("cloudslash-out/import.sh")
-		gen.GenerateDestroyPlan("cloudslash-out/destroy_plan.out")
+		gen.GenerateWasteTF(cfg.OutputDir+"/waste.tf")
+		gen.GenerateImportScript(cfg.OutputDir+"/import.sh")
+		gen.GenerateDestroyPlan(cfg.OutputDir+"/destroy_plan.out")
 
 		// Remediation Scripts
-		gen.GenerateFixScript("cloudslash-out/fix_terraform.sh")
-		os.Chmod("cloudslash-out/fix_terraform.sh", 0755)
+		gen.GenerateFixScript(cfg.OutputDir+"/fix_terraform.sh")
+		os.Chmod(cfg.OutputDir+"/fix_terraform.sh", 0755)
 
 		remGen := remediation.NewGenerator(g)
-		remGen.GenerateSafeDeleteScript("cloudslash-out/safe_cleanup.sh")
-		os.Chmod("cloudslash-out/safe_cleanup.sh", 0755)
+		remGen.GenerateSafeDeleteScript(cfg.OutputDir+"/safe_cleanup.sh")
+		os.Chmod(cfg.OutputDir+"/safe_cleanup.sh", 0755)
 
-		remGen.GenerateIgnoreScript("cloudslash-out/ignore_resources.sh")
-		os.Chmod("cloudslash-out/ignore_resources.sh", 0755)
+		remGen.GenerateIgnoreScript(cfg.OutputDir+"/ignore_resources.sh")
+		os.Chmod(cfg.OutputDir+"/ignore_resources.sh", 0755)
 
-		if err := report.GenerateDashboard(g, "cloudslash-out/dashboard.html"); err != nil {
+		remGen.GenerateUndoScript(cfg.OutputDir+"/undo_cleanup.sh")
+		os.Chmod(cfg.OutputDir+"/undo_cleanup.sh", 0755)
+
+		if err := report.GenerateDashboard(g, cfg.OutputDir+"/dashboard.html"); err != nil {
 			fmt.Printf("Failed to generate dashboard: %v\n", err)
 		}
 
 		// Executive Summary
-		report.GenerateExecutiveSummary(g, "cloudslash-out/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
+		report.GenerateExecutiveSummary(g, cfg.OutputDir+"/executive_summary.md", fmt.Sprintf("cs-scan-%d", time.Now().Unix()), "AWS-ACCOUNT")
 
+		// Generate Report Summary (Shared by CI and Slack)
+		summary := report.Summary{
+			Region:       cfg.Region,
+			TotalScanned: len(g.Nodes), // Approximate
+			TotalWaste:   0,
+			TotalSavings: 0,
+		}
 
+		g.Mu.RLock()
+		for _, n := range g.Nodes {
+			if n.IsWaste {
+				summary.TotalWaste++
+				summary.TotalSavings += n.Cost
+			}
+		}
+		g.Mu.RUnlock()
+
+		// 1. CI/CD Decoration (Native PR Comments)
+		// Detects GitHub/GitLab and posts Report directly to PR.
+		ci := report.NewCIDecorator(cfg.Logger)
+		if err := ci.Run(summary, g); err != nil {
+			cfg.Logger.Error("CI Decoration failed", "error", err)
+		}
+
+		// 2. Slack Notification
 		if cfg.SlackWebhook != "" && cfg.Headless {
 			fmt.Println(" -> Transmitting Cost Report to Slack...")
 			client := notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
-
-			// Recalculate summary for Slack
-			summary := report.Summary{
-				Region:       cfg.Region,
-				TotalScanned: len(g.Nodes), // Approximate
-				TotalWaste:   0,
-				TotalSavings: 0,
-			}
-
-			g.Mu.RLock()
-			for _, n := range g.Nodes {
-				if n.IsWaste {
-					summary.TotalWaste++
-					summary.TotalSavings += n.Cost
-				}
-			}
-			g.Mu.RUnlock()
 
 			if err := client.SendAnalysisReport(summary); err != nil {
 				fmt.Printf(" [WARN] Failed to send Slack report: %v\n", err)
@@ -451,7 +546,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		if cfg.SlackWebhook != "" {
 			slackClient = notifier.NewSlackClient(cfg.SlackWebhook, cfg.SlackChannel)
 		}
-		performSignalAnalysis(g, slackClient)
+		performSignalAnalysis(g, slackClient, hClient)
 
 		// Check for partial graph results.
 		g.Mu.RLock()
@@ -504,8 +599,21 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 		scanWg.Add(1)
 		engine.Submit(func(ctx context.Context) error {
 			defer scanWg.Done()
+			
+			// Golden Signal B: Scanner Swarm (Latency & Failures)
+			tr := otel.Tracer("cloudslash/scanner")
+			ctx, span := tr.Start(ctx, taskName, trace.WithAttributes(
+				attribute.String("provider", "aws"),
+				attribute.String("region", region),
+				attribute.String("aws.profile", profile),
+			))
+			defer span.End()
+
 			err := task(ctx)
 			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+				
 				// Capture partial failure
 				scope := fmt.Sprintf("%s:%s [%s]", profile, region, taskName)
 				g.AddError(scope, err)
@@ -540,7 +648,7 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 }
 
 // performSignalAnalysis analyzes cost trends.
-func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
+func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient, hClient *history.Client) {
 	// Snapshot current state.
 	s := history.Snapshot{
 		Timestamp:      time.Now().Unix(),
@@ -560,12 +668,12 @@ func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient) {
 	g.Mu.RUnlock()
 
 	// Persist
-	if err := history.Append(s); err != nil {
+	if err := hClient.Append(s); err != nil {
 		// Non-critical failure, just log to debug if needed
 	}
 
 	// Analyze history window.
-	window, err := history.LoadWindow(10)
+	window, err := hClient.LoadWindow(10)
 	if err == nil {
 		// Analyze with zero budget baseline.
 		res := history.Analyze(window, 0)
@@ -620,37 +728,61 @@ func runPolicyEngine(ctx context.Context, rulesFile string, g *graph.Graph) erro
 		return err
 	}
 
-	// 4. Evaluate against Graph Nodes
-	g.Mu.Lock()
-	defer g.Mu.Unlock()
-
+	// 4. Evaluate against Graph Nodes (Two-Phase Locking)
+	// Phase 1: Analysis (Read-Only) - Allows concurrent readers
+	g.Mu.RLock()
+	
+	type violation struct {
+		Node    *graph.Node
+		Matches []policy.DynamicRule
+	}
+	var pendingUpdates []violation
 	violations := 0
+
 	for _, node := range g.Nodes {
-		// Convert Node properties to map[string]interface{}.
-		// Note: node.Properties is already map[string]interface{} but specific fields (ID, Type, Cost) need mapping.
-		input := map[string]interface{}{
-			"id":   node.ID,
-			"kind": node.Type, // "type" is reserved in CEL, use "kind"
-			"cost": node.Cost,
-			"tags": node.Properties["Tags"], // Assuming Tags is parsed
-			// Flatten properties into input as well? 
-			// For simplicity, let's expose 'props'
-			"props": node.Properties,
+		// Convert Node properties to Typed Context.
+		evalCtx := policy.EvaluationContext{
+			ID:    node.ID,
+			Kind:  node.Type,
+			Cost:  node.Cost,
+			Tags:  make(map[string]string),
+			Props: node.Properties,
 		}
 
-		matches, err := engine.Evaluate(input)
+		// Safely extract tags.
+		if tags, ok := node.Properties["Tags"].(map[string]string); ok {
+			evalCtx.Tags = tags
+		}
+
+		// Evaluate CEL rules (Read-Locked).
+		// Rules are sorted by priority.
+		matches, err := engine.Evaluate(ctx, evalCtx)
 		if err != nil {
-			continue // Log?
+			continue 
 		}
 
 		if len(matches) > 0 {
+			pendingUpdates = append(pendingUpdates, violation{Node: node, Matches: matches})
+		}
+	}
+	g.Mu.RUnlock()
+
+	// Phase 2: Commit findings (Write-Locked).
+	if len(pendingUpdates) > 0 {
+		g.Mu.Lock()
+		defer g.Mu.Unlock()
+
+		violations = len(pendingUpdates)
+		for _, v := range pendingUpdates {
 			// Mark as Waste or Policy Violation
-			node.IsWaste = true
-			violations++
+			v.Node.IsWaste = true
 			
-			// Append Reason
-			for _, ruleID := range matches {
-				node.WasteReason += fmt.Sprintf("[Policy:%s] ", ruleID)
+			// Append Reason (Top Priority Rule wins)
+			// But we log all matching policies for audit trail
+			v.Node.WasteReason += fmt.Sprintf("[Policy:%s(P%d)] ", v.Matches[0].ID, v.Matches[0].Priority)
+			
+			if len(v.Matches) > 1 {
+				v.Node.WasteReason += fmt.Sprintf("(+%d others)", len(v.Matches)-1)
 			}
 		}
 	}

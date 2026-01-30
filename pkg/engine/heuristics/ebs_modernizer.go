@@ -7,7 +7,7 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-// EBSModernizerHeuristic identifies legacy gp2 volumes that should be upgraded to gp3.
+// EBSModernizerHeuristic identifies gp2 volumes upgradable to gp3.
 type EBSModernizerHeuristic struct{}
 
 func (h *EBSModernizerHeuristic) Name() string { return "EBSModernizer" }
@@ -36,11 +36,10 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 		return
 	}
 
-	// SDK typed int32, but graph property often unmarshals or is stored as int/float.
+	// Normalize size type.
 	raw := n.Properties["Size"]
 	sz := 0
-
-	// Handle type assertions for size, which involves multiple numeric types from the SDK.
+	
 	switch v := raw.(type) {
 	case int32:
 		sz = int(v)
@@ -54,20 +53,20 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 		return
 	}
 
-	// gp2: 3 IOPS/GB (min 100, max 3000 bursted)
+	// gp2 performance model (3 IOPS/GB).
 	curIOPS := sz * 3
 	if curIOPS < 100 {
 		curIOPS = 100
 	}
 
-	// gp3 Baseline: 3000 IOPS flat
+	// gp3 baseline (3000 IOPS).
 	boost := 0.0
 	if curIOPS < 3000 {
 		boost = 3000.0 / float64(curIOPS)
 	}
 
 	n.IsWaste = true
-	// Assign a priority score (RiskScore) based on the impact of the optimization.
+	// Assign priority score.
 	n.RiskScore = 3
 	n.Cost = float64(sz) * 0.02 // Savings ($0.10 -> $0.08)
 
@@ -78,7 +77,7 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 	rsn += fmt.Sprintf(" Save $%.2f/mo.", n.Cost)
 
 	n.Properties["Reason"] = rsn
-	// Suggest remediation action.
+	// Suggest remediation.
 	n.Properties["FixRecommendation"] = "Run 'cloudslash cleanup' to generate remediation scripts."
 	n.Properties["IsGP2"] = true
 }

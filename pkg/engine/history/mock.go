@@ -7,7 +7,10 @@ import (
 // SeedMockData populates the ledger with a synthetic cost anomaly scenario.
 // Pattern: 48h stable baseline followed by a significant spike in the last hour.
 // Triggers the Anomaly Detection engine for demonstration purposes.
-func SeedMockData() error {
+// SeedMockData populates the ledger with a synthetic cost anomaly scenario.
+// Pattern: 48h stable baseline followed by a significant spike in the last hour.
+// Triggers the Anomaly Detection engine for demonstration purposes.
+func (c *Client) SeedMockData() error {
 	now := time.Now().Unix()
 	
 	// 1. Reset ledger structure.
@@ -23,7 +26,7 @@ func SeedMockData() error {
 			ResourceCounts:   map[string]int{"EC2": 5, "RDS": 1},
 			WasteCount:       0,
 		}
-		if err := Append(s); err != nil {
+		if err := c.Append(s); err != nil {
 			return err
 		}
 	}
@@ -35,7 +38,7 @@ func SeedMockData() error {
 		ResourceCounts:   map[string]int{"EC2": 5, "RDS": 2},
 		WasteCount:       1,
 	}
-	return Append(spike)
+	return c.Append(spike)
 	
 	// This ensures the Anomaly Detection engine identifies a high-velocity cost increase events.
 }

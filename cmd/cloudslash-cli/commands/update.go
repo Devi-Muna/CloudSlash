@@ -32,7 +32,7 @@ var updateCmd = &cobra.Command{
 			return
 		}
 
-		// Prevent downgrades.
+		// Prevent downgrades to older versions.
 		if latest < version.Current {
 			fmt.Printf("You are running a newer version (%s) than the latest release (%s).\n", version.Current, latest)
 			return
@@ -69,7 +69,7 @@ func fetchLatestVersion() (string, error) {
 }
 
 func doUpdate() error {
-	// 1. Execute update script.
+	// Execute the remote update script.
 	cmd := exec.Command("sh", "-c", "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash")
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("powershell", "-Command", "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex")

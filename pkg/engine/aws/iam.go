@@ -3,10 +3,10 @@ package aws
 import (
 	"context"
 	"fmt"
-	"strings"
-
+	
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
 type IAMClient struct {
@@ -19,29 +19,43 @@ func NewIAMClient(cfg aws.Config) *IAMClient {
 	}
 }
 
-// CheckAdminPrivileges checks if a role has AdministratorAccess policy attached.
-func (c *IAMClient) CheckAdminPrivileges(ctx context.Context, roleName string) (bool, error) {
-	paginator := iam.NewListAttachedRolePoliciesPaginator(c.Client, &iam.ListAttachedRolePoliciesInput{
-		RoleName: aws.String(roleName),
-	})
+// SimulatePrivileges verifies permissions using the AWS Policy Simulator.
+// Returns potentially dangerous permissions granted globally ("*").
+func (c *IAMClient) SimulatePrivileges(ctx context.Context, roleArn string) ([]string, error) {
+	// Verify if the role can perform destructive actions globally.
+	// Checks for wildcard permission grants.
+	dangerousActions := []string{
+		"s3:DeleteBucket",
+		"ec2:TerminateInstances",
+		"rds:DeleteDBInstance",
+		"iam:CreateUser",
+		"iam:AttachRolePolicy",
+	}
 
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return false, fmt.Errorf("failed to list attached policies: %v", err)
-		}
+	input := &iam.SimulatePrincipalPolicyInput{
+		PolicySourceArn: aws.String(roleArn),
+		ActionNames:     dangerousActions,
+		ResourceArns:    []string{"*"}, // Check global impact
+	}
 
-		for _, policy := range page.AttachedPolicies {
-			if strings.HasSuffix(*policy.PolicyArn, "AdministratorAccess") {
-				return true, nil
+	out, err := c.Client.SimulatePrincipalPolicy(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("policy simulation failed: %v", err)
+	}
+
+	var confirmedRisks []string
+	for _, result := range out.EvaluationResults {
+		if result.EvalDecision == types.PolicyEvaluationDecisionTypeAllowed {
+			if result.EvalActionName != nil {
+				confirmedRisks = append(confirmedRisks, *result.EvalActionName)
 			}
 		}
 	}
 
-	return false, nil
+	return confirmedRisks, nil
 }
 
-// GetRolesFromInstanceProfile returns the role names associated with a profile name.
+// GetRolesFromInstanceProfile retrieves role ARNs for a given profile.
 func (c *IAMClient) GetRolesFromInstanceProfile(ctx context.Context, profileName string) ([]string, error) {
 	out, err := c.Client.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName),
@@ -50,9 +64,11 @@ func (c *IAMClient) GetRolesFromInstanceProfile(ctx context.Context, profileName
 		return nil, err
 	}
 
-	var roles []string
+	var roleArns []string
 	for _, role := range out.InstanceProfile.Roles {
-		roles = append(roles, *role.RoleName)
+		if role.Arn != nil {
+			roleArns = append(roleArns, *role.Arn)
+		}
 	}
-	return roles, nil
+	return roleArns, nil
 }

@@ -3,10 +3,12 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/informers"
 )
 
 type Scanner struct {
@@ -26,10 +28,32 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		return nil // Graceful skip if no client
 	}
 
-	// List Nodes & Group by EKS NodeGroup.
-	nodes, err := s.Client.Clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	// 1. Initialize SharedInformerFactory
+	// "Best in the World" generic pattern: Local Cache + Watch
+	// Resync every 10 minutes to ensure eventual consistency
+	factory := informers.NewSharedInformerFactory(s.Client.Clientset, 10*time.Minute)
+
+	// 2. Initialize Listers (binds Informers to the factory)
+	nodeLister := factory.Core().V1().Nodes().Lister()
+	podLister := factory.Core().V1().Pods().Lister()
+
+	// 3. Start Informers & Wait for Cache Sync
+	// This establishes the Watch connection without blocking the main thread initially
+	factory.Start(ctx.Done())
+
+	// Wait for the local cache to fully populate from the API server
+	// This prevents "empty list" bugs on startup
+	synced := factory.WaitForCacheSync(ctx.Done())
+	for kind, ok := range synced {
+		if !ok {
+			return fmt.Errorf("failed to sync informer for %v", kind)
+		}
+	}
+
+	// 4. Query Local Cache (0% Load on API Server)
+	nodes, err := nodeLister.List(labels.Everything())
 	if err != nil {
-		return fmt.Errorf("failed to list k8s nodes: %v", err)
+		return fmt.Errorf("failed to list k8s nodes from cache: %v", err)
 	}
 
 	type NodeGroupData struct {
@@ -42,7 +66,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Map NodeGroup Name -> Data
 	nodeGroups := make(map[string]*NodeGroupData)
 
-	for _, node := range nodes.Items {
+	// Note: Lister returns []*corev1.Node (pointers)
+	for _, node := range nodes {
 		// EKS specific label
 		ngName, ok := node.Labels["eks.amazonaws.com/nodegroup"]
 		if !ok {
@@ -57,15 +82,15 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		nodeGroups[ngName].NodeNames = append(nodeGroups[ngName].NodeNames, node.Name)
 	}
 
-	// List ALL Pods once to optimize performance.
-	allPods, err := s.Client.Clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	// List ALL Pods from local cache
+	allPods, err := podLister.List(labels.Everything())
 	if err != nil {
-		return fmt.Errorf("failed to list all pods: %v", err)
+		return fmt.Errorf("failed to list all pods from cache: %v", err)
 	}
 
 	// Build map: NodeName -> []Pod
-	podsByNode := make(map[string][]corev1.Pod)
-	for _, pod := range allPods.Items {
+	podsByNode := make(map[string][]*corev1.Pod)
+	for _, pod := range allPods {
 		if pod.Spec.NodeName != "" {
 			podsByNode[pod.Spec.NodeName] = append(podsByNode[pod.Spec.NodeName], pod)
 		}

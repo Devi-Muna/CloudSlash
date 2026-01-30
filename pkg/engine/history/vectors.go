@@ -4,19 +4,19 @@ import (
 	"math"
 )
 
-// Vector represents resource state.
+// Vector represents a multidimensional resource state.
 type Vector []float64
 
-// Pattern definitions.
+// Predefined vector patterns.
 var (
-	// Uniform scaling pattern.
-	PatternUniformScaling = Normalize(Vector{1.0, 1.0, 0.5, 0.1}) // Balanced growth.
+	// Pattern: Balanced growth.
+	PatternUniformScaling = Normalize(Vector{1.0, 1.0, 0.5, 0.1}) 
 	
-	// Anomaly pattern.
-	PatternAnomaly = Normalize(Vector{0.1, 0.0, 1.0, 1.0}) // Waste spike.
+	// Pattern: Anomalous waste spike.
+	PatternAnomaly = Normalize(Vector{0.1, 0.0, 1.0, 1.0}) 
 )
 
-// Normalize scales vector to unit length.
+// Normalize scales the vector to unit length.
 func Normalize(v Vector) Vector {
 	var sum float64
 	for _, x := range v {
@@ -34,7 +34,7 @@ func Normalize(v Vector) Vector {
 	return result
 }
 
-// DotProduct calculates vector dot product.
+// DotProduct calculates the dot product of two vectors.
 func DotProduct(a, b Vector) float64 {
 	if len(a) != len(b) {
 		return 0
@@ -47,9 +47,7 @@ func DotProduct(a, b Vector) float64 {
 }
 
 // CosineSimilarity calculates similarity.
-// Calculate cosine similarity.
-//
-//
+// CosineSimilarity calculates the cosine similarity between vectors.
 func CosineSimilarity(a, b Vector) float64 {
 	// Calculate cosine similarity.
 	//
@@ -74,15 +72,14 @@ func CosineSimilarity(a, b Vector) float64 {
 	return dot / (magA * magB)
 }
 
-// ClassifyPattern identifies vector patterns.
-//
+// ClassifyPattern classifies the vector against known patterns.
 func ClassifyPattern(v Vector) string {
-	// Check safe patterns.
+	// Check for safe patterns.
 	if CosineSimilarity(v, PatternUniformScaling) > 0.8 {
 		return "SAFE"
 	}
 	
-	// Check anomaly patterns.
+	// Check for anomaly patterns.
 	if CosineSimilarity(v, PatternAnomaly) > 0.8 {
 		return "ANOMALY"
 	}

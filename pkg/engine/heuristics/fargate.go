@@ -18,7 +18,7 @@ type AbandonedFargateHeuristic struct {
 func (h *AbandonedFargateHeuristic) Name() string { return "AbandonedFargateHeuristic" }
 
 func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) error {
-	// Skip heuristic if K8s connection is unavailable.
+	// Require K8s connection.
 	if h.K8sClient == nil {
 		return nil
 	}
@@ -33,15 +33,15 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 
 		profileName, _ := node.Properties["ProfileName"].(string)
 
-		// Filter: Exclude default profiles and CoreDNS.
+		// Exclude default/system profiles.
 		if profileName == "fp-default" || strings.Contains(strings.ToLower(profileName), "coredns") {
 			continue
 		}
 
-		// AWS SDK stores Selectors as []types.FargateProfileSelector
+		// Parse selectors.
 		selectors, ok := node.Properties["Selectors"].([]types.FargateProfileSelector)
 		if !ok || len(selectors) == 0 {
-			// No selectors? It matches nothing. Abandoned.
+			// Empty profile (abandoned).
 			node.IsWaste = true
 			node.RiskScore = 100
 			node.Cost = 0
@@ -49,34 +49,34 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			continue
 		}
 
-		// A Profile is ACTIVE if AT LEAST ONE selector is active (OR Logic).
+		// Check profile activity.
 		isProfileActive := false
 		var failureReasons []string
 
 		for i, sel := range selectors {
 			nsName := *sel.Namespace
 			if nsName == "kube-system" {
-				// Whitelist kube-system selectors.
+				// Whitelist kube-system.
 				isProfileActive = true
 				break
 			}
 
-			// Check if the target namespace exists.
+
 			
-			// Define label selector (from profile selectors)
+			// Format label selector.
 			labelSelector := formatLabelSelector(sel.Labels)
 
-			// Check for active Pods.
+			// Check active Pods.
 			pods, err := h.K8sClient.Clientset.CoreV1().Pods(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
 
 			if err == nil && len(pods.Items) > 0 {
 				isProfileActive = true
-				break // Active pods found.
+				break // Active.
 			}
 
-			// Check for active Workload Controllers (Deployments/StatefulSets).
+			// Check active Workload Controllers.
 			deployments, err := h.K8sClient.Clientset.AppsV1().Deployments(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
@@ -88,17 +88,17 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 						hasActiveController = true
 						break
 					} else {
-						// Scaled to 0. Treat as inactive.
+						// Inactive (scaled to 0).
 					}
 				}
 			}
 
 			if hasActiveController {
 				isProfileActive = true
-				break // Indicates active intent.
+				break // Active.
 			}
 
-			// Check StatefulSets
+			// Check StatefulSets.
 			sts, err := h.K8sClient.Clientset.AppsV1().StatefulSets(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
@@ -116,14 +116,14 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 				break
 			}
 
-			// Selector matches a namespace, but no Pods or active Controllers were found.
+			// Selector matches namespace but no active workloads.
 			failureReasons = append(failureReasons, fmt.Sprintf("Selector #%d ('%s'): No active Pods or Controllers found.", i+1, nsName))
 		}
 
 		if !isProfileActive {
 			node.IsWaste = true
 			node.RiskScore = 60
-			node.Cost = 0 // No direct cost, but represents configuration risk.
+			node.Cost = 0 // Risk: Configuration debt.
 
 			reason := "Abandoned Fargate Profile:\n"
 			for _, r := range failureReasons {
@@ -137,7 +137,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 	return nil
 }
 
-// formatLabelSelector converts map[string]string to "key=value,key2=value2"
+// formatLabelSelector formats labels for K8s API.
 func formatLabelSelector(labels map[string]string) string {
 	if len(labels) == 0 {
 		return ""

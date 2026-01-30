@@ -15,13 +15,13 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// Client holds AWS service clients.
+// Client wraps AWS service clients and configuration.
 type Client struct {
 	Config aws.Config
 	STS    *sts.Client
 }
 
-// NewClient initializes a new AWS client.
+// NewClient initializes a new authenticated AWS client.
 func NewClient(ctx context.Context, region, profile string, verbose bool) (*Client, error) {
 	opts := []func(*config.LoadOptions) error{
 		config.WithRegion(region),
@@ -30,7 +30,12 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		opts = append(opts, config.WithSharedConfigProfile(profile))
 	}
 
-	// Configure User-Agent.
+	// Support local testing via AWS_ENDPOINT_URL override.
+	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
+		opts = append(opts, config.WithBaseEndpoint(endpoint))
+	}
+
+	// Configure custom User-Agent mapping.
 	const signature = "CS-v1-7f8a9d-AGPL"
 
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
@@ -38,7 +43,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		return nil, fmt.Errorf("unable to load SDK config: %v", err)
 	}
 
-	// Add middleware for User-Agent.
+	// Inject custom User-Agent middleware.
 	cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 		return stack.Build.Add(middleware.BuildMiddlewareFunc("UserAgentTrap", func(ctx context.Context, input middleware.BuildInput, next middleware.BuildHandler) (
 			middleware.BuildOutput, middleware.Metadata, error,
@@ -55,7 +60,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		}), middleware.After)
 	})
 
-	// Enable verbose logging.
+	// Enable verbose (matrix-style) logging if requested.
 	if verbose {
 		cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 			return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("MatrixLogger", func(ctx context.Context, input middleware.InitializeInput, next middleware.InitializeHandler) (
@@ -74,7 +79,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 	}, nil
 }
 
-// VerifyIdentity checks if the credentials are valid and returns the caller identity.
+// VerifyIdentity confirms credential validity and returns the caller's account ID.
 func (c *Client) VerifyIdentity(ctx context.Context) (string, error) {
 	input := &sts.GetCallerIdentityInput{}
 	result, err := c.STS.GetCallerIdentity(ctx, input)
@@ -84,15 +89,15 @@ func (c *Client) VerifyIdentity(ctx context.Context) (string, error) {
 	return *result.Account, nil
 }
 
-// GetConfigForRegion returns a copy of the base configuration tailored for a specific region.
-// This is crucial for Cross-Region operations (like S3 buckets in EU while scanning from US).
+// GetConfigForRegion returns a regional configuration copy.
+// Essential for cross-region operations (e.g. S3 buckets in different regions).
 func (c *Client) GetConfigForRegion(region string) aws.Config {
 	cfg := c.Config.Copy()
 	cfg.Region = region
 	return cfg
 }
 
-// ListProfiles attempts to find all profiles in ~/.aws/config and ~/.aws/credentials.
+// ListProfiles discovers available AWS profiles from standard configuration paths.
 func ListProfiles() ([]string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -101,7 +106,7 @@ func ListProfiles() ([]string, error) {
 
 	profiles := make(map[string]bool)
 	paths := []string{}
-	// Check standard env vars first
+	// Check standard environment variables.
 	if cfgPath := os.Getenv("AWS_CONFIG_FILE"); cfgPath != "" {
 		paths = append(paths, cfgPath)
 	} else {
@@ -114,7 +119,7 @@ func ListProfiles() ([]string, error) {
 		paths = append(paths, filepath.Join(home, ".aws", "credentials"))
 	}
 
-	// Regex to find [profile name] or [name]
+	// Parse profile names using regex.
 	re := regexp.MustCompile(`^\[(?:profile\s+)?([^\]]+)\]`)
 
 	for _, path := range paths {
@@ -139,6 +144,15 @@ func ListProfiles() ([]string, error) {
 	}
 
 	if len(list) == 0 {
+		// Fallback: Check for Web Identity (IRSA/EKS) presence.
+		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != "" {
+			return []string{"default"}, nil
+		}
+		// Fallback: Check for standard environment credentials.
+		if os.Getenv("AWS_ACCESS_KEY_ID") != "" {
+			return []string{"default"}, nil
+		}
+
 		return nil, fmt.Errorf("no profiles found in standard locations")
 	}
 

@@ -32,6 +32,9 @@ func TestVoidWalker(t *testing.T) {
 	g.AddEdge("vpc-123", "sub-priv")
 	g.AddEdge("sub-priv", "i-private")
 
+	// Wait for graph
+	g.CloseAndWait()
+
 	// 2. Run Analysis
 	AnalyzeReachability(g)
 
@@ -55,6 +58,8 @@ func TestVoidWalker(t *testing.T) {
 func TestDarkMatter(t *testing.T) {
 	g := NewGraph()
 	g.AddNode("i-isolated", "AWS::EC2::Instance", nil)
+
+	g.CloseAndWait()
 
 	AnalyzeReachability(g)
 

@@ -12,14 +12,14 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-// ElasticacheScanner handles ElastiCache discovery and metrics.
+// ElasticacheScanner manages ElastiCache discovery and metric analysis.
 type ElasticacheScanner struct {
 	Client   *elasticache.Client
 	CWClient *cloudwatch.Client
 	Graph    *graph.Graph
 }
 
-// NewElasticacheScanner creates a new scanner instance.
+// NewElasticacheScanner initializes a new scanner.
 func NewElasticacheScanner(cfg aws.Config, g *graph.Graph) *ElasticacheScanner {
 	return &ElasticacheScanner{
 		Client:   elasticache.NewFromConfig(cfg),
@@ -28,7 +28,7 @@ func NewElasticacheScanner(cfg aws.Config, g *graph.Graph) *ElasticacheScanner {
 	}
 }
 
-// ScanClusters discovers clusters and usage metrics.
+// ScanClusters discovers clusters and metrics.
 // Analyzes metrics over a 7-day window.
 func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 	paginator := elasticache.NewDescribeCacheClustersPaginator(s.Client, &elasticache.DescribeCacheClustersInput{
@@ -42,10 +42,9 @@ func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 		}
 
 		for _, cluster := range page.CacheClusters {
-			// Skip memcached nodes that are part of a cluster if processed differently,
-			// but DescribeCacheClusters returns all nodes.
+			// Note: Describes all cache nodes.
 			
-			// We group by CacheClusterId.
+			// Group nodes by Cluster ID.
 			id := *cluster.CacheClusterId
 			
 			props := map[string]interface{}{
@@ -73,10 +72,9 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 	}
 
 	endTime := time.Now()
-	startTime := endTime.Add(-7 * 24 * time.Hour) // 7 Days
+	startTime := endTime.Add(-7 * 24 * time.Hour) // 7-day window.
 
-	// Metrics to fetch
-    // Using cwtypes directly
+	// Metrics to fetch.
 	queries := []cwtypes.MetricDataQuery{
 		{
 			Id: aws.String("m_conn"),
@@ -86,7 +84,7 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 					MetricName: aws.String("CurrConnections"),
 					Dimensions: []cwtypes.Dimension{{Name: aws.String("CacheClusterId"), Value: aws.String(clusterID)}},
 				},
-				Period: aws.Int32(86400), // 1 day buckets
+				Period: aws.Int32(86400), // 1-day granularity.
 				Stat:   aws.String("Sum"),
 			},
 		},
@@ -151,7 +149,7 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 		return
 	}
 
-	// Parse Results
+	// Parse metric results.
 	var totalConn, totalHits, totalMisses, totalNet float64
     var maxCPU float64
 
@@ -173,13 +171,13 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 		case "m_misses":
 			totalMisses = sum
 		case "m_cpu":
-			maxCPU = max // Use Max of Max
+			maxCPU = max // Capture peak CPU utilization.
 		case "m_net":
 			totalNet = sum
 		}
 	}
 
-	// Update Node Properties
+	// Update node properties.
 	s.Graph.Mu.Lock()
 	node.Properties["SumConnections7d"] = totalConn
 	node.Properties["SumHits7d"] = totalHits

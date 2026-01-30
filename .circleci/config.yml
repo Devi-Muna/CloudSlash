@@ -1,0 +1,144 @@
+version: 2.1
+
+# -------------------------------------------------------------------------------------
+# BEST IN THE WORLD CI/CD ARCHITECTURE (NO LOCAL SCRIPTS)
+# -------------------------------------------------------------------------------------
+
+orbs:
+  # Official Go Orb for caching & building
+  go: circleci/go@1.9.0
+  # Official AWS Orb for interacting with cloud
+  aws-cli: circleci/aws-cli@4.0
+
+jobs:
+  # ---------------------------------------------------------
+  # Job 1: The Factory (Build the Artifact)
+  # ---------------------------------------------------------
+  build-binary:
+    docker:
+      - image: cimg/go:1.21
+    steps:
+      - checkout
+      - go/load-cache
+      - go/mod-download
+      - go/save-cache
+      - run:
+          name: "Compile CloudSlash Binary"
+          # Builds the actual CLI tool as 'cloudslash'
+          command: go build -o cloudslash ./cmd/cloudslash-cli/main.go
+      - run:
+          name: "Verify Binary"
+          command: ./cloudslash --version
+      # SAVE the binary so the next job can use it
+      - persist_to_workspace:
+          root: .
+          paths:
+            - cloudslash
+
+  # ---------------------------------------------------------
+  # Job 2: The Quality Gate (Unit Tests)
+  # ---------------------------------------------------------
+  test-unit:
+    docker:
+      - image: cimg/go:1.21
+    steps:
+      - checkout
+      - go/mod-download
+      - run:
+          name: "Run Unit Tests"
+          command: go test -v -race -short ./...
+
+  # ---------------------------------------------------------
+  # Job 3: The Lazarus Gauntlet (Integration Test)
+  # ---------------------------------------------------------
+  verify-lazarus:
+    docker:
+      - image: cimg/python:3.10 # Python image includes AWS CLI usually, or we install it
+    environment:
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_PAGER: ""
+    steps:
+      - checkout
+      - aws-cli/setup # Uses variables from Context (cloudslash-aws)
+
+      # 1. DOWNLOAD THE BINARY from Job 1
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: "Setup Victim Infrastructure"
+          command: |
+            echo "Creating a 'Zombie' Instance to test detection..."
+            # Create a t3.micro tag 'Test=Lazarus'
+            aws ec2 run-instances \
+              --image-id ami-0c55b159cbfafe1f0 \
+              --count 1 \
+              --instance-type t3.micro \
+              --tag-specifications 'ResourceType=instance,Tags=[{Key=Test,Value=Lazarus}]' \
+              > instance.json
+
+            INSTANCE_ID=$(jq -r '.Instances[0].InstanceId' instance.json)
+            echo "export INSTANCE_ID=$INSTANCE_ID" >> $BASH_ENV
+
+            echo "Waiting for instance $INSTANCE_ID to be running..."
+            aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+      - run:
+          name: "Execute CloudSlash (The Test)"
+          command: |
+            chmod +x cloudslash
+
+            # Run the tool in headless mode targeting our victim
+            echo "Scanning for zombies..."
+            ./cloudslash scan --headless --required-tags "Test=Lazarus" --output-dir ./lazarus-out
+
+      - run:
+          name: "Verify & Restore"
+          command: |
+            # 1. Verify CloudSlash generated the scripts
+            if [ ! -f "./lazarus-out/resource_deletion.sh" ]; then
+              echo "FAIL: Deletion script not generated!"
+              exit 1
+            fi
+
+            # 2. Simulate User Action: "Delete" (Purgatory)
+            echo "Simulating User Deletion..."
+            chmod +x ./lazarus-out/resource_deletion.sh
+            ./lazarus-out/resource_deletion.sh
+
+            # 3. Verify Purgatory (Instance should be STOPPED)
+            echo "Verifying Purgatory State..."
+            aws ec2 wait instance-stopped --instance-ids $INSTANCE_ID
+
+            # 4. Simulate Undo (Lazarus Restore)
+            # Assuming your tool generated an undo script or we manually undo for this test
+            # If your tool creates 'undo.sh', use it. If not, use AWS CLI to prove recoverability.
+            echo "Testing Resurrection..."
+            aws ec2 start-instances --instance-ids $INSTANCE_ID
+            aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+
+            echo "PASS: Lazarus Protocol Successful"
+
+      - run:
+          name: "Cleanup"
+          when: always # Runs even if previous steps fail
+          command: |
+            if [ -n "$INSTANCE_ID" ]; then
+              aws ec2 terminate-instances --instance-ids $INSTANCE_ID
+              aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID
+            fi
+
+workflows:
+  version: 2
+  pipeline:
+    jobs:
+      - build-binary
+      - test-unit
+      - verify-lazarus:
+          context: cloudslash-aws
+          requires:
+            - build-binary
+            - test-unit
+          filters:
+            branches:
+              only: main

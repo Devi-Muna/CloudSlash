@@ -1,0 +1,16 @@
+{
+  "resource_id": "ami-0mockIgnoreDurationFail",
+  "resource_type": "AWS::EC2::AMI",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "CreateTime": "2025-10-22T09:36:55.575517445+05:45",
+    "CreationDate": "2025-10-22T09:36:55.575Z",
+    "Name": "expired-backup",
+    "Reason": "Aged Artifact: AMI is \u003e 90 days old and has no active instances.",
+    "State": "available",
+    "Tags": {
+      "cloudslash:ignore": "30d"
+    }
+  }
+}

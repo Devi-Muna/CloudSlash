@@ -52,14 +52,14 @@ func (m regionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > 0 {
 				m.cursor--
 			} else {
-				// Loop to bottom
+				// Wrap selection to bottom.
 				m.cursor = len(m.choices) - 1
 			}
 		case "down", "j":
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			} else {
-				// Loop to top
+				// Wrap selection to top.
 				m.cursor = 0
 			}
 		case " ", "x":
@@ -81,7 +81,7 @@ func (m regionModel) View() string {
 	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("? Which regions do you want to scan?"))
 	s.WriteString("\n\n")
 
-	// Pagination logic.
+	// Handle pagination logic for the region list.
 	windowHeight := 10
 	start := 0
 	end := len(m.choices)
@@ -130,7 +130,7 @@ func (m regionModel) View() string {
 
 func (m regionModel) GetSelectedRegions() []string {
 	var selected []string
-	// Default to us-east-1 if no selection.
+	// Default to 'us-east-1' if no selection is made.
 	if len(m.selected) == 0 {
 		return []string{"us-east-1"}
 	}
@@ -141,7 +141,7 @@ func (m regionModel) GetSelectedRegions() []string {
 }
 
 func PromptForRegions() ([]string, error) {
-	// 1. Attempt dynamic region discovery.
+	// Attempt dynamic region discovery via AWS API.
 	dynamicRegions, err := fetchDynamicRegions()
 	if err == nil && len(dynamicRegions) > 0 {
 		p := tea.NewProgram(regionModel {
@@ -156,7 +156,7 @@ func PromptForRegions() ([]string, error) {
 		return []string{"us-east-1"}, nil
 	}
 
-	// 2. Fallback to static region list.
+	// Fallback to the static region list if API fails.
 	p := tea.NewProgram(initialRegionModel())
 	m, err := p.Run()
 	if err != nil {
@@ -173,18 +173,18 @@ func fetchDynamicRegions() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Initialize robust AWS client (using default profile)
+	// Initialize a robust AWS client using the default profile.
 	client, err := internalaws.NewClient(ctx, "us-east-1", "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create EC2 Client
+	// Create the EC2 service client.
 	ec2Client := ec2.NewFromConfig(client.Config)
 	
-	// Describe Regions
+	// Fetch available regions.
 	resp, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{
-		AllRegions: aws.Bool(true), // Fetch Opt-In Regions too if enabled
+		AllRegions: aws.Bool(true), // Include opt-in regions.
 	})
 	if err != nil {
 		return nil, err

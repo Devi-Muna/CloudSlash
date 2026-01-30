@@ -24,7 +24,7 @@ func LogAction(action, resourceID, resourceType string, cost float64, reason str
 	}
 	defer f.Close()
 	
-	// Log format: [DATE] ACTION RESOURCE COST REASON
+	// Format: [DATE] ACTION RESOURCE COST REASON
 	entry := fmt.Sprintf("[%s] %s %s (%s) - Savings: $%.2f/mo - Reason: %s\n", 
 		time.Now().Format(time.RFC3339),
 		action,
@@ -35,6 +35,6 @@ func LogAction(action, resourceID, resourceType string, cost float64, reason str
 	)
 	
 	if _, err := f.WriteString(entry); err != nil {
-		fmt.Printf("(Warning: Failed to write audit log)\n")
+		fmt.Printf("(Warning: Audit log write failed)\n")
 	}
 }

@@ -7,15 +7,17 @@ import (
 	"time"
 )
 
+// Task defines the unit of work.
 type Task func(ctx context.Context) error
 
+// Engine manages concurrent task execution.
 type Engine struct {
 	aimd   *AIMD
 	tasks  chan Task
 	wg     sync.WaitGroup
 	quit   chan struct{}
 	active     int
-	MaxWorkers int // 0 = unlimited (managed by AIMD)
+	MaxWorkers int // MaxWorkers sets a hard ceiling on concurrency
 	mu         sync.Mutex
 	stats      Stats
 }
@@ -26,6 +28,7 @@ type Stats struct {
 	TasksCompleted int64
 }
 
+// NewEngine initializes the worker pool.
 func NewEngine() *Engine {
 	return &Engine{
 		aimd:  NewAIMD(50, 5, 500),
@@ -34,19 +37,23 @@ func NewEngine() *Engine {
 	}
 }
 
+// Start begins the worker loop.
 func (e *Engine) Start(ctx context.Context) {
 	go e.loop(ctx)
 }
 
+// Submit sends a task for processing.
 func (e *Engine) Submit(t Task) {
 	e.tasks <- t
 }
 
+// Stop shuts down the engine.
 func (e *Engine) Stop() {
 	close(e.quit)
 	e.wg.Wait()
 }
 
+// GetStats returns current metrics.
 func (e *Engine) GetStats() Stats {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -122,7 +129,7 @@ func (e *Engine) worker(ctx context.Context) {
 			isThrottled := false
 			if err != nil {
 				if strings.Contains(err.Error(), "Throttling") || strings.Contains(err.Error(), "RateExceeded") {
-					// Backoff handled by retry loop.
+					// Note: Retries handled by caller.
 					continue
 				}
 			}

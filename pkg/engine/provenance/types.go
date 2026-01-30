@@ -2,7 +2,7 @@ package provenance
 
 import "time"
 
-// ProvenanceRecord represents the attribution data for a single resource.
+// ProvenanceRecord holds resource attribution.
 type ProvenanceRecord struct {
 	ResourceID string
 	TFAddress  string

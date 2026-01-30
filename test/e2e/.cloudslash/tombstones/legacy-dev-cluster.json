@@ -1,0 +1,17 @@
+{
+  "resource_id": "legacy-dev-cluster",
+  "resource_type": "AWS::EKS::Cluster",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "CreatedAt": "2025-12-01T09:36:55.575518612+05:45",
+    "HasFargate": false,
+    "HasManagedNodes": false,
+    "HasSelfManagedNodes": false,
+    "KarpenterEnabled": false,
+    "Name": "legacy-dev-cluster",
+    "Reason": "Idle Control Plane: Active EKS cluster with zero compute nodes for \u003e 7 days.\nDeleting this cluster will leave 1 Orphaned ELBs behind. Here is the CLI command to delete them too:\naws elbv2 delete-load-balancer --load-balancer-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/k8s-legacy-service/50dc6c495c0c9188",
+    "Region": "us-east-1",
+    "Status": "ACTIVE"
+  }
+}

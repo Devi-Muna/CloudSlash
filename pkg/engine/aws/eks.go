@@ -21,7 +21,7 @@ type EKSClient interface {
 	DescribeFargateProfile(ctx context.Context, params *eks.DescribeFargateProfileInput, optFns ...func(*eks.Options)) (*eks.DescribeFargateProfileOutput, error)
 }
 
-// EKSEC2Client defines the EC2 API subset required for EKS operations.
+// EKSEC2Client defines required EC2 operations.
 type EKSEC2Client interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 }
@@ -51,7 +51,7 @@ func (s *EKSScanner) ScanClusters(ctx context.Context) error {
 
 		for _, clusterName := range page.Clusters {
 			if err := s.processCluster(ctx, clusterName); err != nil {
-				// Log non-fatal cluster processing errors.
+				// Log non-fatal errors.
 				fmt.Printf("Warning: failed to process cluster %s: %v\n", clusterName, err)
 			}
 		}
@@ -73,25 +73,25 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 
 	arn := *cluster.Arn
 
-	// 1. Check for managed node groups.
+	// Check for managed node groups.
 	hasManagedNodes, err := s.checkManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	// 2. Check Fargate profiles.
+	// Check Fargate profiles.
 	hasFargate, err := s.scanFargateProfiles(ctx, name, arn)
 	if err != nil {
 		return err
 	}
 
-	// 3. Check self-managed nodes.
+	// Check self-managed nodes.
 	hasSelfManaged, err := s.checkSelfManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	// 4. Check for Karpenter
+	// Detect Karpenter installation.
 	karpenterEnabled := false
 	if cluster.Tags != nil {
 		if _, ok := cluster.Tags["karpenter.sh/discovery"]; ok {
@@ -115,7 +115,7 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 }
 
 func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Check for any nodegroups with DesiredSize > 0.
+	// Check for active nodegroups.
 	paginator := eks.NewListNodegroupsPaginator(s.Client, &eks.ListNodegroupsInput{ClusterName: &clusterName})
 
 	for paginator.HasMorePages() {
@@ -164,7 +164,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 				FargateProfileName: &profileName,
 			})
 			if err != nil {
-				// Log warning and proceed with next profile.
+				// Log warning and continue.
 				fmt.Printf("   [Warning] Failed to describe Fargate Profile %s: %v\n", profileName, err)
 				continue
 			}
@@ -174,7 +174,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 				continue
 			}
 
-			// Ingest into Graph
+			// Add profile to graph.
 			props := map[string]interface{}{
 				"ProfileName": *fp.FargateProfileName,
 				"ClusterName": clusterName,
@@ -185,7 +185,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 
 			s.Graph.AddNode(*fp.FargateProfileArn, "AWS::EKS::FargateProfile", props)
 
-			// Link to Cluster
+			// Link profile to cluster.
 			s.Graph.AddEdge(*fp.FargateProfileArn, clusterARN)
 		}
 	}
@@ -193,7 +193,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 }
 
 func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Filter instances by cluster tag (owned or shared).
+	// Filter instances by cluster ownership tag.
 	key := fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)
 
 	input := &ec2.DescribeInstancesInput{
@@ -203,8 +203,7 @@ func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName stri
 		},
 	}
 
-	// Validate existence of at least one instance matching criteria.
-	// Pagination breakdown is required to ensure complete coverage, though early exit is possible.
+	// Check for at least one matching instance.
 	paginator := ec2.NewDescribeInstancesPaginator(s.EC2Client, input)
 
 	if paginator.HasMorePages() {

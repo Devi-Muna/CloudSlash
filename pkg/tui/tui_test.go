@@ -122,6 +122,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			g := graph.NewGraph()
 			g.AddNode(tc.mockNode.ID, tc.mockNode.Type, tc.mockNode.Properties)
+			g.CloseAndWait()
+
 			if n := g.GetNode(tc.mockNode.ID); n != nil {
 				n.IsWaste = tc.mockNode.IsWaste
 				n.Cost = tc.mockNode.Cost
@@ -130,7 +132,7 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 			}
 
 			eng := swarm.NewEngine()
-			model := NewModel(eng, g, false, "us-east-1")
+			model := NewModel(eng, g, true, "us-east-1")
 
 			model.refreshData()
 
@@ -162,13 +164,15 @@ func TestTUI_TerraformIndicator(t *testing.T) {
 		SourceLocation: "main.tf:12",
 	}
 	g.AddNode(node.ID, node.Type, node.Properties)
+	g.CloseAndWait()
+
 	if n := g.GetNode(node.ID); n != nil {
 		n.IsWaste = node.IsWaste
 		n.SourceLocation = node.SourceLocation
 	}
 
 	eng := swarm.NewEngine()
-	model := NewModel(eng, g, false, "us-east-1")
+	model := NewModel(eng, g, true, "us-east-1")
 	view := model.View()
 
 	if strings.Contains(view, "[TERRAFORM DETECTED]") {

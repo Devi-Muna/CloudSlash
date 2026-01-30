@@ -38,25 +38,25 @@ var CleanupCmd = &cobra.Command{
 		engine := swarm.NewEngine()
 		engine.Start(ctx)
 
-		// 1. Execute headless scan.
+		// Execute a headless scan to build the infrastructure graph.
 		fmt.Println("\n[SCAN] Analyzing infrastructure topology...")
-		client, err := aws.NewClient(ctx, config.Region, "", config.Verbose) // Default region/profile
+		client, err := aws.NewClient(ctx, config.Region, "", config.Verbose) // Default region/profile.
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
 
-		// Initialize heuristics engine.
+		// Initialize the heuristics engine.
 		hEngine := heuristics.NewEngine()
 		hEngine.Register(&heuristics.UnattachedVolumeHeuristic{Pricing: nil})
-		// ... (Add others if needed)
+		// Register additional heuristics as needed.
 
-		// Execute volume scan.
+		// Execute the specific volume scan module.
 		ec2 := aws.NewEC2Scanner(client.Config, g)
 		ec2.ScanVolumes(ctx)
 		hEngine.Run(ctx, g)
 
-		// 2. Identify waste resources.
+		// Identify waste resources in the graph.
 		g.Mu.RLock()
 		var waste []*graph.Node
 		for _, node := range g.Nodes {
@@ -79,7 +79,7 @@ var CleanupCmd = &cobra.Command{
 			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
 
-			// Check for dependent resources.
+			// Check for dependent resources that might be impacted.
 			dependents := g.GetUpstream(item.ID)
 			if len(dependents) > 0 {
 				activeDeps := 0
@@ -107,7 +107,7 @@ var CleanupCmd = &cobra.Command{
 				ans := strings.ToLower(strings.TrimSpace(scanner.Text()))
 				if ans == "y" {
 					fmt.Printf("    Deleting %s... ", item.ID)
-					// Verify implementation of Delete
+					// Verify the deletion request with the cloud provider.
 					err := deleter.DeleteVolume(ctx, item.ID)
 					if err != nil {
 						fmt.Printf("FAILED: %v\n", err)

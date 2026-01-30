@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
-// Deleter handles destructive actions.
+// Deleter manages the deletion of cloud resources.
 type Deleter struct {
 	EC2 *ec2.Client
 }
@@ -19,10 +19,10 @@ func NewDeleter(cfg aws.Config) *Deleter {
 	}
 }
 
-// DeleteVolume deletes an EBS volume.
+// DeleteVolume deletes an EBS volume by ID.
 func (d *Deleter) DeleteVolume(ctx context.Context, id string) error {
-	// Parse ID from ARN if needed
-	// arn:aws:ec2:region:account:volume/vol-123
+	// Extract volume ID if ARN is provided.
+	// Example: arn:aws:ec2:region:account:volume/vol-123
 	if strings.HasPrefix(id, "arn:") {
 		parts := strings.Split(id, "/")
 		id = parts[len(parts)-1]

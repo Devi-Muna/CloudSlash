@@ -1,0 +1,22 @@
+{
+  "resource_id": "payment-service-broken",
+  "resource_type": "AWS::ECS::Service",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "ClusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/frontend-cluster",
+    "DesiredCount": 3,
+    "Events": [
+      "(service payment-service-broken) was unable to place a task because no container instance met all of its requirements.",
+      "(service payment-service-broken) has reached a steady state."
+    ],
+    "LaunchType": "FARGATE",
+    "Name": "payment-service-broken",
+    "PendingCount": 0,
+    "Reason": "STUCK Service. Desired: 3, Running: 0. Reason: Insufficient Capacity (Infrastructure Issue).",
+    "Region": "us-east-1",
+    "RunningCount": 0,
+    "Status": "ACTIVE",
+    "TaskDefinition": "arn:aws:ecs:...:task-definition/payment:5"
+  }
+}

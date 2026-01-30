@@ -52,7 +52,7 @@ func (h *NetworkForensicsHeuristic) topo(g *graph.Graph, nat *graph.Node) {
 
 	for _, id := range subnets {
 		g.AddNode(id, "aws_subnet", map[string]interface{}{
-			"Reason":   "Empty Subnet (Linked to Unused NAT)",
+			"Reason":   "Empty Subnet",
 			"ParentID": nat.ID,
 			"Name":     fmt.Sprintf("Subnet: %s (Empty)", id),
 		})
@@ -64,7 +64,7 @@ func (h *NetworkForensicsHeuristic) topo(g *graph.Graph, nat *graph.Node) {
 	if rtbs, ok := nat.Properties["RouteTables"].([]string); ok {
 		for _, id := range rtbs {
 			g.AddNode(id, "aws_route_table", map[string]interface{}{
-				"Reason":   "Route Table targeting Unused NAT",
+				"Reason":   "Route Table",
 				"ParentID": nat.ID,
 				"Name":     fmt.Sprintf("Route Table: %s", id),
 			})

@@ -26,7 +26,7 @@ func NewVpcEndpointScanner(cfg aws.Config, g *graph.Graph) *VpcEndpointScanner {
 	}
 }
 
-// ScanEndpoints discovers Interface type VPC endpoints.
+// ScanEndpoints discovers Interface VPC Endpoints.
 func (s *VpcEndpointScanner) ScanEndpoints(ctx context.Context) error {
 	paginator := ec2.NewDescribeVpcEndpointsPaginator(s.Client, &ec2.DescribeVpcEndpointsInput{
 		Filters: []types.Filter{
@@ -61,7 +61,7 @@ func (s *VpcEndpointScanner) checkFlow(ctx context.Context, id string, props map
 	node := s.Graph.GetNode(id)
 	if node == nil { return }
 	
-	// Check processed bytes metric.
+	// Check bytes processed.
 	
 	endTime := time.Now()
 	startTime := endTime.Add(-30 * 24 * time.Hour) // 30 Days
@@ -71,7 +71,7 @@ func (s *VpcEndpointScanner) checkFlow(ctx context.Context, id string, props map
 			Id: aws.String("m_bytes"),
 			MetricStat: &cwtypes.MetricStat{
 				Metric: &cwtypes.Metric{
-					Namespace:  aws.String("AWS/PrivateLinkEndpoints"), // Correct Namespace
+					Namespace:  aws.String("AWS/PrivateLinkEndpoints"),
 					MetricName: aws.String("BytesProcessed"),
 					Dimensions: []cwtypes.Dimension{{Name: aws.String("VpcEndpointId"), Value: aws.String(id)}},
 				},

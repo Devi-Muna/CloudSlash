@@ -3,7 +3,10 @@ package commands
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,18 +53,43 @@ Example:
 			config.DisableCWMetrics = true
 		}
 
+
 		if headless, _ := cmd.Flags().GetBool("headless"); headless {
 			config.Headless = true
 		}
 
-		// Run Engine
+		// Initialize the application logger.
+		var handler slog.Handler
+		if config.JsonLogs {
+			handler = slog.NewJSONHandler(os.Stdout, nil)
+		} else if config.Verbose {
+			handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+		} else {
+			handler = slog.NewTextHandler(io.Discard, nil) // Silent by default.
+		}
+		config.Logger = slog.New(handler)
+
+		// Resolve the cache directory, adhering to XDG standards.
+		cacheDir := os.Getenv("XDG_CACHE_HOME")
+		if cacheDir == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				home = os.TempDir()
+			}
+			cacheDir = filepath.Join(home, ".cloudslash")
+		} else {
+			cacheDir = filepath.Join(cacheDir, "cloudslash")
+		}
+		config.CacheDir = cacheDir
+
+		// Execute the core engine scan.
 		_, g, swarmEngine, err := engine.Run(cmd.Context(), config)
 		if err != nil {
 			fmt.Printf("Error running scan: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Launch TUI (The Controller)
+		// Launch the terminal user interface.
 		if !config.Headless {
 			model := ui.NewModel(swarmEngine, g, config.MockMode, config.Region)
 			startTime := time.Now()
@@ -71,21 +99,21 @@ Example:
 				os.Exit(1)
 			}
 			
-			// Render Exit Screen (Cleanly after TUI exit)
+			// Display the exit summary.
 			g.Mu.RLock()
 			count := len(g.Nodes)
 			g.Mu.RUnlock()
 			ui.PrintExitSummary(startTime, count)
 		}
 
-		// Run optimization engine.
+		// Execute the optimization solver.
 		runSolver(g)
 
-		// Generate resource deletion script.
-		cleanupPath := "cloudslash-out/resource_deletion.sh"
-		// Ensure output dir exists
-		if _, err := os.Stat("cloudslash-out"); os.IsNotExist(err) {
-			_ = os.Mkdir("cloudslash-out", 0755)
+		// Generate the resource deletion script.
+		cleanupPath := filepath.Join(config.OutputDir, "resource_deletion.sh")
+		// Ensure output directory exists.
+		if _, err := os.Stat(config.OutputDir); os.IsNotExist(err) {
+			_ = os.Mkdir(config.OutputDir, 0755)
 		}
 		gen := script.NewGenerator(g, nil)
 		if err := gen.GenerateDeletionScript(cleanupPath); err != nil {
@@ -95,15 +123,15 @@ Example:
 			_ = os.Chmod(cleanupPath, 0755)
 		}
 
-		// Generate restoration plan.
-		restorePath := "cloudslash-out/restore.tf"
+		// Generate the restoration plan (Lazarus Protocol).
+		restorePath := filepath.Join(config.OutputDir, "restore.tf")
 		if err := gen.GenerateRestorationPlan(restorePath); err != nil {
 			fmt.Printf("[WARN] Failed to generate restoration plan: %v\n", err)
 		} else {
 			fmt.Printf("[SUCCESS] Lazarus Protocol Active: Restoration plan generated: %s\n", restorePath)
 		}
 
-		// Initialize Terraform client.
+		// Initialize the Terraform client.
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
 			fmt.Println("\n[INFO] Terraform detected. Initializing State Analysis...")
@@ -131,7 +159,7 @@ Example:
 					provEngine := provenance.NewEngine(".")
 					provMap := make(map[string]*provenance.ProvenanceRecord)
 
-					// Attribute all unused resources
+					// Attribute unused resources to their source.
 					for _, z := range unused {
 						rec, err := provEngine.Attribute(z.ID, state)
 						if err == nil && rec != nil {
@@ -190,7 +218,7 @@ func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provena
 
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Println("  Next Step: Run 'terraform plan' to verify the state is clean.")
-	fmt.Println("  Script generated: cloudslash-out/fix_terraform.sh")
+	fmt.Printf("  Script generated: %s/fix_terraform.sh\n", config.OutputDir)
 }
 
 func printProvenanceBox(rec *provenance.ProvenanceRecord) {
@@ -213,12 +241,12 @@ func generateFixScript(report *tf.AnalysisReport) {
 		return
 	}
 
-	dir := "cloudslash-out"
+	dir := config.OutputDir
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		_ = os.Mkdir(dir, 0755)
 	}
 
-	f, err := os.Create(fmt.Sprintf("%s/fix_terraform.sh", dir))
+	f, err := os.Create(filepath.Join(dir, "fix_terraform.sh"))
 	if err != nil {
 		fmt.Printf("[ERROR] Failed to create fix script: %v\n", err)
 		return
@@ -248,15 +276,47 @@ func runSolver(g *graph.Graph) {
 	fmt.Printf("\n[ %s OPTIMIZATION ENGINE ]\n", version.Current)
 	fmt.Println("Initializing Solver with Dynamic Intelligence...")
 
-	// 1. Initialize Pricing Client.
-	fmt.Println(" -> Connecting to AWS Pricing API (this may take a moment)...")
-	ctx := context.Background()
-	pc, err := pricing.NewClient(ctx)
-	if err != nil {
-		fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
+	// ---------------------------------------------------------
+	// Initialize Infrastructure (Logger & Paths).
+	// ---------------------------------------------------------
+	
+	// Setup Logger (Silent by default unless verbose).
+	var logger *slog.Logger
+	if config.Verbose {
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	} else {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 
-	// 2. Convert graph nodes to workloads and calculate current spend.
+	// Setup Cache Directory (XDG Compliant).
+	home, _ := os.UserHomeDir()
+	cacheDir := filepath.Join(home, ".cloudslash", "cache")
+	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
+		cacheDir = filepath.Join(xdg, "cloudslash")
+	}
+	_ = os.MkdirAll(cacheDir, 0755)
+
+	// ---------------------------------------------------------
+	// Inject Dependencies into Pricing Client.
+	// ---------------------------------------------------------
+	fmt.Println(" -> Connecting to AWS Pricing API (this may take a moment)...")
+	ctx := context.Background()
+
+	// Pass Logger, CacheDir, and Manual Discount Rate from Config
+	// Note: You need to ensure config.DiscountRate exists in your Config struct!
+	// If not, use 0.0 or add it to defaults.go
+	manualRate := 0.0 // or config.DiscountRate
+	
+	pc, err := pricing.NewClient(ctx, logger, cacheDir, manualRate)
+	
+	if err != nil {
+		fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
+	} else {
+		// Log the effective rate if verbose
+		logger.Info("Pricing Client Initialized")
+	}
+
+	// Convert graph nodes to workloads and calculate current spend.
 	var workloads []*tetris.Item
 	var currentSpend float64
 
@@ -271,7 +331,7 @@ func runSolver(g *graph.Graph) {
 
 			specs := aws.GetSpecs(instanceType)
 			
-			// Calculate current cost for this instance
+			// Calculate current cost for this instance.
 			var cost float64
 			var err error
 			if pc != nil {
@@ -282,7 +342,7 @@ func runSolver(g *graph.Graph) {
 				cost = estimator.GetEstimatedCost(instanceType, internalconfig.DefaultRegion)
 			}
 			
-			// Add to total monthly spend (cost is per month)
+			// Add to total monthly spend (cost is per month).
 			currentSpend += cost
 
 			workloads = append(workloads, &tetris.Item{
@@ -301,13 +361,13 @@ func runSolver(g *graph.Graph) {
 		return
 	}
 
-	// 3. Initialize solver components.
+	// Initialize solver components.
 	riskEngine := oracle.NewRiskEngine(internalconfig.DefaultRiskConfig())
 	safePolicy := policy.DefaultPolicy()
 	validator := policy.NewValidator(safePolicy)
 	optimizer := solver.NewOptimizer(riskEngine, validator)
 
-	// 4. Build Dynamic Catalog
+	// Build Dynamic Catalog.
 	var catalog []solver.InstanceType
 	
 	fmt.Printf("Building Instance Catalog (%d candidates)...\n", len(aws.CandidateTypes))
@@ -339,7 +399,7 @@ func runSolver(g *graph.Graph) {
 			successCount++
 		}
 
-		// Monthly Cost (730 hours)
+		// Monthly Cost (730 hours).
 		hourlyCost := cost / 730.0
 
 		catalog = append(catalog, solver.InstanceType{
@@ -352,7 +412,7 @@ func runSolver(g *graph.Graph) {
 	}
 	fmt.Printf("\n > Catalog Complete. Live Prices: %d | Estimates: %d\n", successCount, fallbackCount)
 
-	// 5. Execute solver.
+	// Execute solver.
 	req := solver.OptimizationRequest{
 		Workloads:    workloads,
 		Catalog:      catalog,
@@ -365,7 +425,7 @@ func runSolver(g *graph.Graph) {
 		return
 	}
 
-	// 6. Print optimization results.
+	// Print optimization results.
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Printf("OPTIMIZATION PLAN (Risk Score: %.2f%%)\n", plan.RiskScore*100)
 	fmt.Printf("Current Spend: $%.2f/mo -> Optimized: $%.2f/mo\n", req.CurrentSpend, plan.TotalCost)

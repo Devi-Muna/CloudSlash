@@ -32,7 +32,7 @@ func NewDynamoDBScanner(cfg aws.Config, g *graph.Graph) *DynamoDBScanner {
 }
 
 // ScanTables identifies tables with excessive provisioned capacity.
-// Analyzes usage metrics over 30 days.
+// Analyzes usage metrics over a 30-day window.
 func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 	paginator := dynamodb.NewListTablesPaginator(s.Client, &dynamodb.ListTablesInput{})
 
@@ -43,7 +43,7 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 		}
 
 		for _, tableName := range page.TableNames {
-			// Describe Table for details
+			// Retrieve table details.
 			desc, err := s.Client.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(tableName)})
 			if err != nil {
 				continue
@@ -57,7 +57,7 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 					isProvisioned = true
 				}
 			} else {
-				// Legacy tables default to provisioned.
+				// Handle legacy tables defaulting to provisioned mode.
 				if table.ProvisionedThroughput != nil {
 					isProvisioned = true
 				}
@@ -67,7 +67,7 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 				continue // Skip On-Demand tables
 			}
 
-			// Get Provisioned Values
+			// Extract provisioned capacity values.
 			readCap := *table.ProvisionedThroughput.ReadCapacityUnits
 			writeCap := *table.ProvisionedThroughput.WriteCapacityUnits
 
@@ -82,10 +82,10 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 
 			s.Graph.AddNode(tableName, "aws_dynamodb_table", props)
 
-			// Check for auto-scaling configuration.
+			// Check for auto-scaling policies.
 			go s.checkAutoScaling(ctx, tableName, props)
 
-			// Enrich with Consumed Metrics
+			// Enrich node with consumed capacity metrics.
 			go s.enrichTableMetrics(ctx, tableName, props)
 		}
 	}
@@ -93,8 +93,7 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 }
 
 func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string, props map[string]interface{}) {
-	// ServiceNamespace: dynamodb
-	// ResourceId: table/tableName
+	// Construct auto-scaling resource identifier.
 	resourceId := fmt.Sprintf("table/%s", tableName)
     
 	out, err := s.AAClient.DescribeScalingPolicies(ctx, &applicationautoscaling.DescribeScalingPoliciesInput{
@@ -109,7 +108,7 @@ func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string
 		}
 	}
 
-	// Check node existence first without holding lock (GetNode locks internally)
+	// Verify node existence.
 	node := s.Graph.GetNode(tableName)
 	if node != nil {
 		s.Graph.Mu.Lock()
@@ -119,9 +118,9 @@ func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string
 }
 
 func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName string, props map[string]interface{}) {
-	// GetNode locks internally, no need for external lock here
+	// Retrieve table node.
 	node := s.Graph.GetNode(tableName)
-	// Remove manual unlock as GetNode handles it
+
 	if node == nil {
 		return
 	}
@@ -166,7 +165,7 @@ func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName stri
 	if err != nil { return }
 
 	var avgConsumedRCU, avgConsumedWCU float64
-	// Calculate average daily usage.
+	// Calculate average daily consumption.
 	
 	for _, res := range out.MetricDataResults {
 		totalSum := 0.0

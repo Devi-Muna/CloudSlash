@@ -33,7 +33,7 @@ func (a *AIMD) Feedback(lat time.Duration, throttled bool) {
 	defer a.mu.Unlock()
 
 	now := time.Now()
-	// dampen oscillation
+	// Dampen oscillation.
 	if now.Sub(a.lastChange) < 100*time.Millisecond {
 		return
 	}
@@ -47,7 +47,7 @@ func (a *AIMD) Feedback(lat time.Duration, throttled bool) {
 		return
 	}
 
-	// scale up if latency is healthy
+	// Scale up on success.
 	if lat < 100*time.Millisecond {
 		a.concurrency += 5
 		if a.concurrency > a.maxWorkers {

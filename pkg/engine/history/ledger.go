@@ -10,32 +10,45 @@ import (
 // Snapshot represents a point-in-time state.
 type Snapshot struct {
 	Timestamp      int64             `json:"timestamp"`       // Unix Epoch
-	TotalMonthlyCost float64           `json:"monthly_cost"`    // Monthly cost estimate.
+	TotalMonthlyCost float64           `json:"monthly_cost"`    // Estimated monthly cost.
 	ResourceCounts map[string]int    `json:"resource_counts"` // Resource counts by type.
 	WasteCount     int               `json:"waste_count"`     // Total number of flagged resources
 	Vector         Vector            `json:"-"`               // Derived state vector.
 }
 
-// Backend defines storage for snapshots.
+// Backend defines the storage interface for snapshots.
 type Backend interface {
 	Append(s Snapshot) error
 	Load(n int) ([]Snapshot, error)
 }
 
-// CurrentBackend is the active storage.
-var CurrentBackend Backend = &FileBackend{}
-
-// Append adds a snapshot to the ledger.
-func Append(s Snapshot) error {
-	return CurrentBackend.Append(s)
+// Client manages historical state.
+type Client struct {
+	backend Backend
 }
 
-// LoadWindow returns recent snapshots.
-func LoadWindow(n int) ([]Snapshot, error) {
-	return CurrentBackend.Load(n)
+// NewClient initializes a history client.
+// Defaults to FileBackend.
+func NewClient(backend Backend) *Client {
+	if backend == nil {
+		backend = &FileBackend{}
+	}
+	return &Client{
+		backend: backend,
+	}
 }
 
-// FileBackend implements filesystem storage.
+// Append records a new snapshot.
+func (c *Client) Append(s Snapshot) error {
+	return c.backend.Append(s)
+}
+
+// LoadWindow retrieves the growing history window.
+func (c *Client) LoadWindow(n int) ([]Snapshot, error) {
+	return c.backend.Load(n)
+}
+
+// FileBackend implements local filesystem storage.
 type FileBackend struct{}
 
 func (b *FileBackend) Append(s Snapshot) error {
@@ -101,7 +114,7 @@ func (b *FileBackend) Load(n int) ([]Snapshot, error) {
 	return history, nil
 }
 
-// GetLedgerPath returns the ledger file path.
+// GetLedgerPath provides the default local storage path.
 func GetLedgerPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

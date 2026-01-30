@@ -12,11 +12,11 @@ import (
 	"github.com/DrSkyle/cloudslash/pkg/version"
 )
 
-// GenerateDashboard creates a high-fidelity HTML report.
+// GenerateDashboard generates an interactive HTML dashboard.
 func GenerateDashboard(g *graph.Graph, path string) error {
-	items := extractItems(g) // Extract items from graph.
+	items := extractItems(g) // Extract items.
 
-	// Calculate Stats
+	// Compute statistics.
 	totalCost := 0.0
 	riskCount := 0
 	for _, item := range items {
@@ -26,11 +26,11 @@ func GenerateDashboard(g *graph.Graph, path string) error {
 		}
 	}
 
-	// Prepare visualization data.
+	// Prepare chart data.
 	graphData, err := buildSankeyData(g)
 	if err != nil {
 		fmt.Printf("[WARN] Failed to build Sankey data: %v\n", err)
-		// Handle empty graph gracefully.
+		// Handle empty graph.
 		graphData = []byte("{}")
 	}
 
@@ -62,7 +62,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             --text-dim: #94A3B8;
         }
 
-        /* 1. Reset and base styles. */
+        /* 1. Base styles. */
         * { box-sizing: border-box; }
         body {
             background: var(--bg);
@@ -86,7 +86,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         .logo span { color: var(--primary); }
         .meta { color: var(--text-dim); }
 
-        /* 3. KPI grid styles. */
+        /* 3. KPI styles. */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -106,7 +106,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
         .card .value.cost { color: var(--danger); }
         .card .value.safe { color: var(--primary); }
 
-        /* 4. Analytics grid styles. */
+        /* 4. Analytics chart styles. */
         .analytics-grid {
             display: grid;
             grid-template-columns: 2fr 1fr;
@@ -349,7 +349,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
             serviceMap[svc] = (serviceMap[svc] || 0) + item.monthly_cost;
         });
 
-        // Aggegate top services.
+        // Aggregate top services.
         const sortedServices = Object.entries(serviceMap).sort((a,b) => b[1] - a[1]);
         const topServices = sortedServices.slice(0, 5);
         if (sortedServices.length > 5) {
@@ -706,7 +706,7 @@ func GenerateDashboard(g *graph.Graph, path string) error {
 	return os.WriteFile(path, []byte(html), 0644)
 }
 
-// Sankey data structures.
+// Sankey visualization structures.
 type SankeyNode struct {
 	Name  string `json:"name"`
 	Waste bool   `json:"waste"`

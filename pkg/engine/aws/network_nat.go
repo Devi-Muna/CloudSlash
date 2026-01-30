@@ -27,7 +27,7 @@ func NewNATScanner(cfg aws.Config, g *graph.Graph) *NATScanner {
 	}
 }
 
-// ScanNATGateways implements the "Idle NAT" detection.
+// ScanNATGateways discovers NAT Gateways and metrics.
 func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 	paginator := ec2.NewDescribeNatGatewaysPaginator(s.Client, &ec2.DescribeNatGatewaysInput{})
 
@@ -58,7 +58,7 @@ func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 			// Fetch connection metrics.
 			go s.checkTraffic(ctx, id, props)
 			
-			// Analyze network topology for idle associations.
+			// Analyze network topology for idleness.
 			go s.checkEmptyRoom(ctx, id, vpcId)
 		}
 	}
@@ -114,9 +114,9 @@ func (s *NATScanner) checkTraffic(ctx context.Context, id string, props map[stri
 	s.Graph.Mu.Unlock()
 }
 
-// checkEmptyRoom verifies if the NAT serves any ACTIVE instance.
+// checkEmptyRoom determines if the NAT Gateway serves active instances.
 func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId string) {
-	// Find Route Tables pointing to this NAT Gateway.
+	// Identify associated Route Tables.
 	routeReq := &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("vpc-id"), Values: []string{vpcId}},
@@ -140,7 +140,7 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 		}
 	}
 	
-	// Store RouteTables for visualization
+	// Store Route Tables for visualization.
 	node := s.Graph.GetNode(natId)
 	if node != nil {
 		s.Graph.Mu.Lock()
@@ -149,17 +149,17 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 	}
 	
 	if len(subnets) == 0 {
-		// Identify NATs with no associated subnets.
+		// Handle NATs with no subnet associations.
 		s.updateActiveCount(natId, 0)
 		return
 	}
 	
-	// Scan Subnets for Active ENIs (excluding the NAT itself).
+	// Scan subnets for active ENIs.
 	activeENICount := 0
 	var emptySubnetIds []string
 	
 	for subnetId := range subnets {
-		// Describe Network Interfaces in this subnet
+		// List network interfaces.
 		eniReq := &ec2.DescribeNetworkInterfacesInput{
 			Filters: []types.Filter{
 				{Name: aws.String("subnet-id"), Values: []string{subnetId}},
@@ -171,7 +171,7 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 		
 		subnetActive := 0
 		for _, eni := range eniOut.NetworkInterfaces {
-			// Exclude AWS owned (Lambda, NAT itself)
+			// Exclude AWS-managed interfaces.
 			if eni.InterfaceType == types.NetworkInterfaceTypeNatGateway {
 				continue // Self
 			}

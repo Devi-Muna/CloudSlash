@@ -1,0 +1,16 @@
+{
+  "resource_id": "production-unused",
+  "resource_type": "AWS::ECS::Cluster",
+  "timestamp": 1769745115,
+  "region": "unknown",
+  "soul": {
+    "ActiveServicesCount": 0,
+    "Name": "production-unused",
+    "PendingTasksCount": 0,
+    "Reason": "Idle Cluster: 2 active Container Instances (\u003e1h uptime) with 0 running tasks.",
+    "Region": "us-east-1",
+    "RegisteredContainerInstancesCount": 2,
+    "RunningTasksCount": 0,
+    "Status": "ACTIVE"
+  }
+}

@@ -1,0 +1,29 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.4"
+
+      - name: Run E2E Tests
+        env:
+          # In GitHub Actions, Docker is available at the default socket.
+          # We don't need to overide E2E_DOCKER_SOCKET usually,
+          # but ensuring it's unset or default is fine.
+          E2E_DOCKER_SOCKET: unix:///var/run/docker.sock
+        run: |
+          go test -tags=e2e ./test/e2e/... -v
