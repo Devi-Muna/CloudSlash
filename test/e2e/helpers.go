@@ -4,6 +4,9 @@ package e2e
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -62,4 +65,21 @@ func GetInstanceState(t *testing.T, client *ec2.Client, instanceID string) types
 		t.Fatalf("Instance %s not found", instanceID)
 	}
 	return out.Reservations[0].Instances[0].State.Name
+}
+
+// GetBinaryPath builds CLI and returns binary path
+func GetBinaryPath(t *testing.T) string {
+	t.Helper()
+	binPath := filepath.Join(t.TempDir(), "cloudslash")
+	// Navigate to root
+	rootDir := "../../" 
+	cmd := exec.Command("go", "build", "-o", binPath, "cmd/cloudslash-cli/main.go")
+	cmd.Dir = rootDir
+	// Inherit env
+	cmd.Env = os.Environ()
+	
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("Build failed: %s", out)
+	}
+	return binPath
 }

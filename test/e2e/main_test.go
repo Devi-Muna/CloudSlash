@@ -32,30 +32,32 @@ const (
 )
 
 func getDockerSocket() string {
+	// 1. Env Var Override
 	if env := os.Getenv("E2E_DOCKER_SOCKET"); env != "" {
 		return env
 	}
 	
-	// 1. Try Standard Linux/Mac Docker
+	// 2. Standard Socket
 	if _, err := os.Stat("/var/run/docker.sock"); err == nil {
 		return "unix:///var/run/docker.sock"
 	}
 	
-	// 2. Try OrbStack (Common on macOS)
+	// 3. OrbStack / User Home Fallback
 	home, _ := os.UserHomeDir()
 	orbPath := filepath.Join(home, ".orbstack/run/docker.sock")
 	if _, err := os.Stat(orbPath); err == nil {
 		return "unix://" + orbPath
 	}
 	
-	// 3. Fallback
+	// 4. Fallback
 	return "unix:///var/run/docker.sock"
 }
+
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
-	// 1. Setup Docker Client
+	// Setup Docker Client
 	socket := getDockerSocket()
 
 	cli, err := client.NewClientWithOpts(
@@ -70,7 +72,7 @@ func TestMain(m *testing.M) {
 	DockerClient = cli
 
 
-	// 2. Start LocalStack
+	// Start LocalStack
 	// Pull Image
 	reader, err := cli.ImagePull(ctx, localstackImage, image.PullOptions{})
 	if err != nil {
@@ -130,7 +132,7 @@ func TestMain(m *testing.M) {
 	// Wait for Health
 	waitForLocalStack(endpointURL)
 
-	// 3. Configure SDK
+	// Configure SDK
 	os.Setenv("AWS_ENDPOINT_URL", endpointURL)
 	os.Setenv("AWS_ACCESS_KEY_ID", "test")
 	os.Setenv("AWS_SECRET_ACCESS_KEY", "test")
@@ -153,10 +155,10 @@ func TestMain(m *testing.M) {
 	}
 	awsCfg = cfg
 
-	// 4. Run Tests
+	// Run Tests
 	code := m.Run()
 
-	// 5. Cleanup
+	// Cleanup
 	cleanup()
 	os.Exit(code)
 }
