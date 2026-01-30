@@ -15,7 +15,7 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// Client wraps AWS service clients and configuration.
+// Client encapsulates AWS SDK usage, handling authentication, region resolution, and middleware injection.
 type Client struct {
 	Config aws.Config
 	STS    *sts.Client
@@ -30,12 +30,12 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		opts = append(opts, config.WithSharedConfigProfile(profile))
 	}
 
-	// Support local testing via AWS_ENDPOINT_URL override.
+	// Check for local endpoint overrides (used for mocking/testing).
 	if endpoint := os.Getenv("AWS_ENDPOINT_URL"); endpoint != "" {
 		opts = append(opts, config.WithBaseEndpoint(endpoint))
 	}
 
-	// Configure custom User-Agent mapping.
+	// Define the application signature for backend audit logging.
 	const signature = "CS-v1-7f8a9d-AGPL"
 
 	cfg, err := config.LoadDefaultConfig(ctx, opts...)
@@ -43,7 +43,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		return nil, fmt.Errorf("unable to load SDK config: %v", err)
 	}
 
-	// Inject custom User-Agent middleware.
+	// Inject custom User-Agent header for usage tracking and API quotas.
 	cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 		return stack.Build.Add(middleware.BuildMiddlewareFunc("UserAgentTrap", func(ctx context.Context, input middleware.BuildInput, next middleware.BuildHandler) (
 			middleware.BuildOutput, middleware.Metadata, error,
@@ -60,7 +60,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 		}), middleware.After)
 	})
 
-	// Enable verbose (matrix-style) logging if requested.
+	// If matrix mode is enabled, intercept and log all API calls for visual debugging.
 	if verbose {
 		cfg.APIOptions = append(cfg.APIOptions, func(stack *middleware.Stack) error {
 			return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("MatrixLogger", func(ctx context.Context, input middleware.InitializeInput, next middleware.InitializeHandler) (
@@ -79,7 +79,7 @@ func NewClient(ctx context.Context, region, profile string, verbose bool) (*Clie
 	}, nil
 }
 
-// VerifyIdentity confirms credential validity and returns the caller's account ID.
+// VerifyIdentity validates the session credentials and retrieves the canonical Account ID.
 func (c *Client) VerifyIdentity(ctx context.Context) (string, error) {
 	input := &sts.GetCallerIdentityInput{}
 	result, err := c.STS.GetCallerIdentity(ctx, input)
@@ -90,14 +90,14 @@ func (c *Client) VerifyIdentity(ctx context.Context) (string, error) {
 }
 
 // GetConfigForRegion returns a regional configuration copy.
-// Essential for cross-region operations (e.g. S3 buckets in different regions).
+// Use this when interacting with cross-region resources (like S3 buckets detailed in a different region).
 func (c *Client) GetConfigForRegion(region string) aws.Config {
 	cfg := c.Config.Copy()
 	cfg.Region = region
 	return cfg
 }
 
-// ListProfiles discovers available AWS profiles from standard configuration paths.
+// ListProfiles attempts to resolve all configured AWS profiles on the host system.
 func ListProfiles() ([]string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

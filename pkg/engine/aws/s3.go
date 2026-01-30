@@ -26,7 +26,7 @@ func NewS3Scanner(cfg aws.Config, g *graph.Graph) *S3Scanner {
 	}
 }
 
-// getRegionalClient provides a client configured for the bucket's specific region.
+// getRegionalClient ensures S3 operations target the correct bucket region to avoid redirection errors.
 func (s *S3Scanner) getRegionalClient(region string) *s3.Client {
 	if region == "" {
 		return s.Client
@@ -54,7 +54,7 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 		name := *bucket.Name
 		arn := fmt.Sprintf("arn:aws:s3:::bucket/%s", name)
 
-		// Resolve bucket region to prevent redirection errors.
+		// Determine the authoritative region for the bucket to ensure API connectivity.
 		region := "us-east-1" // Default
 		loc, err := s.Client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{Bucket: &name})
 		if err == nil && loc.LocationConstraint != "" {
@@ -74,13 +74,13 @@ func (s *S3Scanner) ScanBuckets(ctx context.Context) error {
 			"CreationDate": bucket.CreationDate,
 		}
 
-		// Check for lifecycle rules.
+		// Verify if a Multipart Upload Abort policy is active (Cost Optimization).
 		hasAbortRule := s.hasAbortLifecycle(ctx, regionalClient, name)
 		props["HasAbortLifecycle"] = hasAbortRule
 		
 		s.Graph.AddNode(arn, "AWS::S3::Bucket", props)
 
-		// Scan for incomplete multipart uploads if no abort lifecycle exists.
+		// If no auto-abort policy exists, scan for hidden incomplete multipart uploads (User Waste).
 		if !hasAbortRule {
 			if err := s.scanMultipartUploads(ctx, regionalClient, name, arn); err != nil {
 				fmt.Printf("Failed to scan multipart uploads for bucket %s (%s): %v\n", name, region, err)

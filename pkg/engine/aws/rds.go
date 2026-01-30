@@ -14,12 +14,7 @@ type RDSScanner struct {
 	Graph  *graph.Graph
 }
 
-func NewRDSScanner(cfg aws.Config, g *graph.Graph) *RDSScanner {
-	return &RDSScanner{
-		Client: rds.NewFromConfig(cfg),
-		Graph:  g,
-	}
-}
+// NewRDSScanner initializes the database discovery engine with regional configuration.
 
 func (s *RDSScanner) ScanInstances(ctx context.Context) error {
 	paginator := rds.NewDescribeDBInstancesPaginator(s.Client, &rds.DescribeDBInstancesInput{})

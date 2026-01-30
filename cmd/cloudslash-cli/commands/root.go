@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
     
 Identify. Audit. Optimize.`,
 	Version: version.Current,
-	// Run is nil to force help output.
+	// Explicitly nil Run to ensure the help text is displayed by default.
 	Run: nil,
 }
 
@@ -40,7 +40,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Define persistent flags available to all commands.
+	// Register persistent flags available to this command and all subcommands.
 	rootCmd.PersistentFlags().StringVar(&config.Region, "region", "us-east-1", "AWS Region")
 	rootCmd.PersistentFlags().StringVar(&config.TFStatePath, "tfstate", "terraform.tfstate", "Path to web.tfstate")
 	rootCmd.PersistentFlags().BoolVar(&config.AllProfiles, "all-profiles", false, "Scan all AWS profiles")
@@ -54,7 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.OutputDir, "output-dir", "cloudslash-out", "Directory for artifacts")
 	rootCmd.PersistentFlags().StringVar(&config.OtelEndpoint, "otel-endpoint", "", "OpenTelemetry Exporter Endpoint (HTTP)")
 
-	// Bind command flags to Viper configuration. Precedence: Flag > Env > Config > Default.
+	// Bind pflags to viper for hierarchical configuration resolution (Flag > Env > Config).
 	viper.BindPFlag("region", rootCmd.PersistentFlags().Lookup("region"))
 	viper.BindPFlag("tfstate", rootCmd.PersistentFlags().Lookup("tfstate"))
 	viper.BindPFlag("all_profiles", rootCmd.PersistentFlags().Lookup("all-profiles"))
@@ -68,7 +68,7 @@ func init() {
 	viper.BindPFlag("output_dir", rootCmd.PersistentFlags().Lookup("output-dir"))
 	viper.BindPFlag("otel_endpoint", rootCmd.PersistentFlags().Lookup("otel-endpoint"))
 
-	// Define hidden flags.
+	// Internal debugging flags.
 	rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
 	rootCmd.PersistentFlags().MarkHidden("mock")
 
@@ -77,12 +77,12 @@ func init() {
 	})
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Check for updates if running a primary command.
+		// Check for newer versions during primary operations.
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
 		}
 
-		// Load configuration values from Viper sources.
+		// Hydrate the configuration object from resolved viper values.
 		config.Region = viper.GetString("region")
 		config.TFStatePath = viper.GetString("tfstate")
 		config.AllProfiles = viper.GetBool("all_profiles")
@@ -109,9 +109,9 @@ func checkUpdate() {
 }
 
 func initConfig() {
-	viper.SetConfigName("cloudslash") // Name of config file (without extension)
-	viper.SetConfigType("yaml")       // REQUIRED if the config file does not have the extension in the name
-	viper.AddConfigPath(".")          // Look for config in the working directory
+	viper.SetConfigName("cloudslash")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
 	viper.AddConfigPath("$HOME/.cloudslash")
 	
 	viper.SetEnvPrefix("CLOUDSLASH")
@@ -166,11 +166,10 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 }
 
 func safeWriteConfig() {
-	// Attempt to create config file if missing.
+	// Persist the default configuration, creating the file if it doesn't exist.
 	if err := viper.SafeWriteConfig(); err != nil {
-		// If it exists, overwrite it.
 		if err2 := viper.WriteConfig(); err2 != nil {
-			// Fallback: Force create file at explicit path.
+			// Fallback: manually create the file if viper fails to resolve the path.
 			path := viper.ConfigFileUsed()
 			if path != "" {
 				f, createErr := os.Create(path)

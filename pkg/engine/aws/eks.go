@@ -21,7 +21,7 @@ type EKSClient interface {
 	DescribeFargateProfile(ctx context.Context, params *eks.DescribeFargateProfileInput, optFns ...func(*eks.Options)) (*eks.DescribeFargateProfileOutput, error)
 }
 
-// EKSEC2Client defines required EC2 operations.
+// EKSEC2Client abstracts EC2 dependencies for node analysis.
 type EKSEC2Client interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 }
@@ -51,7 +51,7 @@ func (s *EKSScanner) ScanClusters(ctx context.Context) error {
 
 		for _, clusterName := range page.Clusters {
 			if err := s.processCluster(ctx, clusterName); err != nil {
-				// Log non-fatal errors.
+				// Log non-fatal errors (e.g. transient API failures or permission gaps).
 				fmt.Printf("Warning: failed to process cluster %s: %v\n", clusterName, err)
 			}
 		}
@@ -66,32 +66,32 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 	}
 	cluster := resp.Cluster
 
-	// Filter for active clusters.
+	// Ignore clusters in non-active states (Creating/Deleting) to prevent noise.
 	if cluster.Status != types.ClusterStatusActive {
 		return nil
 	}
 
 	arn := *cluster.Arn
 
-	// Check for managed node groups.
+	// Analyze topological components.
 	hasManagedNodes, err := s.checkManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	// Check Fargate profiles.
+
 	hasFargate, err := s.scanFargateProfiles(ctx, name, arn)
 	if err != nil {
 		return err
 	}
 
-	// Check self-managed nodes.
+
 	hasSelfManaged, err := s.checkSelfManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	// Detect Karpenter installation.
+	// Detect Karpenter autoscaling via discovery tags.
 	karpenterEnabled := false
 	if cluster.Tags != nil {
 		if _, ok := cluster.Tags["karpenter.sh/discovery"]; ok {
@@ -115,7 +115,7 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 }
 
 func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Check for active nodegroups.
+	// Enumerate managed nodegroups to determine cluster capacity mode.
 	paginator := eks.NewListNodegroupsPaginator(s.Client, &eks.ListNodegroupsInput{ClusterName: &clusterName})
 
 	for paginator.HasMorePages() {
@@ -193,7 +193,7 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 }
 
 func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Filter instances by cluster ownership tag.
+	// Filter instances by cluster ownership tag (k8s.io/cluster/<name>).
 	key := fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)
 
 	input := &ec2.DescribeInstancesInput{

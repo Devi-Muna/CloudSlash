@@ -60,25 +60,25 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 
 				s.Graph.AddNode(arn, "AWS::EC2::Instance", props)
 
-				// Link the instance to its VPC.
+				// Map topology: Instance -> VPC.
 				if instance.VpcId != nil {
 					vpcARN := fmt.Sprintf("arn:aws:ec2:region:account:vpc/%s", *instance.VpcId)
 					s.Graph.AddTypedEdge(vpcARN, arn, graph.EdgeTypeContains, 100)
 				}
 
-				// Link the instance to its subnet.
+				// Map topology: Instance -> Subnet.
 				if instance.SubnetId != nil {
 					subnetARN := fmt.Sprintf("arn:aws:ec2:region:account:subnet/%s", *instance.SubnetId)
 					s.Graph.AddTypedEdge(subnetARN, arn, graph.EdgeTypeContains, 100)
 				}
 
-				// Link the instance to its security groups.
+				// Map topology: Instance -> Security Groups (Forensics).
 				for _, sg := range instance.SecurityGroups {
 					sgARN := fmt.Sprintf("arn:aws:ec2:region:account:security-group/%s", *sg.GroupId)
 					s.Graph.AddTypedEdge(arn, sgARN, graph.EdgeTypeSecuredBy, 100)
 				}
 
-				// Link the instance to its source AMI.
+				// Map topology: Instance -> Source AMI (Provenance).
 				if instance.ImageId != nil {
 					amiARN := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", *instance.ImageId)
 					s.Graph.AddTypedEdge(arn, amiARN, graph.EdgeTypeUses, 100)
@@ -87,7 +87,7 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 		}
 	}
 
-	// Synchronize instance type specifications for Solver accuracy.
+	// Hydrate the Instance Type catalog to ensure accurate pricing and right-sizing analysis.
 	var observedTypes []string
 	for k := range uniqueTypes {
 		observedTypes = append(observedTypes, k)
@@ -141,7 +141,7 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 					instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", *att.InstanceId)
 					s.Graph.AddTypedEdge(arn, instanceARN, graph.EdgeTypeAttachedTo, 100)
 
-					// Store attachment metadata.
+					// Capture termination behavior for waste analysis (orphaned volume risk).
 					props["DeleteOnTermination"] = att.DeleteOnTermination
 					props["AttachedInstanceId"] = *att.InstanceId
 				}
@@ -155,8 +155,8 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 	out := make(map[string]bool)
 	if len(volIDs) == 0 { return out }
 	
-	// Provide a list of volume IDs to the API.
-	// Assume pagination is handled by the caller.
+	// Query the API for modification status (Optimizing/Modifying).
+	// Pagination is managed by the caller.
 	
 	resp, err := s.Client.DescribeVolumesModifications(ctx, &ec2.DescribeVolumesModificationsInput{
 		VolumeIds: volIDs,

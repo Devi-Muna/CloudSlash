@@ -155,7 +155,7 @@ graph LR
     Safe ==> Dash
 ```
 
-![Topology View](assets/topologyviewtui.png)
+![Topology View](assets/cloudslashmap.png)
 
 ### 1. The Autonomy Engine (Optimization)
 

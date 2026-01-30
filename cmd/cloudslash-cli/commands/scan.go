@@ -58,7 +58,7 @@ Example:
 			config.Headless = true
 		}
 
-		// Initialize the application logger.
+		// Configure structured logging based on verbosity settings.
 		var handler slog.Handler
 		if config.JsonLogs {
 			handler = slog.NewJSONHandler(os.Stdout, nil)
@@ -69,7 +69,7 @@ Example:
 		}
 		config.Logger = slog.New(handler)
 
-		// Resolve the cache directory, adhering to XDG standards.
+		// Determine cache location, respecting XDG_CACHE_HOME if present.
 		cacheDir := os.Getenv("XDG_CACHE_HOME")
 		if cacheDir == "" {
 			home, err := os.UserHomeDir()
@@ -82,14 +82,14 @@ Example:
 		}
 		config.CacheDir = cacheDir
 
-		// Execute the core engine scan.
+		// Initiate the parallel scanning engine.
 		_, g, swarmEngine, err := engine.Run(cmd.Context(), config)
 		if err != nil {
 			fmt.Printf("Error running scan: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Launch the terminal user interface.
+		// Start the interactive TUI unless requested otherwise (CI/CD mode).
 		if !config.Headless {
 			model := ui.NewModel(swarmEngine, g, config.MockMode, config.Region)
 			startTime := time.Now()
@@ -109,7 +109,7 @@ Example:
 		// Execute the optimization solver.
 		runSolver(g)
 
-		// Generate the resource deletion script.
+		// Generate executable remediation artifacts.
 		cleanupPath := filepath.Join(config.OutputDir, "resource_deletion.sh")
 		// Ensure output directory exists.
 		if _, err := os.Stat(config.OutputDir); os.IsNotExist(err) {
@@ -131,7 +131,7 @@ Example:
 			fmt.Printf("[SUCCESS] Lazarus Protocol Active: Restoration plan generated: %s\n", restorePath)
 		}
 
-		// Initialize the Terraform client.
+		// Initialize Terraform analysis if available.
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
 			fmt.Println("\n[INFO] Terraform detected. Initializing State Analysis...")
@@ -276,9 +276,7 @@ func runSolver(g *graph.Graph) {
 	fmt.Printf("\n[ %s OPTIMIZATION ENGINE ]\n", version.Current)
 	fmt.Println("Initializing Solver with Dynamic Intelligence...")
 
-	// ---------------------------------------------------------
-	// Initialize Infrastructure (Logger & Paths).
-	// ---------------------------------------------------------
+	// Prepare optimization environment (logging, cache).
 	
 	// Setup Logger (Silent by default unless verbose).
 	var logger *slog.Logger
@@ -296,9 +294,7 @@ func runSolver(g *graph.Graph) {
 	}
 	_ = os.MkdirAll(cacheDir, 0755)
 
-	// ---------------------------------------------------------
-	// Inject Dependencies into Pricing Client.
-	// ---------------------------------------------------------
+	// Initialize the Pricing Client for real-time cost retrieval.
 	fmt.Println(" -> Connecting to AWS Pricing API (this may take a moment)...")
 	ctx := context.Background()
 

@@ -22,6 +22,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -30,7 +32,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 
-		// Global View Switch
+		// Navigation: Switch context.
 		case "q":
 			if m.state == ViewStateDetail || m.state == ViewStateTopology {
 				m.state = ViewStateList
@@ -39,7 +41,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		
-		// View Switching
+		// View Toggle (Topology <-> List).
 		case "t":
 			if m.state == ViewStateTopology {
 				m.state = ViewStateList
@@ -49,7 +51,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// State-Specific Handling
+		// Dispatch input to the active view controller.
 		if m.state == ViewStateTopology {
 			switch msg.String() {
 			case "up", "k":
@@ -88,7 +90,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.state = ViewStateDetail
 				}
 			case "m":
-				// Soft Delete (Mark for Death)
+				// Soft Delete: Mark resource for later cleanup without immediate destruction.
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
 					id := m.wasteItems[m.cursor].ID
 					// Simulate "Soft Delete" by logging the action and hiding the node.
@@ -211,15 +213,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		stats := m.Engine.GetStats()
 		m.tasksDone = int(stats.TasksCompleted)
 
-		// Heuristic Progress: Completed / (Completed + Active + 1)
-		// The +1 prevents division by zero and keeps it < 100% until truly done
+		// Calculate scanning progress: Completed / (Total Active + 1).
+		// The denominator offset prevents division by zero.
 		total := float64(stats.TasksCompleted + int64(stats.ActiveWorkers))
 		if total == 0 {
 			total = 1
 		}
 		pct := float64(stats.TasksCompleted) / total
 
-		// If scanning is done (Active=0 and >10 tasks), force 100%
+		// Force completion if heuristic engine is idle.
 		if stats.TasksCompleted > 10 && stats.ActiveWorkers == 0 {
 			m.scanning = false
 			pct = 1.0

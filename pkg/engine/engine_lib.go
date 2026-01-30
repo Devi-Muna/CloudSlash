@@ -33,7 +33,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config defines the engine execution parameters.
+// Config encapsulates all runtime parameters and dependency injections for the engine.
 type Config struct {
 	Region           string
 	TFStatePath      string
@@ -70,7 +70,7 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 		cfg.OutputDir = "cloudslash-out"
 	}
 
-	// Initialize logger.
+	// Configure fallback logging if not injected.
 	if cfg.Logger == nil {
 		// Fallback logger for testing.
 		var handler slog.Handler
@@ -83,7 +83,7 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 	}
 	slog.SetDefault(cfg.Logger)
 
-	// Initialize Telemetry (Golden Signal A).
+	// Initialize OpenTelemetry tracing (Golden Signal A: Latency & Errors).
 	if !cfg.SkipTelemetry {
 		shutdown, telErr := telemetry.Init(ctx, version.AppName, version.Current, cfg.OtelEndpoint)
 		if telErr != nil {
@@ -128,7 +128,7 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 		}
 	}()
 
-	// Initialize graph and engine.
+	// Instantiate the resource graph and worker swarm.
 	var g *graph.Graph
 	var engine *swarm.Engine
 
@@ -138,8 +138,7 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 		engine.MaxWorkers = cfg.MaxConcurrency
 	}
 
-	// Initialize history backend.
-	// Initialize History Client
+	// Initialize History Storage Backend.
 	var backend history.Backend
 	if strings.HasPrefix(cfg.HistoryURL, "s3://") {
 		var err error
@@ -162,7 +161,7 @@ func Run(ctx context.Context, cfg Config) (bool, *graph.Graph, *swarm.Engine, er
 		doneChan = runRealMode(ctx, cfg, g, engine, historyClient)
 	}
 
-	// Wait for scan to complete in non-headless mode (if applicable) or return.
+	// Await completion of all scanning tasks (unless headless mode manages its own lifecycle).
 	if doneChan != nil {
 		<-doneChan
 	}
@@ -198,9 +197,7 @@ func runMockMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 		fmt.Printf("Heuristic run failed: %v\n", err)
 	}
 
-	// ---------------------------------------------------------
 	// Initialize Enterprise Policy Engine (CEL).
-	// ---------------------------------------------------------
 	if cfg.RulesFile != "" {
 		slog.Info("Initializing Policy Engine", "rules_file", cfg.RulesFile)
 		if err := runPolicyEngine(ctx, cfg.RulesFile, g); err != nil {
@@ -456,9 +453,7 @@ func runRealMode(ctx context.Context, cfg Config, g *graph.Graph, engine *swarm.
 			fmt.Printf("Time Machine Analysis failed: %v\n", err)
 		}
 
-		// ---------------------------------------------------------
 		// Initialize Enterprise Policy Engine (CEL).
-		// ---------------------------------------------------------
 		if cfg.RulesFile != "" {
 			slog.Info("Initializing Policy Engine", "rules_file", cfg.RulesFile)
 			if err := runPolicyEngine(ctx, cfg.RulesFile, g); err != nil {
@@ -600,7 +595,7 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 		engine.Submit(func(ctx context.Context) error {
 			defer scanWg.Done()
 			
-			// Golden Signal B: Scanner Swarm (Latency & Failures)
+			// Golden Signal B: Scanner Swarm (Latency & Failures).
 			tr := otel.Tracer("cloudslash/scanner")
 			ctx, span := tr.Start(ctx, taskName, trace.WithAttributes(
 				attribute.String("provider", "aws"),
@@ -647,7 +642,7 @@ func runScanForProfile(ctx context.Context, region, profile string, verbose bool
 	return awsClient, nil
 }
 
-// performSignalAnalysis analyzes cost trends.
+// performSignalAnalysis evaluates cost history to detect velocity and acceleration anomalies.
 func performSignalAnalysis(g *graph.Graph, slack *notifier.SlackClient, hClient *history.Client) {
 	// Snapshot current state.
 	s := history.Snapshot{
@@ -729,7 +724,7 @@ func runPolicyEngine(ctx context.Context, rulesFile string, g *graph.Graph) erro
 	}
 
 	// 4. Evaluate against Graph Nodes (Two-Phase Locking)
-	// Phase 1: Analysis (Read-Only) - Allows concurrent readers
+	// Phase 1: Read-Only Analysis (Concurrent Safe).
 	g.Mu.RLock()
 	
 	type violation struct {
@@ -767,7 +762,7 @@ func runPolicyEngine(ctx context.Context, rulesFile string, g *graph.Graph) erro
 	}
 	g.Mu.RUnlock()
 
-	// Phase 2: Commit findings (Write-Locked).
+	// Phase 2: Write-Locked Mutation.
 	if len(pendingUpdates) > 0 {
 		g.Mu.Lock()
 		defer g.Mu.Unlock()

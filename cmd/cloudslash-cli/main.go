@@ -9,14 +9,15 @@ import (
 )
 
 func main() {
-	// 1. THE BOUNCER: Block Native Windows
+	// Validate operating system compatibility.
+	// CloudSlash relies on POSIX standards unavailable in native Windows.
 	if runtime.GOOS == "windows" {
-		fmt.Println("❌  Error: CloudSlash does not support native Windows.")
-		fmt.Println("💡  Solution: Please run CloudSlash inside WSL2 (Windows Subsystem for Linux).")
-		fmt.Println("   Docs: https://learn.microsoft.com/en-us/windows/wsl/install")
+		fmt.Println("[ERROR] CloudSlash does not support native Windows.")
+		fmt.Println("[INFO]  Solution: Please run CloudSlash inside WSL2 (Windows Subsystem for Linux).")
+		fmt.Println("        Docs: https://learn.microsoft.com/en-us/windows/wsl/install")
 		os.Exit(1)
 	}
 
-	// 2. Run the App
+	// Hand off control to the CLI command processor.
 	commands.Execute()
 }

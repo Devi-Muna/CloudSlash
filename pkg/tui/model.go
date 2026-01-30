@@ -96,7 +96,7 @@ func NewModel(e *swarm.Engine, g *graph.Graph, isMock bool, region string) Model
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		m.spinner.Tick,
+		spinner.Tick,
 		tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		}),
