@@ -1,9 +1,5 @@
 version: 2.1
 
-# -------------------------------------------------------------------------------------
-# BEST IN THE WORLD CI/CD ARCHITECTURE (NO LOCAL SCRIPTS)
-# -------------------------------------------------------------------------------------
-
 orbs:
   # Official Go Orb for caching & building
   go: circleci/go@1.9.0
@@ -12,7 +8,7 @@ orbs:
 
 jobs:
   # ---------------------------------------------------------
-  # Job 1: The Factory (Build the Artifact)
+  #  Build the Artifact
   # ---------------------------------------------------------
   build-binary:
     docker:
@@ -36,7 +32,7 @@ jobs:
             - cloudslash
 
   # ---------------------------------------------------------
-  # Job 2: The Quality Gate (Unit Tests)
+  # Unit Tests
   # ---------------------------------------------------------
   test-unit:
     docker:
@@ -49,7 +45,7 @@ jobs:
           command: go test -v -race -short ./...
 
   # ---------------------------------------------------------
-  # Job 3: The Lazarus Gauntlet (Integration Test)
+  # Integration Test
   # ---------------------------------------------------------
   verify-lazarus:
     docker:

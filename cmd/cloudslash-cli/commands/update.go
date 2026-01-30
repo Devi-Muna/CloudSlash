@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/DrSkyle/cloudslash/pkg/version"
@@ -69,13 +68,14 @@ func fetchLatestVersion() (string, error) {
 }
 
 func doUpdate() error {
-	// Execute the remote update script.
+	// We only support Bash (Linux/Mac/WSL)
+	// The Bouncer in main.go guarantees we are not on native Windows.
 	cmd := exec.Command("sh", "-c", "curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash")
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("powershell", "-Command", "irm https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.ps1 | iex")
-	}
 
+	// CRITICAL: Allow the script to ask for sudo password if needed
+	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
