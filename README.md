@@ -551,6 +551,16 @@ Upon completion of an audit cycle, CloudSlash generates a suite of remediation a
 - **`restore.tf`**: A Terraform configuration file containing generated `import` blocks. This facilitates the re-assimilation of previously deleted or detached resources back into Terraform management.
 - **`waste.tf` & `import.sh`**: Advanced Terraform-native remediation artifacts. These files allow for the importation of unmanaged waste resources into a temporary Terraform state, enabling destruction via standard `terraform destroy` workflows rather than direct API calls.
 
+### 5. Recommended Remediation Workflow (Gold Standard)
+
+For maximum safety and data integrity, we recommend the following execution order when processing audit results:
+
+1.  **Review the Intelligence**: Open `dashboard.html` to visually confirm the graph topology and high-cost centers.
+2.  **Harmonize State**: Run `./cloudslash-out/fix_terraform.sh` _first_. This ensures your Terraform state is consistent with reality, preventing "Drift Detected" errors during later steps.
+3.  **Execute Purgatory**: Run `./cloudslash-out/safe_cleanup.sh`. This stops instances and snapshots volumes without deleting data, immediately stopping the "money burn."
+4.  **Verify & Wait**: Observe the environment for 24-48 hours. If no alarms trigger, the remediation is successful.
+5.  **Emergency Rollback**: If a service interruption occurs, immediately run `./cloudslash-out/undo_cleanup.sh` to restore all resources to their exact pre-cleanup state.
+
 ---
 
 ## Support the Project
