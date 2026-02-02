@@ -340,36 +340,42 @@ func runSolver(g *graph.Graph) {
 	_ = os.MkdirAll(cacheDir, 0755)
 
 	// Initialize pricing client.
-	fmt.Printf(" -> Connecting to AWS Pricing API... ")
-	
-	done := make(chan bool)
-	go func() {
-		chars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-		i := 0
-		for {
-			select {
-			case <-done:
-				return
-			default:
-				fmt.Printf("\r -> Connecting to AWS Pricing API... %s ", chars[i%len(chars)])
-				time.Sleep(100 * time.Millisecond)
-				i++
-			}
-		}
-	}()
+	logger.Info("Initializing Solver", "mock_mode", config.MockMode)
 
+	var pc *pricing.Client
+	var err error
 	ctx := context.Background()
 
-	manualRate := 0.0
-
-	pc, err := pricing.NewClient(ctx, logger, cacheDir, manualRate)
-	done <- true
-	fmt.Printf("\r -> Connecting to AWS Pricing API... Done.\n")
-
-	if err != nil {
-		fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
+	if config.MockMode {
+		fmt.Println(" -> [MOCK] Using static pricing estimation.")
 	} else {
-		logger.Info("Pricing Client Initialized")
+		done := make(chan bool)
+		fmt.Printf(" -> Connecting to AWS Pricing API... ")
+		go func() {
+			chars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+			i := 0
+			for {
+				select {
+				case <-done:
+					return
+				default:
+					fmt.Printf("\r -> Connecting to AWS Pricing API... %s ", chars[i%len(chars)])
+					time.Sleep(100 * time.Millisecond)
+					i++
+				}
+			}
+		}()
+
+		manualRate := 0.0
+		pc, err = pricing.NewClient(ctx, logger, cacheDir, manualRate)
+		done <- true // Stop spinner
+		fmt.Printf("\r -> Connecting to AWS Pricing API... Done.\n")
+
+		if err != nil {
+			fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
+		} else {
+			logger.Info("Pricing Client Initialized")
+		}
 	}
 
 	// Calculate current spend.

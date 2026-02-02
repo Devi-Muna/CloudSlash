@@ -52,6 +52,10 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heurist
 			return nil, fmt.Errorf("CloudSlash: VNAT_Err - Invalid NAT Gateway ID detected")
 		}
 
+		if h.CW == nil {
+			continue
+		}
+
 		maxConns, err := h.CW.GetMetricMax(ctx, "AWS/NATGateway", "ActiveConnectionCount", dims, startTime, endTime)
 		if err != nil {
 			continue
@@ -303,6 +307,10 @@ func (h *RDSHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats
 			{Name: aws.String("DBInstanceIdentifier"), Value: aws.String(id)},
 		}
 
+		if h.CW == nil {
+			continue
+		}
+
 		maxConns, err := h.CW.GetMetricMax(ctx, "AWS/RDS", "DatabaseConnections", dims, startTime, endTime)
 		if err != nil {
 			continue
@@ -350,6 +358,10 @@ func (h *ELBHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats
 
 		dims := []types.Dimension{
 			{Name: aws.String("LoadBalancer"), Value: aws.String(lbDimValue)},
+		}
+
+		if h.CW == nil {
+			continue
 		}
 
 		requestCount, err := h.CW.GetMetricSum(ctx, "AWS/ApplicationELB", "RequestCount", dims, startTime, endTime)
@@ -414,11 +426,14 @@ func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph
 			node.Properties["MetricsHistoryCPU"] = cpuHistory
 			netHistory, _ := h.CW.GetMetricHistory(ctx, "AWS/EC2", "NetworkIn", dims, startTime, endTime)
 			node.Properties["MetricsHistoryNet"] = netHistory
-		}
-
-		maxCPU, err := h.CW.GetMetricMax(ctx, "AWS/EC2", "CPUUtilization", dims, startTime, endTime)
-		if err != nil {
-			continue
+		
+			maxCPU, err = h.CW.GetMetricMax(ctx, "AWS/EC2", "CPUUtilization", dims, startTime, endTime)
+			if err != nil {
+				continue
+			}
+		} else {
+			// Mock Mode: Simulate idle instance
+			maxCPU = 1.0
 		}
 
 		if maxCPU < 5.0 {

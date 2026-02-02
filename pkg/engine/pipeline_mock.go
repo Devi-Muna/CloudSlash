@@ -55,6 +55,9 @@ func runMockMode(ctx context.Context, e *Engine) {
 	hEngine2.Register(&heuristics.SnapshotChildrenHeuristic{})
 	hEngine2.Run(ctx, e.Graph)
 
+	// Finalize graph.
+	e.Graph.CloseAndWait()
+
 	os.Mkdir(e.outputDir, 0755)
 
 	// Generate outputs.
