@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
 type RedshiftScanner struct {
@@ -26,8 +26,7 @@ func NewRedshiftScanner(cfg aws.Config, g *graph.Graph) *RedshiftScanner {
 	}
 }
 
-// ScanClusters discovers Redshift clusters and metrics.
-// Analyzes metrics over a 24-hour window.
+// ScanClusters scans Redshift clusters.
 func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 	paginator := redshift.NewDescribeClustersPaginator(s.Client, &redshift.DescribeClustersInput{})
 
@@ -39,28 +38,29 @@ func (s *RedshiftScanner) ScanClusters(ctx context.Context) error {
 
 		for _, cluster := range page.Clusters {
 			id := *cluster.ClusterIdentifier
-			
+
 			props := map[string]interface{}{
 				"Service":                   "Redshift",
 				"NodeType":                  *cluster.NodeType,
 				"ClusterStatus":             *cluster.ClusterStatus, // e.g., "available"
-				"ClusterAvailabilityStatus": *cluster.ClusterAvailabilityStatus, 
+				"ClusterAvailabilityStatus": *cluster.ClusterAvailabilityStatus,
 				"NumberOfNodes":             cluster.NumberOfNodes,
 			}
 
 			// Add to Graph
 			s.Graph.AddNode(id, "aws_redshift_cluster", props)
 
-			// Enrich with CloudWatch metrics.
+			// Add metrics.
 			go s.enrichClusterMetrics(ctx, id, props)
-			
-			// Note: RI coverage check pending implementation.
-			// Default to On-Demand pricing.
+
+			// TODO: Check RI.
+			// Assume On-Demand.
 		}
 	}
 	return nil
 }
 
+// enrichClusterMetrics retrieves usage metrics.
 func (s *RedshiftScanner) enrichClusterMetrics(ctx context.Context, clusterID string, props map[string]interface{}) {
 	node := s.Graph.GetNode(clusterID)
 	exists := (node != nil)
@@ -115,7 +115,9 @@ func (s *RedshiftScanner) enrichClusterMetrics(ctx context.Context, clusterID st
 		max := 0.0
 		for _, v := range res.Values {
 			sum += v
-			if v > max { max = v }
+			if v > max {
+				max = v
+			}
 		}
 		if *res.Id == "m_queries" {
 			totalQueries = sum

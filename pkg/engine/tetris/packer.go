@@ -17,8 +17,6 @@ func NewPacker() *Packer {
 // Pack executes Best Fit Decreasing (BFD).
 func (p *Packer) Pack(items []*Item, binFactory func() *Bin) []*Bin {
 	// Sort items by size (descending).
-	// Reduces fragmentation.
-	// This ensures larger items are placed first, minimizing fragmentation.
 	sort.Slice(items, func(i, j int) bool {
 		areaI := items[i].Dimensions.CPU * items[i].Dimensions.RAM
 		areaJ := items[j].Dimensions.CPU * items[j].Dimensions.RAM
@@ -54,8 +52,7 @@ func (p *Packer) Pack(items []*Item, binFactory func() *Bin) []*Bin {
 			newBin := binFactory()
 			if !newBin.AddItem(item) {
 				// Item too large for optimal binning.
-				// This indicates the item exceeds the capacity of the largest available node type.
-				continue 
+				continue
 			}
 			usedBins = append(usedBins, newBin)
 		}

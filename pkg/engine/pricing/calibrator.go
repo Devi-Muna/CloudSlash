@@ -16,8 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 )
 
-
-
 type DiscountCache struct {
 	Factor    float64 `json:"factor"`
 	Timestamp int64   `json:"timestamp"`
@@ -147,7 +145,7 @@ func (c *Calibrator) fetchFromAWS(ctx context.Context) (float64, error) {
 	}
 
 	factor := totalAmortized / totalUnblended
-	
+
 	// Sanity check factor range.
 	if factor > 1.5 || factor < 0.1 {
 		return 1.0, nil // Suspicious data

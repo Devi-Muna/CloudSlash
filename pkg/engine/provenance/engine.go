@@ -1,12 +1,13 @@
 package provenance
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/providers/terraform"
+	"github.com/DrSkyle/cloudslash/v2/pkg/providers/terraform"
 )
 
 // Engine manages provenance lookup.
@@ -19,7 +20,7 @@ func NewEngine(root string) *Engine {
 }
 
 // Attribute resolves resource authorship.
-func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (*ProvenanceRecord, error) {
+func (e *Engine) Attribute(ctx context.Context, resourceID string, state *terraform.TerraformState) (*ProvenanceRecord, error) {
 	// Bridge AWS ID to source via Terraform state.
 	// Lookup ID in state.
 	addr, err := terraform.FindAddressByID(state, resourceID)
@@ -31,15 +32,15 @@ func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (
 	}
 
 	// Parse resource address.
-	
+
 	var resType, resName string
-	
+
 	// Strip index.
 	cleanAddr := addr
 	if idx := strings.Index(cleanAddr, "["); idx != -1 {
 		cleanAddr = cleanAddr[:idx]
 	}
-	
+
 	addrParts := strings.Split(cleanAddr, ".")
 	if len(addrParts) >= 2 {
 		resName = addrParts[len(addrParts)-1]
@@ -55,7 +56,7 @@ func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (
 	}
 
 	// Resolve Git blame.
-	blame, err := GetBlame(loc.FilePath, loc.StartLine, loc.EndLine)
+	blame, err := GetBlame(ctx, loc.FilePath, loc.StartLine, loc.EndLine)
 	if err != nil {
 		return nil, fmt.Errorf("git blame failed: %w", err)
 	}
@@ -72,7 +73,7 @@ func (e *Engine) Attribute(resourceID string, state *terraform.TerraformState) (
 		CommitDate: blame.Date,
 		Message:    blame.Message,
 	}
-	
+
 	// Check statute of limitations (1 year).
 	if time.Since(blame.Date) > 365*24*time.Hour {
 		rec.IsLegacy = true

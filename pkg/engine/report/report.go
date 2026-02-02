@@ -1,15 +1,15 @@
 package report
 
 import (
-	"fmt"
+	"encoding/json"
 	"html/template"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/version"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 )
 
 // ReportData contains data for the static report template.
@@ -20,9 +20,9 @@ type ReportData struct {
 	TotalWasteCost   float64
 	TotalWaste       int
 	TotalResources   int
-	ProjectedSavings float64 // Annual
+	ProjectedSavings float64
 	WasteItems       []WasteItem
-	JustifiedItems   []WasteItem // New selection for justified waste
+	JustifiedItems   []WasteItem
 
 	// Chart Data
 	ChartLabelsJSON template.JS
@@ -80,10 +80,9 @@ const htmlTemplate = `
             background: var(--bg-glass);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid var(--border-glass);
-            border-radius: 1.5rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            	border: 1px solid var(--border-glass);
+            	border-radius: 1.5rem;
+            	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
         .glass-panel:hover {
@@ -342,7 +341,6 @@ const htmlTemplate = `
             </div>
             <div class="glass-panel kpi-card">
                 <span class="kpi-label">Efficiency Score</span>
-                <!-- Inverse of waste ratio roughly -->
                 <div class="kpi-value" style="color: #fff;">
                     {{if eq .TotalResources 0}}100%{{else}}
                     {{printf "%.0f" (sub 100 (mul (div .TotalWaste .TotalResources) 100))}}%
@@ -548,16 +546,16 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 	costByType := make(map[string]float64)
 
 	g.Mu.RLock()
-	data.TotalResources = len(g.Nodes)
-	for _, node := range g.Nodes {
+	data.TotalResources = len(g.GetNodes())
+	for _, node := range g.GetNodes() {
 		if node.IsWaste {
 			// Short Type Name
-			parts := strings.Split(node.Type, "::")
+			parts := strings.Split(node.TypeStr(), "::")
 			shortType := parts[len(parts)-1]
 
 			// Simple ID formatting
-			idShort := node.ID
-			if parts := strings.Split(node.ID, "/"); len(parts) > 1 {
+			idShort := node.IDStr()
+			if parts := strings.Split(node.IDStr(), "/"); len(parts) > 1 {
 				idShort = parts[len(parts)-1] // Just the ID part of ARN
 			}
 
@@ -608,28 +606,12 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 		values = append(values, c.Cost)
 	}
 
-	// Manually construct JSON arrays for template.
-	// Labels: ["Item1", "Item2"]
-	labelsStr := "["
-	for i, l := range labels {
-		if i > 0 {
-			labelsStr += ","
-		}
-		labelsStr += fmt.Sprintf("\"%s\"", l)
-	}
-	labelsStr += "]"
+	// Use json.Marshal via a helper to ensure safe XSS-free serialization.
+	labelsJSON, _ := json.Marshal(labels)
+	valuesJSON, _ := json.Marshal(values)
 
-	valuesStr := "["
-	for i, v := range values {
-		if i > 0 {
-			valuesStr += ","
-		}
-		valuesStr += fmt.Sprintf("%.2f", v)
-	}
-	valuesStr += "]"
-
-	data.ChartLabelsJSON = template.JS(labelsStr)
-	data.ChartValuesJSON = template.JS(valuesStr)
+	data.ChartLabelsJSON = template.JS(labelsJSON)
+	data.ChartValuesJSON = template.JS(valuesJSON)
 
 	// Sort items by cost.
 	sort.Slice(data.WasteItems, func(i, j int) bool {

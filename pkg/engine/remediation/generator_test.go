@@ -3,13 +3,16 @@ package remediation
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/sebdah/goldie/v2"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestGenerateSafeDeleteScript_Coverage(t *testing.T) {
+func TestGenerateRemediationPlan_Golden(t *testing.T) {
 	g := graph.NewGraph()
 
 	// 1. EC2 Instance
@@ -45,7 +48,7 @@ func TestGenerateSafeDeleteScript_Coverage(t *testing.T) {
 	g.AddNode("my-func", "AWS::Lambda::Function", map[string]interface{}{})
 	// 15. Log Group
 	g.AddNode("/aws/lambda/logs", "AWS::Logs::LogGroup", map[string]interface{}{})
-	
+
 	// 16. Non-Waste (Should be skipped)
 	g.AddNode("i-good", "AWS::EC2::Instance", map[string]interface{}{})
 
@@ -72,11 +75,6 @@ func TestGenerateSafeDeleteScript_Coverage(t *testing.T) {
 	g.MarkWaste("/aws/lambda/logs", 90)
 	g.MarkWaste("i-bad; rm -rf /", 90)
 
-	// 17. Malformed ID (Security Check)
-	g.Nodes = append(g.Nodes, &graph.Node{
-		ID: "i-bad; rm -rf /", Type: "AWS::EC2::Instance", IsWaste: true,
-	})
-
 	// Run Generator
 	tmpDir, err := os.MkdirTemp("", "cloudslash_cov_test")
 	if err != nil {
@@ -84,62 +82,80 @@ func TestGenerateSafeDeleteScript_Coverage(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	scriptPath := filepath.Join(tmpDir, "safe_cleanup.sh")
-	gen := NewGenerator(g)
-	if err := gen.GenerateSafeDeleteScript(scriptPath); err != nil {
+	planPath := filepath.Join(tmpDir, "remediation_plan.json")
+	gen := NewGenerator(g, nil)
+	if err := gen.GenerateRemediationPlan(planPath); err != nil {
 		t.Fatalf("Generation failed: %v", err)
 	}
 
-	contentBytes, _ := os.ReadFile(scriptPath)
+	contentBytes, _ := os.ReadFile(planPath)
+
+	// Normalize timestamps for stable Golden File comparison
 	content := string(contentBytes)
+	re := regexp.MustCompile(`"generated_at": ".*"`)
+	content = re.ReplaceAllString(content, `"generated_at": "2026-01-01T00:00:00Z"`)
 
-	// Define expectations (with Quoting!)
-	checks := []string{
-		"aws ec2 stop-instances --instance-ids 'i-inst1'",
-		"aws ec2 delete-volume --volume-id 'vol-del'",
-		"aws ec2 modify-volume --volume-id 'vol-gp2' --volume-type gp3",
-		"aws rds stop-db-instance --db-instance-identifier 'db-main'",
-		"aws ec2 delete-nat-gateway --nat-gateway-id 'nat-123'",
-		"aws ec2 release-address --allocation-id 'eipalloc-1'",
-		"aws ec2 deregister-image --image-id 'ami-old'",
-		"aws elbv2 delete-load-balancer --load-balancer-arn 'arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/app/my-lb/123'",
-		"aws ecs delete-cluster --cluster 'MyCluster'",
-		"aws ecs delete-service --cluster 'MyCluster' --service 'MyService' --force",
-		"aws eks delete-cluster --name 'MyEKSCluster'",
-		"aws eks delete-nodegroup --cluster-name 'MyEKSCluster' --nodegroup-name 'ng-1'",
-		"aws ecr delete-repository --repository-name 'my-repo' --force",
-		"aws lambda delete-function --function-name 'my-func'",
-		"aws logs delete-log-group --log-group-name '/aws/lambda/logs'",
-		"# SKIPPING MALFORMED ID",
-	}
+	// GOLDIE: Snapshot Testing
+	golder := goldie.New(t)
+	golder.Assert(t, "remediation_plan", []byte(content))
 
-	for _, check := range checks {
-		if !strings.Contains(content, check) {
-			t.Errorf("Missing expected command: %s", check)
-		}
-	}
-
-	if strings.Contains(content, "i-good") {
-		t.Error("Non-waste node was processed!")
+	// Verify no security bypass (manual check still valuable)
+	if strings.Contains(string(contentBytes), "i-good") {
+		assert.Fail(t, "Non-waste node was processed!")
 	}
 }
 
-func TestShellEscape(t *testing.T) {
-	cases := []struct {
-		input    string
-		expected string
-	}{
-		{"simple", "'simple'"},
-		{"has space", "'has space'"},
-		{"has'quote", "'has'\\''quote'"},
-		{"", "''"},
-		{"danger; rm -rf /", "'danger; rm -rf /'"},
+// TestGenerateBashScript_SecurityInjection ensures malicious IDs are escaped.
+func TestGenerateBashScript_SecurityInjection(t *testing.T) {
+	g := graph.NewGraph()
+	// Malicious ID that attempts to close the quote and inject a command
+	maliciousID := "i-123'; rm -rf /"
+	
+	g.AddNode(maliciousID, "AWS::EC2::Instance", map[string]interface{}{})
+	g.CloseAndWait()
+	g.MarkWaste(maliciousID, 100)
+	
+	tmpDir, _ := os.MkdirTemp("", "security_test")
+	defer os.RemoveAll(tmpDir)
+	
+	gen := NewGenerator(g, nil)
+	
+	// Generate the JSON plan first (in-memory simulation)
+	plan := TransactionManifest{
+		Version: "1.0", 
+		Actions: []PlanAction{
+			{
+				ID: maliciousID, 
+				Type: "AWS::EC2::Instance", 
+				Operation: "STOP",
+				Description: "Injection Test",
+				Parameters: map[string]interface{}{
+					"Region": "us-east-1",
+					"Tags": map[string]string{
+						"CloudSlash:ExpiryDate": "2026-01-01",
+					},
+				},
+			},
+		},
 	}
-
-	for _, tc := range cases {
-		got := shellEscape(tc.input)
-		if got != tc.expected {
-			t.Errorf("shellEscape(%q) = %q; want %q", tc.input, got, tc.expected)
-		}
+	
+	shPath := filepath.Join(tmpDir, "attack_test.sh")
+	err := gen.GenerateBashScript(shPath, plan)
+	assert.NoError(t, err)
+	
+	bytes, _ := os.ReadFile(shPath)
+	scriptContent := string(bytes)
+	
+	// Verify critical safety: The malicious payload must NOT exist without escaping
+	// Raw Injection check:
+	if strings.Contains(scriptContent, "--instance-ids i-123'; rm -rf /") {
+		t.Fatal("VULNERABILITY DETECTED: Payload injected raw into script.")
+	}
+	
+	// Verify it contains the escaped version.
+	// Bash strong quoting: 'i-123'\''...
+	expectedSnippet := `'i-123'\''`
+	if !strings.Contains(scriptContent, expectedSnippet) {
+		t.Errorf("Script did not contain expected escaping. Got:\n%s", scriptContent)
 	}
 }

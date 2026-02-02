@@ -46,8 +46,7 @@ func NewS3Backend(s3URL string) (*S3Backend, error) {
 
 func (b *S3Backend) Append(s Snapshot) error {
 	// Retrieve existing history.
-	// Note: S3 requires read-modify-write for append operations.
-	
+
 	existing, err := b.readAll()
 	if err != nil {
 		// Initialize empty history on 404.
@@ -56,8 +55,6 @@ func (b *S3Backend) Append(s Snapshot) error {
 
 	existing = append(existing, s)
 
-
-	
 	// Upload updated history.
 	var buf bytes.Buffer
 	for _, snap := range existing {
@@ -71,7 +68,7 @@ func (b *S3Backend) Append(s Snapshot) error {
 		Key:    aws.String(b.Key),
 		Body:   bytes.NewReader(buf.Bytes()),
 	})
-	
+
 	return err
 }
 
@@ -103,7 +100,7 @@ func (b *S3Backend) readAll() ([]Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	scanner := bufio.NewScanner(bytes.NewReader(bodyBytes))
 	for scanner.Scan() {
 		var s Snapshot

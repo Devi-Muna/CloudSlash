@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/resource"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
+// EC2Client abstracts the EC2 API.
 type EC2Client interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 	DescribeVolumes(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)
@@ -22,11 +24,13 @@ type EC2Client interface {
 	DescribeInstanceTypes(ctx context.Context, params *ec2.DescribeInstanceTypesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceTypesOutput, error)
 }
 
+// EC2Scanner scans EC2 resources.
 type EC2Scanner struct {
 	Client EC2Client
 	Graph  *graph.Graph
 }
 
+// NewEC2Scanner creates a new EC2 scanner.
 func NewEC2Scanner(cfg aws.Config, g *graph.Graph) *EC2Scanner {
 	return &EC2Scanner{
 		Client: ec2.NewFromConfig(cfg),
@@ -34,6 +38,7 @@ func NewEC2Scanner(cfg aws.Config, g *graph.Graph) *EC2Scanner {
 	}
 }
 
+// ScanInstances maps instances and their dependencies (VPC, Subnet, SG, AMI).
 func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 	paginator := ec2.NewDescribeInstancesPaginator(s.Client, &ec2.DescribeInstancesInput{})
 	uniqueTypes := make(map[string]bool)
@@ -55,30 +60,49 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 					"LaunchTime": instance.LaunchTime,
 					"Tags":       parseTags(instance.Tags),
 				}
-				
+
 				uniqueTypes[string(instance.InstanceType)] = true
 
-				s.Graph.AddNode(arn, "AWS::EC2::Instance", props)
+				// Create resource node with strict typing.
+				typedNode := &resource.EC2Instance{
+					BaseResource: resource.BaseResource{
+						ID:     arn,
+						Type:   "AWS::EC2::Instance",
+						Region: "unknown", // Iterate region if available in scanner context?
+						Tags:   parseTags(instance.Tags),
+					},
+					State:        string(instance.State.Name),
+					InstanceType: string(instance.InstanceType),
+					LaunchTime:   *instance.LaunchTime,
+					// VpcID/SubnetID handle pointers safely below
+				}
+				if instance.VpcId != nil {
+					typedNode.VpcID = *instance.VpcId
+				}
+				if instance.SubnetId != nil {
+					typedNode.SubnetID = *instance.SubnetId
+				}
+				if instance.ImageId != nil {
+					typedNode.ImageID = *instance.ImageId
+				}
 
-				// Map topology: Instance -> VPC.
+				s.Graph.AddTypedNode(arn, "AWS::EC2::Instance", props, typedNode)
+
 				if instance.VpcId != nil {
 					vpcARN := fmt.Sprintf("arn:aws:ec2:region:account:vpc/%s", *instance.VpcId)
 					s.Graph.AddTypedEdge(vpcARN, arn, graph.EdgeTypeContains, 100)
 				}
 
-				// Map topology: Instance -> Subnet.
 				if instance.SubnetId != nil {
 					subnetARN := fmt.Sprintf("arn:aws:ec2:region:account:subnet/%s", *instance.SubnetId)
 					s.Graph.AddTypedEdge(subnetARN, arn, graph.EdgeTypeContains, 100)
 				}
 
-				// Map topology: Instance -> Security Groups (Forensics).
 				for _, sg := range instance.SecurityGroups {
 					sgARN := fmt.Sprintf("arn:aws:ec2:region:account:security-group/%s", *sg.GroupId)
 					s.Graph.AddTypedEdge(arn, sgARN, graph.EdgeTypeSecuredBy, 100)
 				}
 
-				// Map topology: Instance -> Source AMI (Provenance).
 				if instance.ImageId != nil {
 					amiARN := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", *instance.ImageId)
 					s.Graph.AddTypedEdge(arn, amiARN, graph.EdgeTypeUses, 100)
@@ -87,16 +111,14 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 		}
 	}
 
-	// Hydrate the Instance Type catalog to ensure accurate pricing and right-sizing analysis.
 	var observedTypes []string
 	for k := range uniqueTypes {
 		observedTypes = append(observedTypes, k)
 	}
 
 	if len(observedTypes) > 0 {
-		// Await spec synchronization.
 		if err := UpdateSpecsCache(ctx, s.Client, observedTypes); err != nil {
-			// Log warning on failure; fallback logic will be used.
+			// Log warning on failure.
 			fmt.Printf("Warning: Spec sync failed (using static catalog): %v\n", err)
 		}
 	}
@@ -104,6 +126,7 @@ func (s *EC2Scanner) ScanInstances(ctx context.Context) error {
 	return nil
 }
 
+// ScanVolumes scans EBS volumes.
 func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 	paginator := ec2.NewDescribeVolumesPaginator(s.Client, &ec2.DescribeVolumesInput{})
 	for paginator.HasMorePages() {
@@ -112,12 +135,12 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 			return fmt.Errorf("failed to describe volumes: %v", err)
 		}
 
-		// Batch volume IDs for efficient modification checks.
+		// Optimize API calls by batch-checking modification status.
 		var volIDs []string
 		for _, v := range page.Volumes {
 			volIDs = append(volIDs, *v.VolumeId)
 		}
-		
+
 		modMap := s.getVolumeModifications(ctx, volIDs)
 
 		for _, volume := range page.Volumes {
@@ -125,23 +148,23 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 			arn := fmt.Sprintf("arn:aws:ec2:region:account:volume/%s", id)
 
 			props := map[string]interface{}{
-				"State":      string(volume.State),
-				"Size":       *volume.Size,
-				"VolumeType": string(volume.VolumeType),
-				"CreateTime": volume.CreateTime,
-				"Tags":       parseTags(volume.Tags),
-				"IsModifying": modMap[id], // Indicate if the volume is currently undergoing modification.
+				"State":       string(volume.State),
+				"Size":        *volume.Size,
+				"VolumeType":  string(volume.VolumeType),
+				"CreateTime":  volume.CreateTime,
+				"Tags":        parseTags(volume.Tags),
+				"IsModifying": modMap[id], // Track modification.
 			}
 
 			s.Graph.AddNode(arn, "AWS::EC2::Volume", props)
 
-			// Link the volume to attached instances.
+			// create edges for volume attachments.
 			for _, att := range volume.Attachments {
 				if att.InstanceId != nil {
 					instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", *att.InstanceId)
 					s.Graph.AddTypedEdge(arn, instanceARN, graph.EdgeTypeAttachedTo, 100)
 
-					// Capture termination behavior for waste analysis (orphaned volume risk).
+					// Record termination behavior for safety analysis.
 					props["DeleteOnTermination"] = att.DeleteOnTermination
 					props["AttachedInstanceId"] = *att.InstanceId
 				}
@@ -151,13 +174,15 @@ func (s *EC2Scanner) ScanVolumes(ctx context.Context) error {
 	return nil
 }
 
+// getVolumeModifications checks for active volume modifications.
 func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string) map[string]bool {
 	out := make(map[string]bool)
-	if len(volIDs) == 0 { return out }
-	
-	// Query the API for modification status (Optimizing/Modifying).
-	// Pagination is managed by the caller.
-	
+	if len(volIDs) == 0 {
+		return out
+	}
+
+	// Describe volume modifications to detect optimization activities.
+
 	resp, err := s.Client.DescribeVolumesModifications(ctx, &ec2.DescribeVolumesModificationsInput{
 		VolumeIds: volIDs,
 	})
@@ -165,8 +190,8 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 		// Return empty map on error.
 		return out
 	}
-	
-	// Check for active modification states.
+
+	// Check modification.
 	for _, mod := range resp.VolumesModifications {
 		state := mod.ModificationState
 		if state == types.VolumeModificationStateModifying || state == types.VolumeModificationStateOptimizing {
@@ -176,6 +201,7 @@ func (s *EC2Scanner) getVolumeModifications(ctx context.Context, volIDs []string
 	return out
 }
 
+// ScanNatGateways scans NAT Gateways.
 func (s *EC2Scanner) ScanNatGateways(ctx context.Context) error {
 	paginator := ec2.NewDescribeNatGatewaysPaginator(s.Client, &ec2.DescribeNatGatewaysInput{})
 	for paginator.HasMorePages() {
@@ -199,6 +225,7 @@ func (s *EC2Scanner) ScanNatGateways(ctx context.Context) error {
 	return nil
 }
 
+// ScanAddresses scans Elastic IPs.
 func (s *EC2Scanner) ScanAddresses(ctx context.Context) error {
 	result, err := s.Client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if err != nil {
@@ -225,6 +252,7 @@ func (s *EC2Scanner) ScanAddresses(ctx context.Context) error {
 	return nil
 }
 
+// ScanSnapshots scans EBS snapshots, filtered by owner.
 func (s *EC2Scanner) ScanSnapshots(ctx context.Context, ownerID string) error {
 	input := &ec2.DescribeSnapshotsInput{
 		OwnerIds: []string{"self"},
@@ -256,6 +284,7 @@ func (s *EC2Scanner) ScanSnapshots(ctx context.Context, ownerID string) error {
 	return nil
 }
 
+// ScanImages discovers self-owned AMIs.
 func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 	input := &ec2.DescribeImagesInput{
 		Owners: []string{"self"},
@@ -270,27 +299,27 @@ func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 		arn := fmt.Sprintf("arn:aws:ec2:region:account:image/%s", id)
 
 		props := map[string]interface{}{
-			"State":        string(img.State),
-			"Name":         *img.Name,
-			"Tags":         parseTags(img.Tags),
+			"State": string(img.State),
+			"Name":  *img.Name,
+			"Tags":  parseTags(img.Tags),
 		}
 
-			// Parse creation timestamp.
-			if img.CreationDate != nil {
-				t, err := time.Parse("2006-01-02T15:04:05.000Z", *img.CreationDate)
-				if err == nil {
-					props["CreateTime"] = t
-				} else {
-					props["CreationDate"] = *img.CreationDate
-				}
+		// Parse creation timestamp.
+		if img.CreationDate != nil {
+			t, err := time.Parse("2006-01-02T15:04:05.000Z", *img.CreationDate)
+			if err == nil {
+				props["CreateTime"] = t
+			} else {
+				props["CreationDate"] = *img.CreationDate
 			}
+		}
 		s.Graph.AddNode(arn, "AWS::EC2::AMI", props)
 
-		// Link AMI to its source snapshots.
+		// Map underlying snapshots.
 		for _, bdm := range img.BlockDeviceMappings {
 			if bdm.Ebs != nil && bdm.Ebs.SnapshotId != nil {
 				snapARN := fmt.Sprintf("arn:aws:ec2:region:account:snapshot/%s", *bdm.Ebs.SnapshotId)
-				// Create lineage edge from AMI to Snapshot.
+				// Create lineage.
 				s.Graph.AddTypedEdge(arn, snapARN, graph.EdgeTypeContains, 100)
 			}
 		}
@@ -298,6 +327,7 @@ func (s *EC2Scanner) ScanImages(ctx context.Context) error {
 	return nil
 }
 
+// parseTags converts AWS tags to a map.
 func parseTags(tags []types.Tag) map[string]string {
 	out := make(map[string]string)
 	for _, t := range tags {

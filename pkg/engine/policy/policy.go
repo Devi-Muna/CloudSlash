@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/config"
+	"github.com/DrSkyle/cloudslash/v2/pkg/config"
 )
 
 // Policy constraints automated optimization.

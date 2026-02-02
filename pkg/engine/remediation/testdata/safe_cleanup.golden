@@ -1,0 +1,84 @@
+#!/bin/bash
+# CloudSlash Safe Remediation Script (Purgatory Mode)
+# Generated: 2026-01-01T00:00:00Z
+
+set -e
+
+function ensure_deleted() {
+  local cmd="$@"
+  if ! OUTPUT=$(eval "$cmd" 2>&1); then
+      if echo "$OUTPUT" | grep -qE "NotFound|Does not exist|InvalidInstanceID.NotFound|InvalidVolume.NotFound|NoSuchEntity|ResourceNotFoundException|InvalidParameterValue"; then
+          echo "  [IDEMPOTENT] Resource already gone."
+      else
+          echo "  [ERROR] $OUTPUT"
+          return 1
+      fi
+  fi
+}
+
+# Tombstone created: .cloudslash/tombstones/i-inst1.json
+echo "[Purgatory] Tagging & Stopping Instance: i-inst1"
+aws ec2 create-tags --resources 'i-inst1' --tags Key=CloudSlash:Status,Value=Purgatory Key=CloudSlash:ExpiryDate,Value=2026-03-03
+aws ec2 stop-instances --instance-ids 'i-inst1'
+
+# Tombstone created: .cloudslash/tombstones/vol-del.json
+echo "[Purgatory] Tagging & Deleting Volume: vol-del"
+aws ec2 create-tags --resources 'vol-del' --tags Key=CloudSlash:Status,Value=Purgatory Key=CloudSlash:ExpiryDate,Value=2026-03-03
+ensure_deleted aws ec2 delete-volume --volume-id 'vol-del'
+
+# Tombstone created: .cloudslash/tombstones/vol-gp2.json
+echo "[Modernization] Upgrading Volume to GP3: vol-gp2"
+aws ec2 modify-volume --volume-id 'vol-gp2' --volume-type gp3
+
+# Tombstone created: .cloudslash/tombstones/db-main.json
+echo "[Purgatory] Tagging & Stopping RDS: db-main"
+aws rds add-tags-to-resource --resource-name 'db-main' --tags Key=CloudSlash:Status,Value=Purgatory Key=CloudSlash:ExpiryDate,Value=2026-03-03
+aws rds stop-db-instance --db-instance-identifier 'db-main'
+
+# Tombstone created: .cloudslash/tombstones/nat-123.json
+echo "[Purgatory] Deleting NAT Gateway: nat-123"
+ensure_deleted aws ec2 delete-nat-gateway --nat-gateway-id 'nat-123'
+
+# Tombstone created: .cloudslash/tombstones/eipalloc-1.json
+echo "[Purgatory] Releasing Elastic IP: eipalloc-1"
+ensure_deleted aws ec2 release-address --allocation-id 'eipalloc-1'
+
+# Tombstone created: .cloudslash/tombstones/ami-old.json
+echo "[Purgatory] Deregistering AMI: ami-old"
+ensure_deleted aws ec2 deregister-image --image-id 'ami-old'
+
+# Tombstone created: .cloudslash/tombstones/123.json
+echo "[Purgatory] Deleting Load Balancer: 123"
+ensure_deleted aws elbv2 delete-load-balancer --load-balancer-arn 'arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/app/my-lb/123'
+
+# Tombstone created: .cloudslash/tombstones/MyCluster.json
+echo "[Purgatory] Deleting ECS Cluster: MyCluster"
+ensure_deleted aws ecs delete-cluster --cluster 'MyCluster'
+
+# Tombstone created: .cloudslash/tombstones/MyService.json
+echo "[Purgatory] Deleting ECS Service: MyService (Cluster: MyCluster)"
+ensure_deleted aws ecs delete-service --cluster 'MyCluster' --service 'MyService' --force
+
+# Tombstone created: .cloudslash/tombstones/MyEKSCluster.json
+echo "[Purgatory] Deleting EKS Cluster: MyEKSCluster"
+ensure_deleted aws eks delete-cluster --name 'MyEKSCluster'
+
+# Tombstone created: .cloudslash/tombstones/ng-1.json
+echo "[Purgatory] Deleting EKS NodeGroup: ng-1 (Cluster: MyEKSCluster)"
+ensure_deleted aws eks delete-nodegroup --cluster-name 'MyEKSCluster' --nodegroup-name 'ng-1'
+
+# Tombstone created: .cloudslash/tombstones/my-repo.json
+echo "[Purgatory] Deleting ECR Repository: my-repo"
+ensure_deleted aws ecr delete-repository --repository-name 'my-repo' --force
+
+# Tombstone created: .cloudslash/tombstones/my-func.json
+echo "[Purgatory] Deleting Lambda Function: my-func"
+ensure_deleted aws lambda delete-function --function-name 'my-func'
+
+# ERROR: Failed to create tombstone for /aws/lambda/logs: open .cloudslash/tombstones/aws/lambda/logs.json: no such file or directory
+echo "[Purgatory] Deleting Log Group: /aws/lambda/logs"
+ensure_deleted aws logs delete-log-group --log-group-name '/aws/lambda/logs'
+
+# SKIPPING MALFORMED ID (Potential Injection): i-bad; rm -rf /
+# SKIPPING MALFORMED ID (Potential Injection): i-bad; rm -rf /
+echo "Purgatory Enforcement Complete. 15 resources frozen."

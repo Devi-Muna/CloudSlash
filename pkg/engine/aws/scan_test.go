@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
-// MockEC2Client implements EC2Client for testing.
+// MockEC2Client implements a mock EC2Client for unit testing purposes.
 type MockEC2Client struct {
 	DescribeVolumesFunc func(ctx context.Context, params *ec2.DescribeVolumesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVolumesOutput, error)
 	// Add other mock functions if needed
@@ -28,7 +28,7 @@ func (m *MockEC2Client) DescribeVolumes(ctx context.Context, params *ec2.Describ
 	return &ec2.DescribeVolumesOutput{}, nil
 }
 
-// Stubs for other interface methods
+// Output stubs for other interface methods to satisfy the contract.
 func (m *MockEC2Client) DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
 	return &ec2.DescribeInstancesOutput{}, nil
 }
@@ -103,7 +103,7 @@ func TestScanVolumes(t *testing.T) {
 				if node == nil {
 					t.Fatal("Volume not found in graph")
 				}
-				
+
 				// Verify edge to instance exists
 				downstream := g.GetDownstream(nodeID)
 				foundEdge := false

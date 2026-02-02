@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 // CIDecorator manages integration with CI/CD environments.
 type CIDecorator struct {
 	logger   *slog.Logger
-	Provider string // "github", "gitlab", or ""
+	Provider string
 }
 
 // NewCIDecorator initializes the decorator based on the environment.
@@ -40,7 +40,7 @@ func NewCIDecorator(logger *slog.Logger) *CIDecorator {
 	}
 }
 
-// Run executes reporting logic (summary and comments).
+// Run executes reporting logic.
 func (d *CIDecorator) Run(summary Summary, g *graph.Graph) error {
 	if d.Provider == "" {
 		return nil // Not in CI
@@ -85,38 +85,38 @@ func (d *CIDecorator) manageGitLabComment(token, content string) error {
 	if apiBase == "" {
 		apiBase = "https://gitlab.com/api/v4"
 	}
-	
+
 	projectID := os.Getenv("CI_PROJECT_ID")
 	mrIID := os.Getenv("CI_MERGE_REQUEST_IID")
-	
+
 	if projectID == "" || mrIID == "" {
 		return fmt.Errorf("not in a Merge Request context (missing CI_PROJECT_ID or CI_MERGE_REQUEST_IID)")
 	}
 
 	// Note: Appending new note for simplicity.
 	// POST a new note (stateless).
-	
+
 	url := fmt.Sprintf("%s/projects/%s/merge_requests/%s/notes", apiBase, projectID, mrIID)
-	
+
 	payload := map[string]string{"body": content}
 	payloadBytes, _ := json.Marshal(payload)
-	
+
 	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
 	req.Header.Set("PRIVATE-TOKEN", token)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API %s: %s", resp.Status, string(body))
 	}
-	
+
 	d.logger.Info("Posted results to GitLab MR")
 	return nil
 }
@@ -125,7 +125,7 @@ func (d *CIDecorator) generateMarkdown(s Summary, g *graph.Graph) string {
 	var sb strings.Builder
 
 	sb.WriteString("### ☁️ CloudSlash Infrastructure Audit\n\n")
-	
+
 	// KPI Table.
 	sb.WriteString("| Metric | Value |\n")
 	sb.WriteString("| :--- | :--- |\n")
@@ -141,11 +141,11 @@ func (d *CIDecorator) generateMarkdown(s Summary, g *graph.Graph) string {
 
 		count := 0
 		g.Mu.RLock()
-		for _, n := range g.Nodes {
-			if n.IsWaste {
+		for _, node := range g.GetNodes() {
+			if node.IsWaste {
 				// Escape table formatting characters.
-				reason := strings.ReplaceAll(n.WasteReason, "|", "\\|")
-				sb.WriteString(fmt.Sprintf("| `%s` | %s | **$%.2f** | %s |\n", n.ID, n.Type, n.Cost, reason))
+				reason := strings.ReplaceAll(node.WasteReason, "|", "\\|")
+				sb.WriteString(fmt.Sprintf("| `%s` | %s | **$%.2f** | %s |\n", node.IDStr(), node.TypeStr(), node.Cost, reason))
 				count++
 				if count >= 10 { // Limit table size
 					break
@@ -204,16 +204,16 @@ func (d *CIDecorator) manageGitHubComment(token, prID, content string) error {
 	if repo == "" {
 		return fmt.Errorf("GITHUB_REPOSITORY not set")
 	}
-	
+
 	apiBase := os.Getenv("GITHUB_API_URL")
 	if apiBase == "" {
 		apiBase = "https://api.github.com"
 	}
-	
+
 	// 1. List Comments to find existing one
 	// GET /repos/{owner}/{repo}/issues/{issue_number}/comments
 	listURL := fmt.Sprintf("%s/repos/%s/issues/%s/comments", apiBase, repo, prID)
-	
+
 	req, _ := http.NewRequest("GET", listURL, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
@@ -230,7 +230,7 @@ func (d *CIDecorator) manageGitHubComment(token, prID, content string) error {
 		// Ignore decode error, might be empty body or 404
 	}
 
-	var commentID float64 
+	var commentID float64
 	for _, c := range comments {
 		body, _ := c["body"].(string)
 		if strings.Contains(body, "### ☁️ CloudSlash Infrastructure Audit") {
@@ -259,13 +259,13 @@ func (d *CIDecorator) manageGitHubComment(token, prID, content string) error {
 	req, _ = http.NewRequest(method, targetURL, bytes.NewBuffer(payloadBytes))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	resp2, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp2.Body.Close()
-	
+
 	if resp2.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp2.Body)
 		return fmt.Errorf("API %s: %s", resp2.Status, string(body))

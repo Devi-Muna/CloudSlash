@@ -3,7 +3,7 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	// Future-Glass Palette
+	// UI Color Palette (High Contrast / Dark Mode).
 	colorNeonGreen  = lipgloss.Color("#00FF99") // Main Action / Success
 	colorNeonPurple = lipgloss.Color("#874BFD") // Header / Border
 	colorDarkGray   = lipgloss.Color("#1E293B") // Background Elements
@@ -12,7 +12,7 @@ var (
 	colorDanger     = lipgloss.Color("#FF0055") // Critical / Delete
 	colorWarning    = lipgloss.Color("#F59E0B") // Warning
 
-	// Shared Styles
+	// Reusable UI Component Styles.
 	subtle    = lipgloss.NewStyle().Foreground(colorTextSub)
 	dimStyle  = lipgloss.NewStyle().Foreground(colorTextSub) // Alias for subtle text
 	highlight = lipgloss.NewStyle().Foreground(colorNeonPurple).Bold(true)
@@ -31,7 +31,7 @@ var (
 			Padding(1, 2).
 			Margin(0, 1)
 
-	// HUD Styles
+	// Heads-Up Display (HUD) Styles.
 	hudStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(colorNeonPurple).
@@ -42,31 +42,31 @@ var (
 			Foreground(colorTextSub).
 			Bold(true).
 			MarginRight(1)
-	
+
 	hudValueStyle = lipgloss.NewStyle().
 			Foreground(colorNeonGreen).
 			Bold(true)
 
-	// List Styles
+	// Resource List View Styles.
 	listSelectedStyle = lipgloss.NewStyle().
-			Foreground(colorTextMain).
-			Background(lipgloss.Color("#331832")). // Very subtle purple bg
-			Bold(true).
-			Padding(0).
-			Margin(0)
+				Foreground(colorTextMain).
+				Background(lipgloss.Color("#331832")). // Very subtle purple bg
+				Bold(true).
+				Padding(0).
+				Margin(0)
 
 	listNormalStyle = lipgloss.NewStyle().
 			Foreground(colorTextSub).
 			Padding(0).
 			Margin(0)
 
-	// Icon Styles (Text Based - No Emojis)
+	// Status Indicators (Text-only for compatibility).
 	iconCritical = lipgloss.NewStyle().Foreground(colorDanger).SetString("[CRITICAL]")
 	iconWarn     = lipgloss.NewStyle().Foreground(colorWarning).SetString("[WARN]")
 	iconSafe     = lipgloss.NewStyle().Foreground(colorNeonGreen).SetString("[SAFE]")
 	iconInfo     = lipgloss.NewStyle().Foreground(colorNeonPurple).SetString("[INFO]")
 
-	// Details Pane
+	// Resource Detail Panel Styles.
 	detailsBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
 			BorderForeground(colorNeonGreen).

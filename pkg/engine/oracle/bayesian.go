@@ -3,7 +3,7 @@ package oracle
 import (
 	"sync"
 
-	"github.com/DrSkyle/cloudslash/pkg/config"
+	"github.com/DrSkyle/cloudslash/v2/pkg/config"
 )
 
 // RiskEngine models resource stability and preemption risk.
@@ -24,7 +24,7 @@ func NewRiskEngine(cfg config.RiskConfig) *RiskEngine {
 func (re *RiskEngine) RecordInterruption(zone, instanceType string) {
 	re.Mu.Lock()
 	defer re.Mu.Unlock()
-	
+
 	key := zone + ":" + instanceType
 	re.History[key] = re.Config.InterruptionPenalty
 }

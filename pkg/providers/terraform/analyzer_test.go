@@ -3,15 +3,16 @@ package terraform
 import (
 	"testing"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/sys/intern"
 )
 
 func TestAnalyze_ModuleAwareness(t *testing.T) {
 	// 1. Setup Mock Zombies (from "Scan")
 	zombies := []*graph.Node{
-		{ID: "i-zombie-1", IsWaste: true}, // Belongs to Module A
-		{ID: "i-zombie-2", IsWaste: true}, // Belongs to Module A
-		{ID: "vol-zombie-3", IsWaste: true}, // Belongs to Module B (Partial)
+		{ID: intern.Get("i-zombie-1"), IsWaste: true},   // Belongs to Module A
+		{ID: intern.Get("i-zombie-2"), IsWaste: true},   // Belongs to Module A
+		{ID: intern.Get("vol-zombie-3"), IsWaste: true}, // Belongs to Module B (Partial)
 	}
 
 	// 2. Setup Mock Terraform State
@@ -48,10 +49,10 @@ func TestAnalyze_ModuleAwareness(t *testing.T) {
 	}
 
 	// 3. Run Analysis
-	report := Analyze(zombies, state)
+	report := Analyze(state, zombies)
 
 	// 4. Verify Verdict
-	
+
 	// Expect Module A to be in ModulesToDelete
 	foundMod := false
 	for _, m := range report.ModulesToDelete {

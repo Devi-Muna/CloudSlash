@@ -3,12 +3,13 @@ package aws
 import (
 	"context"
 	"fmt"
-	
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 )
 
+// IAMClient handles policy simulation.
 type IAMClient struct {
 	Client *iam.Client
 }
@@ -19,11 +20,8 @@ func NewIAMClient(cfg aws.Config) *IAMClient {
 	}
 }
 
-// SimulatePrivileges verifies permissions using the AWS Policy Simulator.
-// Returns potentially dangerous permissions granted globally ("*").
+// SimulatePrivileges checks for dangerous actions.
 func (c *IAMClient) SimulatePrivileges(ctx context.Context, roleArn string) ([]string, error) {
-	// Verify if the role can perform destructive actions globally.
-	// Checks for wildcard permission grants.
 	dangerousActions := []string{
 		"s3:DeleteBucket",
 		"ec2:TerminateInstances",
@@ -35,7 +33,7 @@ func (c *IAMClient) SimulatePrivileges(ctx context.Context, roleArn string) ([]s
 	input := &iam.SimulatePrincipalPolicyInput{
 		PolicySourceArn: aws.String(roleArn),
 		ActionNames:     dangerousActions,
-		ResourceArns:    []string{"*"}, // Check global impact
+		ResourceArns:    []string{"*"}, // Check for broad, un-scoped permissions.
 	}
 
 	out, err := c.Client.SimulatePrincipalPolicy(ctx, input)
@@ -55,7 +53,7 @@ func (c *IAMClient) SimulatePrivileges(ctx context.Context, roleArn string) ([]s
 	return confirmedRisks, nil
 }
 
-// GetRolesFromInstanceProfile retrieves role ARNs for a given profile.
+// GetRolesFromInstanceProfile retrieves associated roles.
 func (c *IAMClient) GetRolesFromInstanceProfile(ctx context.Context, profileName string) ([]string, error) {
 	out, err := c.Client.GetInstanceProfile(ctx, &iam.GetInstanceProfileInput{
 		InstanceProfileName: aws.String(profileName),

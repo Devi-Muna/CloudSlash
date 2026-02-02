@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
+// ECSScanner scans ECS clusters and services.
 type ECSScanner struct {
 	Client *ecs.Client
 	Graph  *graph.Graph
@@ -22,6 +23,7 @@ func NewECSScanner(cfg aws.Config, g *graph.Graph) *ECSScanner {
 	}
 }
 
+// ScanClusters scans clusters and their components.
 func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 	paginator := ecs.NewListClustersPaginator(s.Client, &ecs.ListClustersInput{})
 	var clusterARNs []string
@@ -38,7 +40,7 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 		return nil
 	}
 
-	// Batch cluster description requests (limit 100).
+	// Process clusters in batches of 100 to respect API limits.
 	chunkSize := 100
 	for i := 0; i < len(clusterARNs); i += chunkSize {
 		end := i + chunkSize
@@ -58,7 +60,7 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 
 		for _, cluster := range output.Clusters {
 			s.addClusterNode(cluster)
-			// Scan services and container instances for each cluster.
+			// Recursively scan cluster components.
 			if err := s.ScanServices(ctx, *cluster.ClusterArn); err != nil {
 				fmt.Printf("Error scanning services for cluster %s: %v\n", *cluster.ClusterName, err)
 			}
@@ -71,6 +73,7 @@ func (s *ECSScanner) ScanClusters(ctx context.Context) error {
 	return nil
 }
 
+// addClusterNode adds a cluster node to the graph.
 func (s *ECSScanner) addClusterNode(cluster types.Cluster) {
 	s.Graph.AddNode(*cluster.ClusterArn, "AWS::ECS::Cluster", map[string]interface{}{
 		"Name":                              *cluster.ClusterName,
@@ -82,6 +85,7 @@ func (s *ECSScanner) addClusterNode(cluster types.Cluster) {
 	})
 }
 
+// ScanServices scans services in a cluster.
 func (s *ECSScanner) ScanServices(ctx context.Context, clusterArn string) error {
 	paginator := ecs.NewListServicesPaginator(s.Client, &ecs.ListServicesInput{
 		Cluster: aws.String(clusterArn),
@@ -124,14 +128,15 @@ func (s *ECSScanner) ScanServices(ctx context.Context, clusterArn string) error 
 	return nil
 }
 
+// addServiceNode links a service to its cluster.
 func (s *ECSScanner) addServiceNode(service types.Service, clusterArn string) {
 	events := []string{}
-	// Capture recent service events.
+	// Capture events.
 	for i := 0; i < len(service.Events) && i < 3; i++ {
 		events = append(events, *service.Events[i].Message)
 	}
 
-	// Retrieve Task Definition ARN for image analysis.
+	// Get TaskDef.
 	taskDef := ""
 	if service.TaskDefinition != nil {
 		taskDef = *service.TaskDefinition
@@ -151,6 +156,7 @@ func (s *ECSScanner) addServiceNode(service types.Service, clusterArn string) {
 	s.Graph.AddTypedEdge(clusterArn, *service.ServiceArn, graph.EdgeTypeContains, 1)
 }
 
+// ScanContainerInstances scans container instances in a cluster.
 func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn string) error {
 	paginator := ecs.NewListContainerInstancesPaginator(s.Client, &ecs.ListContainerInstancesInput{
 		Cluster: aws.String(clusterArn),
@@ -186,11 +192,11 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 		}
 
 		for _, ci := range output.ContainerInstances {
-			// Add Container Instance Node
-			// Map container instance to its underlying EC2 instance.
+			// Add Node.
+			// Map EC2 instance.
 			ec2InstanceID := *ci.Ec2InstanceId
 
-			// Capture registration time for uptime analysis.
+
 
 			s.Graph.AddNode(*ci.ContainerInstanceArn, "AWS::ECS::ContainerInstance", map[string]interface{}{
 				"ClusterArn":    clusterArn,
@@ -200,10 +206,9 @@ func (s *ECSScanner) ScanContainerInstances(ctx context.Context, clusterArn stri
 			})
 			s.Graph.AddTypedEdge(clusterArn, *ci.ContainerInstanceArn, graph.EdgeType("HAS_INSTANCE"), 1)
 
-			// Create edge to EC2 instance node.
+			// Create EC2 edge.
 			ec2Arn := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", ec2InstanceID)
-			// Construct EC2 ARN for cross-referencing.
-			_ = ec2Arn
+			s.Graph.AddTypedEdge(*ci.ContainerInstanceArn, ec2Arn, graph.EdgeType("RUNS_ON"), 1)
 		}
 	}
 	return nil

@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudtrail/types"
 )
 
+// CloudTrailClient queries audit trails.
 type CloudTrailClient struct {
 	Client *cloudtrail.Client
 }
@@ -20,14 +21,13 @@ func NewCloudTrailClient(cfg aws.Config) *CloudTrailClient {
 	}
 }
 
-// LookupCreator queries CloudTrail for the IAM identity that created a resource.
-// Searches a 90-day event window.
+// LookupCreator searches CloudTrail for the resource creator (90 days).
 func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string) (string, error) {
-	// Define the 90-day search window.
+	// 90-day window.
 	endTime := time.Now()
 	startTime := endTime.AddDate(0, 0, -90)
 
-	// Configure lookup parameters.
+	// Lookup params.
 	attrKey := types.LookupAttributeKeyResourceName
 
 	input := &cloudtrail.LookupEventsInput{
@@ -42,10 +42,10 @@ func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string)
 		MaxResults: aws.Int32(50),
 	}
 
-	// Execute the CloudTrail lookup.
+	// Query CloudTrail.
 	paginator := cloudtrail.NewLookupEventsPaginator(c.Client, input)
 
-	// Process only the first page of results.
+	// Process first page.
 	if paginator.HasMorePages() {
 		output, err := paginator.NextPage(ctx)
 		if err != nil {
@@ -53,7 +53,7 @@ func (c *CloudTrailClient) LookupCreator(ctx context.Context, resourceID string)
 		}
 
 		for _, event := range output.Events {
-			// Filter for resource creation events.
+			// Check for resource creation events.
 			eventName := aws.ToString(event.EventName)
 			if isCreationEvent(eventName) {
 				return aws.ToString(event.Username), nil

@@ -28,11 +28,11 @@ func GenerateRestorationMessage(resourceType, oldID, newID, tfAddress string) st
 	sb.WriteString("ACTION REQUIRED: Synchronization\n")
 	sb.WriteString("The resource exists in AWS but is disconnected from Terraform state.\n")
 	sb.WriteString("To fix this 'Drift', run the following command in your terminal:\n\n")
-	
+
 	cmd := GenerateImportCommand(tfAddress, newID)
 	sb.WriteString(fmt.Sprintf("  %s\n\n", cmd))
-	
+
 	sb.WriteString("Why? This avoids state corruption by forcing a clean import.\n")
-	
+
 	return sb.String()
 }

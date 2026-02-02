@@ -5,15 +5,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 // viewTopology renders the ECS hierarchy tree
 func (m Model) viewTopology() string {
 	s := strings.Builder{}
 
-	// Header
+	// Topology Header: Hierarchy | Status | Info.
 	headerTxt := fmt.Sprintf("   %-60s | %-10s | %s", "TOPOLOGY HIERARCHY (Cluster -> Service -> Task)", "STATUS", "INFO")
 	s.WriteString(dimStyle.Render(headerTxt) + "\n")
 	s.WriteString(dimStyle.Render("   "+strings.Repeat("─", 60)) + "\n")
@@ -25,7 +24,7 @@ func (m Model) viewTopology() string {
 		return "\n\n   " + subtle.Render("No Clusters Detected.")
 	}
 
-	// Pagination window logic for topology
+	// Viewport Calculation.
 	start, end := m.calculateTopologyWindow(len(m.topologyLines))
 
 	for i := start; i < end; i++ {
@@ -39,17 +38,17 @@ func (m Model) viewTopology() string {
 
 		// Render the tree line
 		treePart := line.Text
-		
+
 		// Status / Info columns
 		status := "Unknown"
 		info := ""
-		
+
 		if line.Node != nil {
 			if s, ok := line.Node.Properties["Status"].(string); ok {
 				status = s
 			}
 			// Add specific info based on type
-			switch line.Node.Type {
+			switch line.Node.TypeStr() {
 			case "AWS::ECS::Service":
 				if rc, ok := line.Node.Properties["RunningCount"].(int); ok {
 					info = fmt.Sprintf("Running: %d", rc)
@@ -92,18 +91,17 @@ func (m *Model) buildTopology() {
 	// 1. Find Roots (Clusters)
 	var clusters []*graph.Node
 	m.Graph.Mu.RLock()
-	for _, n := range m.Graph.Nodes {
-		if n.Type == "AWS::ECS::Cluster" {
-			clusters = append(clusters, n)
+	for _, node := range m.Graph.GetNodes() {
+		if node.TypeStr() == "AWS::ECS::Cluster" {
+			clusters = append(clusters, node)
 		}
 	}
 	m.Graph.Mu.RUnlock()
 
 	// Sort clusters for stability
 	sort.Slice(clusters, func(i, j int) bool {
-		return clusters[i].ID < clusters[j].ID
+		return clusters[i].IDStr() < clusters[j].IDStr()
 	})
-
 
 	// 2. Traverse
 	for i, cluster := range clusters {
@@ -114,21 +112,21 @@ func (m *Model) buildTopology() {
 		}
 
 		// Add Cluster Line
-		clusterName := cluster.ID
+		clusterName := cluster.IDStr()
 		if name, ok := cluster.Properties["Name"].(string); ok {
 			clusterName = name
 		}
-		
-		// Professional Indicator: [Cluster]
+
+		// Indicator: Cluster [C].
 		lines = append(lines, TopologyLine{
-			ID:    cluster.ID,
+			ID:    cluster.IDStr(),
 			Text:  prefix + "[C] " + clusterName,
 			Level: 0,
 			Node:  cluster,
 		})
 
-		children := m.Graph.GetDownstream(cluster.ID)
-		
+		children := m.Graph.GetDownstream(cluster.IDStr())
+
 		// Sort children
 		sort.Strings(children)
 
@@ -147,18 +145,18 @@ func (m *Model) buildTopology() {
 
 			// Resolve Node
 			childNode := m.Graph.GetNode(childID)
-			
+
 			if childNode != nil {
-				childName := childNode.ID
+				childName := childNode.IDStr()
 				if name, ok := childNode.Properties["Name"].(string); ok {
 					childName = name
 				}
-				
-				// Professional Indicator: [Service] or [Inst]
-				typeIndicator := "[S]" // Service
-				if childNode.Type == "AWS::ECS::ContainerInstance" {
+
+				// Indicator: Service [S], Instance [I], or Task [T].
+				typeIndicator := "[S]"
+				if childNode.TypeStr() == "AWS::ECS::ContainerInstance" {
 					typeIndicator = "[I]"
-				} else if childNode.Type == "AWS::ECS::Task" {
+				} else if childNode.TypeStr() == "AWS::ECS::Task" {
 					typeIndicator = "[T]"
 				}
 
@@ -171,7 +169,6 @@ func (m *Model) buildTopology() {
 			}
 		}
 	}
-
 
 	m.topologyLines = lines
 }

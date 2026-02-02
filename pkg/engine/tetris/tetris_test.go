@@ -34,7 +34,7 @@ func TestPacker_Tetris(t *testing.T) {
 	// Verification:
 	// Bin 1: pod-1, pod-2, sidecar (100% CPU utilization).
 	// Bin 2: pod-3, pod-4, sidecar (100% CPU utilization).
-	
+
 	fmt.Printf("\n🧩 Tetris Packing Result: %d Bins Used\n", len(bins))
 	for i, b := range bins {
 		fmt.Printf(" [ Bin %d ] Efficiency: %.1f%%\n", i+1, b.Efficiency()*100)

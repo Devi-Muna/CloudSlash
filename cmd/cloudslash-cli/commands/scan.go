@@ -2,30 +2,32 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine"
-	"github.com/DrSkyle/cloudslash/pkg/engine/aws"
-	internalconfig "github.com/DrSkyle/cloudslash/pkg/config"
-	"github.com/DrSkyle/cloudslash/pkg/engine/pricing"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/engine/provenance"
-	tf "github.com/DrSkyle/cloudslash/pkg/providers/terraform"
-	script "github.com/DrSkyle/cloudslash/pkg/providers/tf"
-	ui "github.com/DrSkyle/cloudslash/pkg/tui"
-	"github.com/DrSkyle/cloudslash/pkg/version"
-	"github.com/DrSkyle/cloudslash/pkg/engine/solver"
-	"github.com/DrSkyle/cloudslash/pkg/engine/oracle"
-	"github.com/DrSkyle/cloudslash/pkg/engine/policy"
-	"github.com/DrSkyle/cloudslash/pkg/engine/tetris"
-	"github.com/spf13/cobra"
+	internalconfig "github.com/DrSkyle/cloudslash/v2/pkg/config"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/aws"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/oracle"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/policy"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/pricing"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/provenance"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/solver"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/tetris"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	tf "github.com/DrSkyle/cloudslash/v2/pkg/providers/terraform"
+	script "github.com/DrSkyle/cloudslash/v2/pkg/providers/tf"
+	ui "github.com/DrSkyle/cloudslash/v2/pkg/tui"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 )
 
 var scanCmd = &cobra.Command{
@@ -53,43 +55,66 @@ Example:
 			config.DisableCWMetrics = true
 		}
 
-
 		if headless, _ := cmd.Flags().GetBool("headless"); headless {
 			config.Headless = true
 		}
 
-		// Configure structured logging based on verbosity settings.
+		// Check for AWS CLI.
+		startTime := time.Now()
+		var totalNodes int
+
+		if _, err := exec.LookPath("aws"); err != nil {
+			fmt.Println("[WARN] The 'aws' CLI is not found in your PATH.")
+			fmt.Println("       Generated remediation scripts will require the AWS CLI to run.")
+		}
+
+		// Configure logging.
 		var handler slog.Handler
 		if config.JsonLogs {
 			handler = slog.NewJSONHandler(os.Stdout, nil)
 		} else if config.Verbose {
 			handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 		} else {
-			handler = slog.NewTextHandler(io.Discard, nil) // Silent by default.
+			handler = slog.NewTextHandler(io.Discard, nil)
 		}
 		config.Logger = slog.New(handler)
 
-		// Determine cache location, respecting XDG_CACHE_HOME if present.
-		cacheDir := os.Getenv("XDG_CACHE_HOME")
-		if cacheDir == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				home = os.TempDir()
-			}
-			cacheDir = filepath.Join(home, ".cloudslash")
+		// Determine cache directory.
+		cacheDir, err := os.UserHomeDir()
+		if err != nil {
+			cacheDir = ".cloudslash"
 		} else {
-			cacheDir = filepath.Join(cacheDir, "cloudslash")
+			cacheDir = filepath.Join(cacheDir, ".cloudslash")
 		}
 		config.CacheDir = cacheDir
 
-		// Initiate the parallel scanning engine.
-		_, g, swarmEngine, err := engine.Run(cmd.Context(), config)
+		// Initialize pricing client.
+		pricingClient, err := pricing.NewClient(cmd.Context(), config.Logger, config.CacheDir, config.DiscountRate)
 		if err != nil {
-			fmt.Printf("Error running scan: %v\n", err)
+			config.Logger.Debug("Pre-init pricing client failed", "error", err)
+		}
+
+		// Initialize engine.
+		eng, err := engine.New(cmd.Context(),
+			engine.WithLogger(config.Logger),
+			engine.WithConfig(config),
+			engine.WithPricing(pricingClient),
+			engine.WithConcurrency(config.MaxConcurrency),
+		)
+		if err != nil {
+			config.Logger.Error("Failed to initialize engine", "error", err)
 			os.Exit(1)
 		}
 
-		// Start the interactive TUI unless requested otherwise (CI/CD mode).
+		success, g, swarmEngine, err := eng.Run(cmd.Context())
+		if err != nil {
+			config.Logger.Error("Pipeline failed", "error", err)
+			os.Exit(1)
+		}
+		if !success {
+			os.Exit(1)
+		}
+
 		if !config.Headless {
 			model := ui.NewModel(swarmEngine, g, config.MockMode, config.Region)
 			startTime := time.Now()
@@ -98,40 +123,35 @@ Example:
 				fmt.Printf("Alas, there's been an error: %v", err)
 				os.Exit(1)
 			}
-			
-			// Display the exit summary.
+
+			// Print summary.
 			g.Mu.RLock()
-			count := len(g.Nodes)
+			totalNodes = len(g.GetNodes())
 			g.Mu.RUnlock()
-			ui.PrintExitSummary(startTime, count)
+			ui.PrintExitSummary(startTime, totalNodes)
 		}
 
-		// Execute the optimization solver.
+		if !config.Headless {
+			// ...
+			ui.PrintExitSummary(startTime, totalNodes)
+		}
+
 		runSolver(g)
 
-		// Generate executable remediation artifacts.
-		cleanupPath := filepath.Join(config.OutputDir, "resource_deletion.sh")
-		// Ensure output directory exists.
-		if _, err := os.Stat(config.OutputDir); os.IsNotExist(err) {
-			_ = os.Mkdir(config.OutputDir, 0755)
-		}
-		gen := script.NewGenerator(g, nil)
-		if err := gen.GenerateDeletionScript(cleanupPath); err != nil {
-			fmt.Printf("[WARN] Failed to generate deletion script: %v\n", err)
-		} else {
-			fmt.Printf("\n[SUCCESS] Resource deletion script generated: %s\n", cleanupPath)
-			_ = os.Chmod(cleanupPath, 0755)
-		}
+		// Generate remediation artifacts.
+		fmt.Printf("\n[INFO] Safe Remediation Plan generated at: %s/remediation_plan.json\n", config.OutputDir)
+		fmt.Printf("       (Use the JSON plan with the CloudSlash Executor for safe removal)\n")
 
-		// Generate the restoration plan (Lazarus Protocol).
+		// Generate restoration plan.
 		restorePath := filepath.Join(config.OutputDir, "restore.tf")
+		gen := script.NewGenerator(g, nil)
 		if err := gen.GenerateRestorationPlan(restorePath); err != nil {
 			fmt.Printf("[WARN] Failed to generate restoration plan: %v\n", err)
 		} else {
 			fmt.Printf("[SUCCESS] Lazarus Protocol Active: Restoration plan generated: %s\n", restorePath)
 		}
 
-		// Initialize Terraform analysis if available.
+		// Initialize Terraform analysis.
 		tfClient := tf.NewClient()
 		if tfClient.IsInstalled() {
 			fmt.Println("\n[INFO] Terraform detected. Initializing State Analysis...")
@@ -148,29 +168,55 @@ Example:
 				} else {
 					var unused []*graph.Node
 					g.Mu.RLock()
-					for _, n := range g.Nodes {
+					for _, n := range g.GetNodes() {
 						if n.IsWaste && !n.Ignored {
 							unused = append(unused, n)
 						}
 					}
 					g.Mu.RUnlock()
 
-					// Analyze resource provenance.
+					// Analyze provenance.
 					provEngine := provenance.NewEngine(".")
 					provMap := make(map[string]*provenance.ProvenanceRecord)
 
-					// Attribute unused resources to their source.
+					// Attribute waste to source.
 					for _, z := range unused {
-						rec, err := provEngine.Attribute(z.ID, state)
+						rec, err := provEngine.Attribute(cmd.Context(), z.IDStr(), state)
 						if err == nil && rec != nil {
 							provMap[rec.TFAddress] = rec
 						}
 					}
 
-					report := tf.Analyze(unused, state)
+					report := tf.Analyze(state, unused)
 
 					printTerraformReport(report, provMap)
 					generateFixScript(report)
+				}
+			}
+			// Check for Partial Failures to signal CI/CD
+			if err != nil && errors.Is(err, engine.ErrPartialResult) {
+				fmt.Println("\n[WARN] Scan completed with partial failures (Strict Mode).")
+				os.Exit(2)
+			} else if config.StrictMode {
+				// If strict mode is on but engine returned nil, check manual state just in case
+				// (Though engine should have returned error)
+				isPartial := false
+				g.Mu.RLock()
+				if g.Metadata.Partial {
+					isPartial = true
+				}
+				g.Mu.RUnlock()
+				if isPartial {
+					fmt.Println("\n[WARN] Scan completed with partial failures. Check logs for details.")
+					os.Exit(2)
+				}
+			} else {
+				// Non-strict mode: check if partial just to warn user, but exit 0
+				g.Mu.RLock()
+				isPartial := g.Metadata.Partial
+				g.Mu.RUnlock()
+				if isPartial {
+					fmt.Println("\n[WARN] Scan completed with partial failures. (Pass --strict to fail on this)")
 				}
 			}
 		}
@@ -186,6 +232,7 @@ func init() {
 	scanCmd.Flags().StringVar(&config.SlackChannel, "slack-channel", "", "Override Slack Channel")
 	scanCmd.Flags().IntVar(&config.MaxConcurrency, "max-workers", 0, "Limit concurrency (default: auto)")
 	scanCmd.Flags().StringVar(&config.RulesFile, "rules", "", "Path to YAML Policy Rules (e.g. dynamic_rules.yaml)")
+	scanCmd.Flags().BoolVar(&config.StrictMode, "strict", false, "Exit with code 2 on partial failures (Strict Mode)")
 }
 
 func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provenance.ProvenanceRecord) {
@@ -207,12 +254,12 @@ func printTerraformReport(report *tf.AnalysisReport, provMap map[string]*provena
 
 	for _, res := range report.ResourcesToDelete {
 		fmt.Printf("# Remove orphaned resource: %s\n", res)
-		
-		// Print provenance details.
+
+		// Print provenance.
 		if rec, ok := provMap[res]; ok {
 			printProvenanceBox(rec)
 		}
-		
+
 		fmt.Printf("terraform state rm %s\n\n", res)
 	}
 
@@ -227,7 +274,7 @@ func printProvenanceBox(rec *provenance.ProvenanceRecord) {
 	fmt.Printf("  │ Commit:  %s (%s)\n", rec.CommitHash[:7], rec.CommitDate.Format("2006-01-02"))
 	fmt.Printf("  │ Message: \"%s\"\n", strings.TrimSpace(rec.Message))
 	fmt.Printf("  │ File:    %s:%d\n", rec.FilePath, rec.LineStart)
-	
+
 	if rec.IsLegacy {
 		fmt.Println("  │ Status:  [LEGACY] (> 1 year old)")
 	} else {
@@ -259,12 +306,12 @@ func generateFixScript(report *tf.AnalysisReport) {
 
 	for _, mod := range report.ModulesToDelete {
 		fmt.Fprintf(f, "echo \"Removing Unused Module: %s\"\n", mod)
-		fmt.Fprintf(f, "terraform state rm %s\n", mod)
+		fmt.Fprintf(f, "terraform state rm '%s'\n", mod)
 	}
 
 	for _, res := range report.ResourcesToDelete {
 		fmt.Fprintf(f, "echo \"Removing Unused Resource: %s\"\n", res)
-		fmt.Fprintf(f, "terraform state rm %s\n", res)
+		fmt.Fprintf(f, "terraform state rm '%s'\n", res)
 	}
 
 	fmt.Fprintf(f, "\necho \"--------------------------------------------------\"\n")
@@ -276,9 +323,7 @@ func runSolver(g *graph.Graph) {
 	fmt.Printf("\n[ %s OPTIMIZATION ENGINE ]\n", version.Current)
 	fmt.Println("Initializing Solver with Dynamic Intelligence...")
 
-	// Prepare optimization environment (logging, cache).
-	
-	// Setup Logger (Silent by default unless verbose).
+	// Setup Logger.
 	var logger *slog.Logger
 	if config.Verbose {
 		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -286,7 +331,7 @@ func runSolver(g *graph.Graph) {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 
-	// Setup Cache Directory (XDG Compliant).
+	// Setup cache directory.
 	home, _ := os.UserHomeDir()
 	cacheDir := filepath.Join(home, ".cloudslash", "cache")
 	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
@@ -294,40 +339,62 @@ func runSolver(g *graph.Graph) {
 	}
 	_ = os.MkdirAll(cacheDir, 0755)
 
-	// Initialize the Pricing Client for real-time cost retrieval.
-	fmt.Println(" -> Connecting to AWS Pricing API (this may take a moment)...")
+	// Initialize pricing client.
+	fmt.Printf(" -> Connecting to AWS Pricing API... ")
+	
+	done := make(chan bool)
+	go func() {
+		chars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		i := 0
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				fmt.Printf("\r -> Connecting to AWS Pricing API... %s ", chars[i%len(chars)])
+				time.Sleep(100 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
 	ctx := context.Background()
 
-	// Pass Logger, CacheDir, and Manual Discount Rate from Config
-	// Note: You need to ensure config.DiscountRate exists in your Config struct!
-	// If not, use 0.0 or add it to defaults.go
-	manualRate := 0.0 // or config.DiscountRate
-	
+	manualRate := 0.0
+
 	pc, err := pricing.NewClient(ctx, logger, cacheDir, manualRate)
-	
+	done <- true
+	fmt.Printf("\r -> Connecting to AWS Pricing API... Done.\n")
+
 	if err != nil {
 		fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
 	} else {
-		// Log the effective rate if verbose
 		logger.Info("Pricing Client Initialized")
 	}
 
-	// Convert graph nodes to workloads and calculate current spend.
+	// Calculate current spend.
 	var workloads []*tetris.Item
 	var currentSpend float64
 
 	g.Mu.RLock()
-	for _, n := range g.Nodes {
-		if n.Type == "AWS::EC2::Instance" {
-			// Extract compute resources dynamically.
-			instanceType := "m5.large" // Default type.
+	nodes := g.GetNodes()
+	totalNodes := len(nodes)
+	fmt.Printf(" -> Analyzing Current Spend (%d resources)...\n", totalNodes)
+
+	for i, n := range nodes {
+		if i%5 == 0 {
+			fmt.Printf("\r    [%d/%d] Scanning resource: %s...", i+1, totalNodes, n.IDStr())
+		}
+
+		if n.TypeStr() == "AWS::EC2::Instance" {
+			instanceType := "m5.large"
 			if t, ok := n.Properties["Type"].(string); ok {
 				instanceType = t
 			}
 
 			specs := aws.GetSpecs(instanceType)
-			
-			// Calculate current cost for this instance.
+
+			// Calculate cost.
 			var cost float64
 			var err error
 			if pc != nil {
@@ -337,42 +404,43 @@ func runSolver(g *graph.Graph) {
 				estimator := &aws.StaticCostEstimator{}
 				cost = estimator.GetEstimatedCost(instanceType, internalconfig.DefaultRegion)
 			}
-			
-			// Add to total monthly spend (cost is per month).
+
+			// Add to monthly spend.
 			currentSpend += cost
 
 			workloads = append(workloads, &tetris.Item{
-				ID: n.ID,
+				ID: n.IDStr(),
 				Dimensions: tetris.Dimensions{
-					CPU: specs.VCPU * 1000, 
+					CPU: specs.VCPU * 1000,
 					RAM: specs.Memory,
 				},
 			})
 		}
 	}
 	g.Mu.RUnlock()
+	fmt.Printf("\r    [%d/%d] Graph Analysis Complete.                             \n", totalNodes, totalNodes)
 
 	if len(workloads) == 0 {
 		fmt.Println("No active compute workloads detected. Optimization skipped.")
 		return
 	}
 
-	// Initialize solver components.
+	// Initialize solver.
 	riskEngine := oracle.NewRiskEngine(internalconfig.DefaultRiskConfig())
 	safePolicy := policy.DefaultPolicy()
 	validator := policy.NewValidator(safePolicy)
 	optimizer := solver.NewOptimizer(riskEngine, validator)
 
-	// Build Dynamic Catalog.
+	// Build catalog.
 	var catalog []solver.InstanceType
-	
+
 	fmt.Printf("Building Instance Catalog (%d candidates)...\n", len(aws.CandidateTypes))
 	if pc != nil {
 		fmt.Printf(" > Connected to AWS Pricing API (%s). Fetching live data...\n", internalconfig.DefaultRegion)
 	} else {
 		fmt.Println(" > AWS Pricing API unavailable. Using static estimates.")
 	}
-	
+
 	successCount := 0
 	fallbackCount := 0
 
@@ -381,12 +449,12 @@ func runSolver(g *graph.Graph) {
 		var cost float64
 		var err error
 
-		// Visual progress indicator.
+		fmt.Printf("\r   [%d/%d] Analyzing: %-12s ", i+1, len(aws.CandidateTypes), it)
+
 		if pc != nil {
-			fmt.Printf("\r   [%d/%d] Querying %-12s ", i+1, len(aws.CandidateTypes), it)
 			cost, err = pc.GetEC2InstancePrice(ctx, internalconfig.DefaultRegion, it)
 		}
-		
+
 		if pc == nil || err != nil || cost == 0 {
 			estimator := &aws.StaticCostEstimator{}
 			cost = estimator.GetEstimatedCost(it, internalconfig.DefaultRegion)
@@ -395,7 +463,7 @@ func runSolver(g *graph.Graph) {
 			successCount++
 		}
 
-		// Monthly Cost (730 hours).
+		// Monthly cost (730 hours).
 		hourlyCost := cost / 730.0
 
 		catalog = append(catalog, solver.InstanceType{
@@ -405,10 +473,14 @@ func runSolver(g *graph.Graph) {
 			HourlyCost: hourlyCost,
 			Zone:       internalconfig.DefaultRegion + "a", // Default zone placement.
 		})
+		
+		if pc == nil {
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 	fmt.Printf("\n > Catalog Complete. Live Prices: %d | Estimates: %d\n", successCount, fallbackCount)
 
-	// Execute solver.
+	// Execute optimization.
 	req := solver.OptimizationRequest{
 		Workloads:    workloads,
 		Catalog:      catalog,
@@ -421,7 +493,7 @@ func runSolver(g *graph.Graph) {
 		return
 	}
 
-	// Print optimization results.
+	// Print results.
 	fmt.Println("-------------------------------------------------------------")
 	fmt.Printf("OPTIMIZATION PLAN (Risk Score: %.2f%%)\n", plan.RiskScore*100)
 	fmt.Printf("Current Spend: $%.2f/mo -> Optimized: $%.2f/mo\n", req.CurrentSpend, plan.TotalCost)

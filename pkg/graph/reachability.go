@@ -1,15 +1,18 @@
 package graph
 
-// AnalyzeReachability performs the "Void Walker" analysis.
-// It marks nodes as ReachabilityReachable or ReachabilityDarkMatter.
+// AnalyzeReachability marks internet-accessible resources.
+// It marks nodes as ReachabilityReachable vs. ReachabilityDarkMatter (Isolated).
 func AnalyzeReachability(g *Graph) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
 	// Identify Roots (Ingress Points).
+	// Identify ingress points.
 	var queue []uint32
-	for _, node := range g.Nodes {
-		// Initialize all nodes as Dark Matter.
+	// Get copy of current nodes.
+	allNodes := g.Store.GetAllNodes()
+	for _, node := range allNodes {
+		// Reset reachability.
 		node.Reachability = ReachabilityDarkMatter
 
 		if isRoot(node) {
@@ -18,7 +21,7 @@ func AnalyzeReachability(g *Graph) {
 		}
 	}
 
-	// BFS Flood Fill.
+	// BFS traversal.
 	visited := make(map[uint32]bool)
 	for _, id := range queue {
 		visited[id] = true
@@ -28,69 +31,59 @@ func AnalyzeReachability(g *Graph) {
 		currentIdx := queue[0]
 		queue = queue[1:]
 
-		// Get Neighbors (Downstream)
-		// We look at outgoing edges
-		if int(currentIdx) < len(g.Edges) {
-			edges := g.Edges[currentIdx]
-			for _, edge := range edges {
-				targetIdx := edge.TargetID
-				if visited[targetIdx] {
-					continue
-				}
+		// Get downstream neighbors.
+		edges := g.Store.GetEdges(currentIdx)
+		for _, edge := range edges {
+			targetIdx := edge.TargetID
+			if visited[targetIdx] {
+				continue
+			}
 
-				if int(targetIdx) >= len(g.Nodes) {
-					continue
-				}
-				targetNode := g.Nodes[targetIdx]
+			// Lookup target.
+			targetNode := g.Store.GetNode(targetIdx)
+			if targetNode == nil {
+				continue
+			}
 
-				// Apply Constraint Check.
-				if canTraverse(g.Nodes[currentIdx], targetNode, edge) {
-					targetNode.Reachability = ReachabilityReachable
-					visited[targetIdx] = true
-					queue = append(queue, targetIdx)
-				}
+			// Source Node
+			sourceNode := g.Store.GetNode(currentIdx)
+
+			// Apply constraints.
+			if canTraverse(sourceNode, targetNode, edge) {
+				targetNode.Reachability = ReachabilityReachable
+				visited[targetIdx] = true
+				queue = append(queue, targetIdx)
 			}
 		}
 	}
 
-	// Reporting phase (optional Debug)
-	// countDark := 0
-	// for _, n := range g.Nodes {
-	// 	if n.Reachability == ReachabilityDarkMatter {
-	// 		countDark++
-	// 	}
-	// }
-	// fmt.Printf("Void Walker: Found %d Dark Matter nodes.\n", countDark)
 }
 
-// isRoot determines if a node is an Ingress Point (Internet).
+// isRoot checks for internet ingress.
 func isRoot(n *Node) bool {
-	// Check for AWS Ingress Points.
-	if n.Type == "AWS::EC2::InternetGateway" {
+	// Check AWS ingress.
+	if n.TypeStr() == "AWS::EC2::InternetGateway" {
 		return true
 	}
-	if n.Type == "AWS::EC2::VPNGateway" {
+	if n.TypeStr() == "AWS::EC2::VPNGateway" {
 		return true
 	}
-	// Note: ALBs and other edge services are typically accessed via an IGW.
 	return false
 }
 
-// canTraverse applies the "Top Notch" logic: Route -> SG -> ACL.
+// canTraverse validates connectivity paths.
 func canTraverse(source, target *Node, edge Edge) bool {
-	// Implements simplified traversal logic (Physical -> Route -> Security).
-
-	// 1. Physical/L2 Connectivity
+	// Check physical connectivity.
 	// Edges of type "Contains" or "AttachedTo" imply physical connectivity.
 
-	// 2. L3/L4 Constraints (Route Tables, Security Groups, NACLs)
+	// Check security constraints.
 	// For this version, we implement basic network segment validation.
 
-	// Check for explicit network isolation.
+	// Check network isolation.
 	if val, ok := target.Properties["NetworkType"]; ok {
 		if val == "Private" {
-			// Enforce Air-Gap logic: Prevent direct traversal from Internet Gateway to Private nodes.
-			if source.Type == "AWS::EC2::InternetGateway" {
+			// Prevent IGW to Private traversal.
+			if source.TypeStr() == "AWS::EC2::InternetGateway" {
 				return false
 			}
 		}
@@ -99,7 +92,7 @@ func canTraverse(source, target *Node, edge Edge) bool {
 	return true
 }
 
-// Helper to check for Dark Matter in downstream analysis
+// IsDarkMatter checks network isolation.
 func IsDarkMatter(n *Node) bool {
 	return n.Reachability == ReachabilityDarkMatter
 }

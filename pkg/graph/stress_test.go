@@ -7,19 +7,19 @@ import (
 	"time"
 )
 
-// Mission 1: The "Chaos Graph" Stress Test
-// The Goal: Prove the pkg/graph engine doesn't panic or stack-overflow when scanning a massive, broken infrastructure.
+// TestGraph_LargeScaleCycles validates stability under high load (50k nodes) with cyclic dependencies.
+// Ensures O(N) or near-linear performance for cycle detection to prevent timeouts.
 func TestGraphChaos(t *testing.T) {
 	g := NewGraph()
-	nodeCount := 50000 // Enterprise Scale
+	nodeCount := 50000
 
 	t.Logf("Generating Chaos Graph with %d nodes...", nodeCount)
-	
+
 	// 1. Generate massive cyclic graph
 	for i := 0; i < nodeCount; i++ {
 		id := fmt.Sprintf("node-%d", i)
 		g.AddNode(id, "AWS::Chaos::Node", map[string]interface{}{})
-		
+
 		// Create random messy edges to previous nodes to ensure density
 		if i > 0 {
 			target := fmt.Sprintf("node-%d", rand.Intn(i))
@@ -33,13 +33,13 @@ func TestGraphChaos(t *testing.T) {
 			oldID := fmt.Sprintf("node-%d", i-100)
 			g.AddEdge(oldID, id) // Create cycle: old -> new (and new -> old via random?)
 			// Ensure strict cycle
-			g.AddEdge(id, oldID) 
+			g.AddEdge(id, oldID)
 		}
 	}
 
 	t.Log("Graph generated. Starting Cycle Detection...")
 
-	// 2. The Assertion: Must not Panic or Hang
+	// Execute topological sort to trigger cycle detection.
 	done := make(chan bool)
 	go func() {
 		// DetectCycles is the heavy operation (usually Tarjan's or DFS)
@@ -50,7 +50,7 @@ func TestGraphChaos(t *testing.T) {
 		// Based on typical implementations:
 		_, err := g.TopologicalSort(g.GetNodes())
 		if err == nil {
-			// It might succeed if it ignores cycles or fails if strict. 
+			// It might succeed if it ignores cycles or fails if strict.
 			// We just want it NOT to hang/panic.
 		} else {
 			// Error is expected for cycles

@@ -1,6 +1,6 @@
 package graph
 
-// ImpactReport details what will be affected if a node is removed.
+// ImpactReport details removal impact.
 type ImpactReport struct {
 	TargetNode      *Node
 	DirectImpact    []*Node // Nodes directly depending on this
@@ -8,37 +8,34 @@ type ImpactReport struct {
 	TotalRiskScore  int
 }
 
-// AnalyzeImpact performs a traversal to find everything that depends on the target node.
-// Analyzes dependencies.
+// AnalyzeImpact quantifies breakage risk.
 func (g *Graph) AnalyzeImpact(nodeID string) *ImpactReport {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
 	// Lookup node index.
-	targetIdx, ok := g.idMap[nodeID]
+	// Lookup node index.
+	targetIdx, ok := g.Store.GetNodeID(nodeID)
 	if !ok {
 		return nil
 	}
-	targetNode := g.Nodes[targetIdx]
+	targetNode := g.Store.GetNode(targetIdx)
 
 	report := &ImpactReport{
 		TargetNode: targetNode,
 	}
 
-	// 1. Identify direct dependencies.
-	if int(targetIdx) < len(g.Edges) {
-		directEdges := g.Edges[targetIdx] // Targets
-		for _, edge := range directEdges {
-			if int(edge.TargetID) < len(g.Nodes) {
-				node := g.Nodes[edge.TargetID]
-				report.DirectImpact = append(report.DirectImpact, node)
-				report.TotalRiskScore += node.RiskScore
-			}
+	// Identify direct dependencies.
+	directEdges := g.Store.GetEdges(targetIdx) // Targets
+	for _, edge := range directEdges {
+		node := g.Store.GetNode(edge.TargetID)
+		if node != nil {
+			report.DirectImpact = append(report.DirectImpact, node)
+			report.TotalRiskScore += node.RiskScore
 		}
 	}
 
-	// 2. Identify cascading impact.
-	// Perform BFS analysis.
+	// Calculate cascading impact via BFS.
 	visited := make(map[uint32]bool)
 	queue := []uint32{}
 
@@ -55,21 +52,17 @@ func (g *Graph) AnalyzeImpact(nodeID string) *ImpactReport {
 		currentIdx := queue[0]
 		queue = queue[1:]
 
-		// Add to cascading
-		if int(currentIdx) < len(g.Nodes) {
-			
-		}
+		// Add to cascading.
 
-		if int(currentIdx) < len(g.Edges) {
-			children := g.Edges[currentIdx]
-			for _, childEdge := range children {
-				if !visited[childEdge.TargetID] {
-					visited[childEdge.TargetID] = true
-					queue = append(queue, childEdge.TargetID)
-					if int(childEdge.TargetID) < len(g.Nodes) {
-						node := g.Nodes[childEdge.TargetID]
-						report.CascadingImpact = append(report.CascadingImpact, node)
-					}
+		children := g.Store.GetEdges(currentIdx)
+		for _, childEdge := range children {
+			if !visited[childEdge.TargetID] {
+				visited[childEdge.TargetID] = true
+				queue = append(queue, childEdge.TargetID)
+
+				node := g.Store.GetNode(childEdge.TargetID)
+				if node != nil {
+					report.CascadingImpact = append(report.CascadingImpact, node)
 				}
 			}
 		}

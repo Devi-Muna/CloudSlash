@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -21,11 +21,12 @@ type EKSClient interface {
 	DescribeFargateProfile(ctx context.Context, params *eks.DescribeFargateProfileInput, optFns ...func(*eks.Options)) (*eks.DescribeFargateProfileOutput, error)
 }
 
-// EKSEC2Client abstracts EC2 dependencies for node analysis.
+// EKSEC2Client abstracts EC2 operations for EKS scanner.
 type EKSEC2Client interface {
 	DescribeInstances(ctx context.Context, params *ec2.DescribeInstancesInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error)
 }
 
+// EKSScanner scans EKS clusters and node groups.
 type EKSScanner struct {
 	Client    EKSClient
 	EC2Client EKSEC2Client // Interface for testing
@@ -40,6 +41,7 @@ func NewEKSScanner(cfg aws.Config, g *graph.Graph) *EKSScanner {
 	}
 }
 
+// ScanClusters scans EKS clusters.
 func (s *EKSScanner) ScanClusters(ctx context.Context) error {
 	paginator := eks.NewListClustersPaginator(s.Client, &eks.ListClustersInput{})
 
@@ -51,7 +53,7 @@ func (s *EKSScanner) ScanClusters(ctx context.Context) error {
 
 		for _, clusterName := range page.Clusters {
 			if err := s.processCluster(ctx, clusterName); err != nil {
-				// Log non-fatal errors (e.g. transient API failures or permission gaps).
+				// Log non-fatal errors.
 				fmt.Printf("Warning: failed to process cluster %s: %v\n", clusterName, err)
 			}
 		}
@@ -59,6 +61,7 @@ func (s *EKSScanner) ScanClusters(ctx context.Context) error {
 	return nil
 }
 
+// processCluster inspects a cluster for nodes and profiles.
 func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 	resp, err := s.Client.DescribeCluster(ctx, &eks.DescribeClusterInput{Name: &name})
 	if err != nil {
@@ -66,32 +69,30 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 	}
 	cluster := resp.Cluster
 
-	// Ignore clusters in non-active states (Creating/Deleting) to prevent noise.
+	// skip clusters that are not in an active state.
 	if cluster.Status != types.ClusterStatusActive {
 		return nil
 	}
 
 	arn := *cluster.Arn
 
-	// Analyze topological components.
+	// Analyze cluster components and configuration.
 	hasManagedNodes, err := s.checkManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
-
 
 	hasFargate, err := s.scanFargateProfiles(ctx, name, arn)
 	if err != nil {
 		return err
 	}
 
-
 	hasSelfManaged, err := s.checkSelfManagedNodes(ctx, name)
 	if err != nil {
 		return err
 	}
 
-	// Detect Karpenter autoscaling via discovery tags.
+	// Detect if Karpenter autoscaler is installed via tags.
 	karpenterEnabled := false
 	if cluster.Tags != nil {
 		if _, ok := cluster.Tags["karpenter.sh/discovery"]; ok {
@@ -114,8 +115,9 @@ func (s *EKSScanner) processCluster(ctx context.Context, name string) error {
 	return nil
 }
 
+// checkManagedNodes checks for Managed Node Groups.
 func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Enumerate managed nodegroups to determine cluster capacity mode.
+	// Check nodegroups.
 	paginator := eks.NewListNodegroupsPaginator(s.Client, &eks.ListNodegroupsInput{ClusterName: &clusterName})
 
 	for paginator.HasMorePages() {
@@ -143,6 +145,7 @@ func (s *EKSScanner) checkManagedNodes(ctx context.Context, clusterName string) 
 	return false, nil
 }
 
+// scanFargateProfiles checks for Fargate profiles.
 func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clusterARN string) (bool, error) {
 	paginator := eks.NewListFargateProfilesPaginator(s.Client, &eks.ListFargateProfilesInput{ClusterName: &clusterName})
 
@@ -192,8 +195,9 @@ func (s *EKSScanner) scanFargateProfiles(ctx context.Context, clusterName, clust
 	return hasProfiles, nil
 }
 
+// checkSelfManagedNodes checks for tagged EC2 instances.
 func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName string) (bool, error) {
-	// Filter instances by cluster ownership tag (k8s.io/cluster/<name>).
+	// Filter instances.
 	key := fmt.Sprintf("tag:kubernetes.io/cluster/%s", clusterName)
 
 	input := &ec2.DescribeInstancesInput{
@@ -203,7 +207,7 @@ func (s *EKSScanner) checkSelfManagedNodes(ctx context.Context, clusterName stri
 		},
 	}
 
-	// Check for at least one matching instance.
+	// Check matches.
 	paginator := ec2.NewDescribeInstancesPaginator(s.EC2Client, input)
 
 	if paginator.HasMorePages() {

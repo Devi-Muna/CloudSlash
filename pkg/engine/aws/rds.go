@@ -4,18 +4,26 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
 )
 
+// RDSScanner scans RDS instances.
 type RDSScanner struct {
 	Client *rds.Client
 	Graph  *graph.Graph
 }
 
-// NewRDSScanner initializes the database discovery engine with regional configuration.
+// NewRDSScanner initializes a scanner for RDS resources.
+func NewRDSScanner(cfg aws.Config, g *graph.Graph) *RDSScanner {
+	return &RDSScanner{
+		Client: rds.NewFromConfig(cfg),
+		Graph:  g,
+	}
+}
 
+// ScanInstances maps RDS instances.
 func (s *RDSScanner) ScanInstances(ctx context.Context) error {
 	paginator := rds.NewDescribeDBInstancesPaginator(s.Client, &rds.DescribeDBInstancesInput{})
 	for paginator.HasMorePages() {

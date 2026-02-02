@@ -11,12 +11,17 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+
+	"github.com/google/cel-go/ext"
+	"reflect"
+
+	"github.com/DrSkyle/cloudslash/v2/pkg/resource"
 )
 
 // DynamicRule represents a user-defined policy rule.
 type DynamicRule struct {
 	ID          string   `json:"id"`
-	Condition   string   `json:"condition"`    // CEL expression: "cost > 100 && tags.env == 'prod'"
+	Condition   string   `json:"condition"`    // CEL expression: "resource.InstanceType == 't2.micro'"
 	Action      string   `json:"action"`       // "block", "warn", "approve"
 	Priority    int      `json:"priority"`     // Higher wins
 	TargetKinds []string `json:"target_kinds"` // Efficient filtering (e.g. ["AWS::S3::Bucket"])
@@ -33,23 +38,41 @@ type CELEngine struct {
 
 // EvaluationContext defines CEL rule input data.
 type EvaluationContext struct {
-	ID    string                 `cel:"id"`
-	Kind  string                 `cel:"kind"`
-	Cost  float64                `cel:"cost"`
-	Tags  map[string]string      `cel:"tags"`
-	Props map[string]interface{} `cel:"props"`
+	ID       string            `cel:"id"`
+	Kind     string            `cel:"kind"`
+	Cost     float64           `cel:"cost"`
+	Tags     map[string]string `cel:"tags"`
+	Resource interface{}       `cel:"resource"` // Strict Struct (e.g. aws.EC2Instance)
 }
 
 // NewCELEngine initializes the CEL environment.
 func NewCELEngine() (*CELEngine, error) {
-	// Register EvaluationContext.
+	// Register EvaluationContext and AWS Types.
+	// We use Any (Dyn) for 'resource' to allow different struct types,
+	// but at runtime it will be a concrete Go struct.
+	// To perform static checking on fields, rules should cast: `resource.instance_type` (if supported by libraries)
+	// Or better: we declare specific variables for common types?
+	// The user request was "Type Safe Policy Definitions".
+	// Ideally we register the message types.
+	// Since these are Go structs, we relies on automatic type adaptation.
+
+	// 1. Enable Native Go Type Support (Type Safety)
+	// This allows CEL to reflect on Go structs directly.
+
+	// 2. Initialize Env with the Registry
 	env, err := cel.NewEnv(
+		// Register the Go struct type.
+		ext.NativeTypes(reflect.TypeOf(&resource.EC2Instance{})),
 		cel.Declarations(
 			decls.NewVar("id", decls.String),
 			decls.NewVar("kind", decls.String),
 			decls.NewVar("cost", decls.Double),
 			decls.NewVar("tags", decls.NewMapType(decls.String, decls.String)),
-			decls.NewVar("props", decls.NewMapType(decls.String, decls.Dyn)),
+
+			// We expose 'resource' as Dyn.
+			// Users can now cast: resource.InstanceType (if mapped) or use specific type.
+			// With NativeTypes, fields are accessible if exported.
+			decls.NewVar("resource", decls.Dyn),
 		),
 	)
 	if err != nil {
@@ -113,11 +136,11 @@ func (e *CELEngine) Evaluate(ctx context.Context, evalCtx EvaluationContext) ([]
 
 	// Map variables.
 	vars := map[string]interface{}{
-		"id":    evalCtx.ID,
-		"kind":  evalCtx.Kind,
-		"cost":  evalCtx.Cost,
-		"tags":  evalCtx.Tags,
-		"props": evalCtx.Props,
+		"id":       evalCtx.ID,
+		"kind":     evalCtx.Kind,
+		"cost":     evalCtx.Cost,
+		"tags":     evalCtx.Tags,
+		"resource": evalCtx.Resource,
 	}
 
 	// Fetch candidate rules.
@@ -128,7 +151,7 @@ func (e *CELEngine) Evaluate(ctx context.Context, evalCtx EvaluationContext) ([]
 
 	// Dedup is only needed if a rule is in both...
 	// For performance, we assume user is sane.
-	
+
 	evaluated := make(map[string]bool)
 
 	// Evaluate candidates (O(k)).
@@ -152,7 +175,7 @@ func (e *CELEngine) Evaluate(ctx context.Context, evalCtx EvaluationContext) ([]
 		if match, ok := out.Value().(bool); ok && match {
 			if rule, exists := e.rules[id]; exists {
 				matches = append(matches, rule)
-				
+
 				// Record violation metric.
 				if e.violationsCounter != nil {
 					e.violationsCounter.Add(ctx, 1, metric.WithAttributes(
@@ -163,7 +186,7 @@ func (e *CELEngine) Evaluate(ctx context.Context, evalCtx EvaluationContext) ([]
 			}
 		}
 	}
-	
+
 	// Sort by priority.
 	sort.Slice(matches, func(i, j int) bool {
 		if matches[i].Priority != matches[j].Priority {

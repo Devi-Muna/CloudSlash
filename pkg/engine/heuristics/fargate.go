@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/providers/k8s"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/providers/k8s"
 	"github.com/aws/aws-sdk-go-v2/service/eks/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -17,23 +17,24 @@ type AbandonedFargateHeuristic struct {
 
 func (h *AbandonedFargateHeuristic) Name() string { return "AbandonedFargateHeuristic" }
 
-func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) error {
-	// Require K8s connection.
+func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	// Require K8s.
 	if h.K8sClient == nil {
-		return nil
+		return nil, nil
 	}
+	stats := &HeuristicStats{}
 
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.Nodes {
-		if node.Type != "AWS::EKS::FargateProfile" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() != "AWS::EKS::FargateProfile" {
 			continue
 		}
 
 		profileName, _ := node.Properties["ProfileName"].(string)
 
-		// Exclude default/system profiles.
+		// Exclude system profiles.
 		if profileName == "fp-default" || strings.Contains(strings.ToLower(profileName), "coredns") {
 			continue
 		}
@@ -41,15 +42,16 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 		// Parse selectors.
 		selectors, ok := node.Properties["Selectors"].([]types.FargateProfileSelector)
 		if !ok || len(selectors) == 0 {
-			// Empty profile (abandoned).
+			// Empty profile.
 			node.IsWaste = true
 			node.RiskScore = 100
 			node.Cost = 0
 			node.Properties["Reason"] = "Empty Fargate Profile: No selectors defined."
+			stats.ItemsFound++
 			continue
 		}
 
-		// Check profile activity.
+		// Check activity.
 		isProfileActive := false
 		var failureReasons []string
 
@@ -61,12 +63,10 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 				break
 			}
 
-
-			
-			// Format label selector.
+			// Format selector.
 			labelSelector := formatLabelSelector(sel.Labels)
 
-			// Check active Pods.
+			// Check pods.
 			pods, err := h.K8sClient.Clientset.CoreV1().Pods(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
@@ -76,7 +76,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 				break // Active.
 			}
 
-			// Check active Workload Controllers.
+			// Check controllers.
 			deployments, err := h.K8sClient.Clientset.AppsV1().Deployments(nsName).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
@@ -88,7 +88,7 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 						hasActiveController = true
 						break
 					} else {
-						// Inactive (scaled to 0).
+						// Inactive.
 					}
 				}
 			}
@@ -116,14 +116,14 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 				break
 			}
 
-			// Selector matches namespace but no active workloads.
+			// No active workloads.
 			failureReasons = append(failureReasons, fmt.Sprintf("Selector #%d ('%s'): No active Pods or Controllers found.", i+1, nsName))
 		}
 
 		if !isProfileActive {
 			node.IsWaste = true
 			node.RiskScore = 60
-			node.Cost = 0 // Risk: Configuration debt.
+			node.Cost = 0 // Config debt.
 
 			reason := "Abandoned Fargate Profile:\n"
 			for _, r := range failureReasons {
@@ -131,13 +131,14 @@ func (h *AbandonedFargateHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			}
 			reason += "Recommendation: Remove unused profile."
 			node.Properties["Reason"] = reason
+			stats.ItemsFound++
 		}
 	}
 
-	return nil
+	return stats, nil
 }
 
-// formatLabelSelector formats labels for K8s API.
+// formatLabelSelector formats labels.
 func formatLabelSelector(labels map[string]string) string {
 	if len(labels) == 0 {
 		return ""

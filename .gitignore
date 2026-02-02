@@ -1,8 +1,11 @@
 # Binaries
 dist/
 /cloudslash
+/cloudslash-cli
+/cloudslash_verified
 /cloudslash.exe
 *.test
+cloudslash-policy.json
 keygen.exe
 
 # Build Artifacts
@@ -54,10 +57,6 @@ internal/heuristics/integration_test.go
 # Integration Tests (Dev Only)
 # internal/aws/integration_test.go
 # internal/aws/scan_test.go
-
-# Logs
-gift_licenses.log
-cmd/gift_licenses.log
 
 # Ephemeral User Files
 RELEASE_NOTES.md

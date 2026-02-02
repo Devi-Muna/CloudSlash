@@ -5,14 +5,12 @@ import (
 	"fmt"
 )
 
-// TerraformState represents Terraform state JSON.
-//
+// TerraformState holds JSON state.
 type TerraformState struct {
 	Resources []Resource `json:"resources"`
 }
 
-// Resource represents a state resource block.
-//
+// Resource is a state block.
 type Resource struct {
 	Module    string     `json:"module,omitempty"` // e.g. "module.payments_cluster"
 	Mode      string     `json:"mode"`             // "managed" or "data"
@@ -21,19 +19,18 @@ type Resource struct {
 	Instances []Instance `json:"instances"`
 }
 
-// Instance represents a resource instance.
+// Instance is a resource instance.
 type Instance struct {
 	Attributes json.RawMessage `json:"attributes"` // Resource attributes.
 }
 
-// ParsedAttribute contains common identifiers.
-//
+// ParsedAttribute common IDs.
 type ParsedAttribute struct {
 	ID  string `json:"id"`
 	ARN string `json:"arn"`
 }
 
-// ParseState parses state JSON.
+// ParseState parses JSON.
 func ParseState(jsonBytes []byte) (*TerraformState, error) {
 	var state TerraformState
 	if err := json.Unmarshal(jsonBytes, &state); err != nil {
@@ -41,7 +38,8 @@ func ParseState(jsonBytes []byte) (*TerraformState, error) {
 	}
 	return &state, nil
 }
-// FindAddressByID finds resource address by ID.
+
+// FindAddressByID finds address.
 func FindAddressByID(state *TerraformState, cloudID string) (string, error) {
 	for _, res := range state.Resources {
 		if res.Mode != "managed" {

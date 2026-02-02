@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine/oracle"
-	"github.com/DrSkyle/cloudslash/pkg/engine/policy"
-	"github.com/DrSkyle/cloudslash/pkg/engine/tetris"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/oracle"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/policy"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/tetris"
 )
 
 // InstanceType defines a compute instance configuration.
@@ -50,13 +50,11 @@ func NewOptimizer(o *oracle.RiskEngine, p *policy.Validator) *Optimizer {
 }
 
 // Solve finds optimal resource allocations.
-// Finds cost-efficient packing configurations under constraints.
 func (opt *Optimizer) Solve(req OptimizationRequest) (*AllocationPlan, error) {
 	var bestPlan *AllocationPlan
 	minCost := req.CurrentSpend * 10.0 // Start high
 
 	// Iterate through instance types.
-	// Simulate full-cluster packing.
 
 	for _, instance := range req.Catalog {
 		// Validate against policy.
@@ -79,9 +77,9 @@ func (opt *Optimizer) Solve(req OptimizationRequest) (*AllocationPlan, error) {
 		}
 
 		bins := opt.Packer.Pack(req.Workloads, factory)
-		
+
 		totalCost := float64(len(bins)) * instance.HourlyCost * 730 // Monthly
-		
+
 		if totalCost < minCost {
 			minCost = totalCost
 			bestPlan = &AllocationPlan{
@@ -115,10 +113,9 @@ func (opt *Optimizer) Solve(req OptimizationRequest) (*AllocationPlan, error) {
 // solveHeterogeneous performs multi-phase bin packing.
 func (opt *Optimizer) solveHeterogeneous(req OptimizationRequest) (*AllocationPlan, error) {
 	// Identify primary workhorse instance.
-	// Sort catalog by efficiency (Cost per unit of compute).
 	candidates := make([]InstanceType, len(req.Catalog))
 	copy(candidates, req.Catalog)
-	
+
 	sort.Slice(candidates, func(i, j int) bool {
 		// Sort by cost/capacity ratio.
 		effI := candidates[i].HourlyCost / (candidates[i].CPU + candidates[i].RAM/1000.0) // Normalize RAM
@@ -139,28 +136,28 @@ func (opt *Optimizer) solveHeterogeneous(req OptimizationRequest) (*AllocationPl
 		}
 	}
 	bins := opt.Packer.Pack(req.Workloads, factory)
-	
+
 	if len(bins) == 0 {
 		return nil, fmt.Errorf("empty workload")
 	}
 
 	// Check for underutilized tail (dust).
 	lastBin := bins[len(bins)-1]
-	
+
 	// Attempt downsizing if utilization < 40%.
 	if lastBin.Efficiency() < 0.4 {
 		// Separate tail.
 		mainFleet := bins[:len(bins)-1]
 		dustItems := lastBin.Items
-		
+
 		// Repack tail items.
 		// Sort by absolute cost.
 		sort.Slice(candidates, func(i, j int) bool {
 			return candidates[i].HourlyCost < candidates[j].HourlyCost
 		})
-		
+
 		var dustBin *tetris.Bin
-		
+
 		// Calculate requirements.
 		var reqCPU, reqRAM float64
 		for _, item := range dustItems {
@@ -185,17 +182,17 @@ func (opt *Optimizer) solveHeterogeneous(req OptimizationRequest) (*AllocationPl
 		if dustBin != nil {
 			// Construct Mixed Fleet
 			finalBins := append(mainFleet, dustBin)
-			
+
 			// Calculate total cost.
 			totalCost := 0.0
 			instructions := []string{}
-			
+
 			// Summarize main fleet.
 			if len(mainFleet) > 0 {
 				totalCost += float64(len(mainFleet)) * workhorse.HourlyCost * 730
 				instructions = append(instructions, fmt.Sprintf("pool-main: %d nodes of type %s", len(mainFleet), workhorse.Name))
 			}
-			
+
 			// Summarize dust bin.
 			dustCost := 0.0
 			dustName := ""

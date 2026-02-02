@@ -17,15 +17,15 @@ type SourceLocation struct {
 	Line int
 }
 
-// CodeAuditor locates resource definitions using AST analysis.
+// CodeAuditor finds definitions via AST.
 type CodeAuditor struct {
 	State   *State
 	Mapping map[string]string // ID -> Address
-	
+
 	// Cache for AST analysis
-	mu        sync.RWMutex
-	index     map[string]SourceLocation // "type.name" -> Location
-	indexed   bool
+	mu      sync.RWMutex
+	index   map[string]SourceLocation // "type.name" -> Location
+	indexed bool
 }
 
 // NewCodeAuditor creates a new auditor.
@@ -42,8 +42,7 @@ func NewCodeAuditor(state *State) *CodeAuditor {
 	}
 }
 
-// FindSource locates resource definition in files.
-// Uses on-demand indexing of the rootDir.
+// FindSource locates definition.
 func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int, error) {
 	if a.Mapping == nil {
 		return "", 0, fmt.Errorf("no state mapping available")
@@ -64,7 +63,7 @@ func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int
 	resourceType := parts[len(parts)-2]
 	key := fmt.Sprintf("%s.%s", resourceType, resourceName)
 
-	// Check Index
+	// Check index.
 	a.mu.RLock()
 	if loc, exists := a.index[key]; exists {
 		a.mu.RUnlock()
@@ -78,12 +77,12 @@ func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int
 		return "", 0, fmt.Errorf("definition not found in %s", rootDir)
 	}
 
-	// Index the directory (One-time cost)
+	// Index directory.
 	if err := a.indexDirectory(rootDir); err != nil {
 		return "", 0, err
 	}
 
-	// Retry Lookup
+	// Retry.
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	if loc, exists := a.index[key]; exists {
@@ -93,11 +92,11 @@ func (a *CodeAuditor) FindSource(resourceID string, rootDir string) (string, int
 	return "", 0, fmt.Errorf("definition not found in %s", rootDir)
 }
 
-// indexDirectory walks the directory and uses HCL AST to find all resources.
+// indexDirectory walks directory.
 func (a *CodeAuditor) indexDirectory(rootDir string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	
+
 	if a.indexed {
 		return nil
 	}
@@ -118,24 +117,23 @@ func (a *CodeAuditor) indexDirectory(rootDir string) error {
 			return nil
 		}
 
-		// Parse HCL (AST Analysis)
+		// Parse HCL.
 		f, parseDiags := parser.ParseHCLFile(path)
 		if parseDiags != nil && parseDiags.HasErrors() {
-			// Start with best-effort, ignore parse errors in individual files
-			return nil 
+			// Ignore errors.
+			return nil
 		}
 
-		// Calculate relative path for reporting
+		// Relative path.
 		relPath, _ := filepath.Rel(rootDir, path)
 
-		// Analyze Blocks
-		// We cast to hclsyntax.Body to get raw blocks/attributes
+		// Analyze.
 		if body, ok := f.Body.(*hclsyntax.Body); ok {
 			for _, block := range body.Blocks {
 				if block.Type == "resource" && len(block.Labels) == 2 {
 					resType := block.Labels[0]
 					resName := block.Labels[1]
-					
+
 					key := fmt.Sprintf("%s.%s", resType, resName)
 					a.index[key] = SourceLocation{
 						File: relPath,

@@ -18,6 +18,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/pricing/types"
 )
 
+const (
+	HoursPerMonth    = 730.0
+	DefaultNATPrice  = 0.045
+	DefaultEIPPrice  = 0.005
+	DefaultCacheTTL  = 15 * 24 * time.Hour
+)
+
 type PriceRecord struct {
 	Price     float64 `json:"price"`
 	Timestamp int64   `json:"timestamp"`
@@ -35,7 +42,6 @@ type Client struct {
 }
 
 // NewClient initializes the pricing client.
-// Resolves cache path and defaults.
 func NewClient(ctx context.Context, logger *slog.Logger, cacheDir string, manualDiscountRate float64) (*Client, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -60,10 +66,10 @@ func NewClient(ctx context.Context, logger *slog.Logger, cacheDir string, manual
 		svc:            pricing.NewFromConfig(cfg),
 		cache:          make(map[string]PriceRecord),
 		cachePath:      filepath.Join(cacheDir, "pricing.json"),
-		ttl:            15 * 24 * time.Hour, // 15 Days
+		ttl:            DefaultCacheTTL, // 15 Days
 		discountFactor: factor,
 	}
-	
+
 	c.loadCache()
 	return c, nil
 }
@@ -98,12 +104,12 @@ func (c *Client) GetEBSPrice(ctx context.Context, region, volumeType string, siz
 		if err != nil {
 			return 0, err
 		}
-		
+
 		c.mu.Lock()
 		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
 		c.saveCache() // Persist cache.
 		c.mu.Unlock()
-		
+
 		return price * float64(sizeGB), nil
 	}
 
@@ -195,11 +201,11 @@ func (c *Client) GetEC2InstancePrice(ctx context.Context, region, instanceType s
 		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
 		c.saveCache()
 		c.mu.Unlock()
-		
-		return price * 730 * c.discountFactor, nil
+
+		return price * HoursPerMonth * c.discountFactor, nil
 	}
 
-	return record.Price * 730 * c.discountFactor, nil // Assumes 730h/month.
+	return record.Price * HoursPerMonth * c.discountFactor, nil // Assumes 730h/month.
 }
 
 func (c *Client) fetchEC2Price(ctx context.Context, region, instanceType string) (float64, error) {
@@ -267,7 +273,7 @@ func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64
 	c.mu.RLock()
 	record, ok := c.cache[cacheKey]
 	c.mu.RUnlock()
-	
+
 	valid := ok && time.Since(time.Unix(record.Timestamp, 0)) < c.ttl
 
 	if !valid {
@@ -279,16 +285,16 @@ func (c *Client) GetNATGatewayPrice(ctx context.Context, region string) (float64
 		price, err := c.fetchNATPrice(tCtx, region)
 		if err != nil {
 			// Default timeout fallback.
-			return 0.045 * 730, nil
+			return DefaultNATPrice * HoursPerMonth, nil
 		}
 		c.mu.Lock()
 		c.cache[cacheKey] = PriceRecord{Price: price, Timestamp: time.Now().Unix()}
 		c.saveCache()
 		c.mu.Unlock()
-		return price * 730, nil
+		return price * HoursPerMonth, nil
 	}
 
-	return record.Price * 730, nil
+	return record.Price * HoursPerMonth, nil
 }
 
 func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, error) {
@@ -330,7 +336,7 @@ func (c *Client) fetchNATPrice(ctx context.Context, region string) (float64, err
 
 // GetEIPPrice estimates unattached EIP monthly cost.
 func (c *Client) GetEIPPrice(ctx context.Context, region string) (float64, error) {
-	return 0.005 * 730, nil
+	return DefaultEIPPrice * HoursPerMonth, nil
 }
 
 func parsePriceFromJSON(jsonStr string) (float64, error) {

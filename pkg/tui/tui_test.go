@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/engine/swarm"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/swarm"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/sys/intern"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -20,8 +21,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "Zombie NAT: Hollow with 0 Traffic",
 			mockNode: &graph.Node{
-				ID:      "nat-hollow-123",
-				Type:    "aws_nat_gateway",
+				ID:      intern.Get("nat-hollow-123"),
+				Type:    intern.Get("aws_nat_gateway"),
 				IsWaste: true,
 				Cost:    32.40,
 				Properties: map[string]interface{}{
@@ -35,8 +36,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "Safe EIP: Unattached & Not in DNS",
 			mockNode: &graph.Node{
-				ID:      "eip-safe-123",
-				Type:    "aws_eip",
+				ID:      intern.Get("eip-safe-123"),
+				Type:    intern.Get("aws_eip"),
 				IsWaste: true,
 				Cost:    3.50,
 				Properties: map[string]interface{}{
@@ -50,8 +51,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "Dangerous EIP: Unattached BUT in DNS",
 			mockNode: &graph.Node{
-				ID:      "eip-danger-999",
-				Type:    "aws_eip",
+				ID:      intern.Get("eip-danger-999"),
+				Type:    intern.Get("aws_eip"),
 				IsWaste: true,
 				Cost:    3.50,
 				Properties: map[string]interface{}{
@@ -65,8 +66,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "S3 Iceberg: Stalled Multipart Upload",
 			mockNode: &graph.Node{
-				ID:        "s3-multipart-upload-1",
-				Type:      "AWS::S3::MultipartUpload",
+				ID:        intern.Get("s3-multipart-upload-1"),
+				Type:      intern.Get("AWS::S3::MultipartUpload"),
 				IsWaste:   true,
 				RiskScore: 20,
 				Properties: map[string]interface{}{
@@ -79,8 +80,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "EBS Modernizer: gp2 to gp3",
 			mockNode: &graph.Node{
-				ID:      "vol-gp2-legacy",
-				Type:    "AWS::EC2::Volume",
+				ID:      intern.Get("vol-gp2-legacy"),
+				Type:    intern.Get("AWS::EC2::Volume"),
 				IsWaste: true,
 				Cost:    2.00,
 				Properties: map[string]interface{}{
@@ -94,8 +95,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "Redshift: Idle Cluster",
 			mockNode: &graph.Node{
-				ID:      "redshift-idle-1",
-				Type:    "aws_redshift_cluster",
+				ID:      intern.Get("redshift-idle-1"),
+				Type:    intern.Get("aws_redshift_cluster"),
 				IsWaste: true,
 				Cost:    500.00,
 				Properties: map[string]interface{}{
@@ -107,8 +108,8 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 		{
 			name: "Lambda: Prunable Versions",
 			mockNode: &graph.Node{
-				ID:      "func-v1",
-				Type:    "aws_lambda_function",
+				ID:      intern.Get("func-v1"),
+				Type:    intern.Get("aws_lambda_function"),
 				IsWaste: true,
 				Properties: map[string]interface{}{
 					"Reason": "Code Rot: Last modified 400 days ago.",
@@ -121,10 +122,9 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			g := graph.NewGraph()
-			g.AddNode(tc.mockNode.ID, tc.mockNode.Type, tc.mockNode.Properties)
+			g.AddNode(tc.mockNode.IDStr(), tc.mockNode.TypeStr(), tc.mockNode.Properties)
 			g.CloseAndWait()
-
-			if n := g.GetNode(tc.mockNode.ID); n != nil {
+			if n := g.GetNode(tc.mockNode.IDStr()); n != nil {
 				n.IsWaste = tc.mockNode.IsWaste
 				n.Cost = tc.mockNode.Cost
 				n.RiskScore = tc.mockNode.RiskScore
@@ -158,15 +158,15 @@ func TestTUI_Rendering_v1_3_0(t *testing.T) {
 func TestTUI_TerraformIndicator(t *testing.T) {
 	g := graph.NewGraph()
 	node := &graph.Node{
-		ID:             "tf-managed-resource",
-		Type:           "unknown",
+		ID:             intern.Get("tf-managed-resource"),
+		Type:           intern.Get("unknown"),
 		IsWaste:        true,
 		SourceLocation: "main.tf:12",
 	}
-	g.AddNode(node.ID, node.Type, node.Properties)
+	g.AddNode(node.IDStr(), node.TypeStr(), node.Properties)
 	g.CloseAndWait()
 
-	if n := g.GetNode(node.ID); n != nil {
+	if n := g.GetNode(node.IDStr()); n != nil {
 		n.IsWaste = node.IsWaste
 		n.SourceLocation = node.SourceLocation
 	}

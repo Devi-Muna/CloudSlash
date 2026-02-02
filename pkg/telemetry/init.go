@@ -15,9 +15,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
-// Init configures OpenTelemetry.
-// Checks OTEL_EXPORTER_OTLP_ENDPOINT.
-// Configures OTLP HTTP or fallback.
+// Init configures OpenTelemetry tracing.
 func Init(ctx context.Context, serviceName, serviceVersion, explicitEndpoint string) (func(context.Context) error, error) {
 	res, err := resource.Merge(
 		resource.Default(),
@@ -38,15 +36,14 @@ func Init(ctx context.Context, serviceName, serviceVersion, explicitEndpoint str
 	}
 
 	if endpoint != "" {
-		// Mode: Enterprise (OTLP HTTP).
+		// Configure OTLP HTTP exporter.
 		exporter, err = otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
 		}
 		// fmt.Printf(" [Telemtry] Initialized OTLP Exporter -> %s\n", endpoint)
 	} else {
-		// Mode: Privacy (Local/No-Op).
-		// Discard output by default.
+		// Configure no-op exporter.
 		exporter, err = stdouttrace.New(stdouttrace.WithWriter(io.Discard))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create stdout exporter: %w", err)
@@ -58,17 +55,17 @@ func Init(ctx context.Context, serviceName, serviceVersion, explicitEndpoint str
 		sdktrace.WithResource(res),
 	)
 
-	// Register global providers.
+	// Register global tracer provider.
 	otel.SetTracerProvider(tp)
-	
-	// Configure W3C propagation.
+
+	// Configure propagation.
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
-	// Return cleanup function.
+	// Return shutdown function.
 	return tp.Shutdown, nil
 }
 
-// Tracer returns a named tracer.
+// Tracer returns a named OTel tracer.
 func Tracer(name string) interface{} {
 	return otel.Tracer(name)
 }

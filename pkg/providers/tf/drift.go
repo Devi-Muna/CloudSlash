@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
-// DriftDetector identifies unmanaged resources.
+// DriftDetector finds unmanaged resources.
 type DriftDetector struct {
 	Graph *graph.Graph
 	State *State
@@ -21,20 +21,20 @@ func NewDriftDetector(g *graph.Graph, s *State) *DriftDetector {
 	}
 }
 
-// ScanForDrift marks unmanaged resources as waste.
+// ScanForDrift marks waste.
 func (d *DriftDetector) ScanForDrift() {
 	managedIDs := d.State.GetManagedResourceIDs()
 	d.Graph.Mu.Lock()
 	defer d.Graph.Mu.Unlock()
 
-	for _, node := range d.Graph.Nodes {
-		// Skip already flagged nodes.
+	for _, node := range d.Graph.GetNodes() {
+		// Skip checked.
 		if node.IsWaste {
 			continue
 		}
 
-		// Check if managed by Terraform.
-		id := node.ID
+		// Check management.
+		id := node.IDStr()
 
 		isManaged := false
 
@@ -60,7 +60,7 @@ func (d *DriftDetector) ScanForDrift() {
 				node.Properties = make(map[string]interface{})
 			}
 			node.Properties["Reason"] = "Shadow IT: Not found in Terraform State"
-			fmt.Printf("Drift Detected: %s (%s)\n", id, node.Type)
+			fmt.Printf("Drift Detected: %s (%s)\n", id, node.TypeStr())
 		}
 	}
 }

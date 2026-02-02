@@ -1,8 +1,8 @@
 package tetris
 
 // Dimensions defines compute resources.
-// CPU in millicores.
-// RAM in MiB.
+// Dimensions defines compute resources.
+// CPU in millicores, RAM in MiB.
 type Dimensions struct {
 	CPU float64
 	RAM float64
@@ -12,7 +12,7 @@ type Dimensions struct {
 type Item struct {
 	ID         string
 	Dimensions Dimensions
-	Group      string // Group for affinity rules.
+	Group      string
 }
 
 // Bin represents a resource container.

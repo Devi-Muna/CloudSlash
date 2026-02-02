@@ -4,15 +4,16 @@ import (
 	"context"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
 	elbv2types "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
+// ALBScanner scans Application Load Balancers.
 type ALBScanner struct {
 	Client    *elasticloadbalancingv2.Client
 	CWClient  *cloudwatch.Client
@@ -29,53 +30,58 @@ func NewALBScanner(cfg aws.Config, g *graph.Graph) *ALBScanner {
 	}
 }
 
-// ScanALBs discovers Application Load Balancers (ALBs) and usage metrics.
+// ScanALBs scans ALBs and checks traffic.
 func (s *ALBScanner) ScanALBs(ctx context.Context) error {
 	paginator := elasticloadbalancingv2.NewDescribeLoadBalancersPaginator(s.Client, &elasticloadbalancingv2.DescribeLoadBalancersInput{})
 
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		for _, lb := range page.LoadBalancers {
-			// Filter for Application Load Balancers.
+			// Filter ALBs.
 			if lb.Type != elbv2types.LoadBalancerTypeEnumApplication {
 				continue
 			}
 
 			arn := *lb.LoadBalancerArn
-			
+
 			props := map[string]interface{}{
 				"Service": "ALB",
 				"Arn":     arn,
 				"DNS":     *lb.DNSName,
 				"State":   string(lb.State.Code),
 			}
-			
+
 			s.Graph.AddNode(arn, "aws_alb", props)
-			
-			// Check request volume metrics.
+
+			// Check traffic metrics.
 			go s.checkRequests(ctx, arn, props)
-			
-			// Analyze listener configuration.
+
+			// Analyze listener configurations.
 			go s.checkListeners(ctx, arn)
-			
-			// Check for associated WAF.
+
+			// Verify WAF association.
 			go s.checkWAF(ctx, arn)
 		}
 	}
 	return nil
 }
 
+// checkRequests queries request counts (7 days).
 func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[string]interface{}) {
 	node := s.Graph.GetNode(arn)
-	if node == nil { return }
-	
-	// Parse Resource ID from ARN.
+	if node == nil {
+		return
+	}
+
+	// Parse ResourceID.
 	// Format: app/load-balancer-name/id
-	resourceId := ""
-	
-	// Robust manual parsing.
+
+	// Manual parsing.
+	var resourceId string
 	parts := -1
 	for i := 0; i < len(arn)-13; i++ {
 		if arn[i:i+13] == "loadbalancer/" {
@@ -91,7 +97,7 @@ func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[st
 
 	endTime := time.Now()
 	startTime := endTime.Add(-7 * 24 * time.Hour)
-	
+
 	queries := []cwtypes.MetricDataQuery{
 		{
 			Id: aws.String("m_reqs"),
@@ -106,39 +112,44 @@ func (s *ALBScanner) checkRequests(ctx context.Context, arn string, props map[st
 			},
 		},
 	}
-	
+
 	out, err := s.CWClient.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 		MetricDataQueries: queries,
 		StartTime:         &startTime,
 		EndTime:           &endTime,
 	})
-	if err != nil { return }
-	
+	if err != nil {
+		return
+	}
+
 	sumReqs := 0.0
 	for _, res := range out.MetricDataResults {
 		for _, v := range res.Values {
 			sumReqs += v
 		}
 	}
-	
+
 	s.Graph.Mu.Lock()
 	node.Properties["SumRequests7d"] = sumReqs
 	s.Graph.Mu.Unlock()
 }
 
+// checkListeners checks for redirection-only status.
 func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 	out, err := s.Client.DescribeListeners(ctx, &elasticloadbalancingv2.DescribeListenersInput{
 		LoadBalancerArn: aws.String(arn),
 	})
-	if err != nil { return }
-	
+	if err != nil {
+		return
+	}
+
 	allRedirects := true
 	if len(out.Listeners) == 0 {
 		allRedirects = false
 	}
-	
+
 	for _, l := range out.Listeners {
-		// Check default actions.
+		// Check actions.
 		isRedirect := false
 		for _, act := range l.DefaultActions {
 			if act.Type == elbv2types.ActionTypeEnumRedirect {
@@ -150,7 +161,7 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 			break
 		}
 	}
-	
+
 	node := s.Graph.GetNode(arn)
 	if node != nil {
 		s.Graph.Mu.Lock()
@@ -159,21 +170,22 @@ func (s *ALBScanner) checkListeners(ctx context.Context, arn string) {
 	}
 }
 
+// checkWAF checks Web ACL association.
 func (s *ALBScanner) checkWAF(ctx context.Context, arn string) {
-	// Check WAFv2 association (Regional).
+	// Check WAF (Regional).
 	out, err := s.WAFClient.GetWebACLForResource(ctx, &wafv2.GetWebACLForResourceInput{
 		ResourceArn: aws.String(arn),
 	})
-	
+
 	hasWAF := false
 	wafCost := 0.0
-	
+
 	if err == nil && out.WebACL != nil {
 		hasWAF = true
-		// Add estimated WAF cost.
+		// Est. cost.
 		wafCost = 5.0
 	}
-	
+
 	node := s.Graph.GetNode(arn)
 	if node != nil {
 		s.Graph.Mu.Lock()

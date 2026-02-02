@@ -4,63 +4,61 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
-// AnalysisReport holds state analysis results.
+// AnalysisReport holds results.
 type AnalysisReport struct {
 	ModulesToDelete   []string // List of modules to remove.
 	ResourcesToDelete []string // List of resources to remove.
 	TotalUnused       int
 }
 
-// Analyze compares unused nodes with Terraform state.
-// Identifies unused modules and resources.
-func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
+// Analyze checks unused nodes.
+func Analyze(state *TerraformState, unused []*graph.Node) *AnalysisReport {
 	report := &AnalysisReport{
 		ModulesToDelete:   []string{},
 		ResourcesToDelete: []string{},
 	}
 
-	// 1. Index unused resources.
-	// Match by ID or ARN.
+	// 1. Index unused.
 	unusedMap := make(map[string]bool)
 	for _, z := range unused {
-		unusedMap[z.ID] = true
+		unusedMap[z.IDStr()] = true
 	}
 
-	// 2. Calculate module usage statistics.
-	
+	// 2. Module stats.
+
 	moduleTotal := make(map[string]int)
-	
+
 	moduleUnused := make(map[string]int)
-	
+
 	moduleUnusedAddrs := make(map[string][]string)
 
-	// Iterate through state resources.
+	// Iterate resources.
 	for _, res := range state.Resources {
 		// Only care about managed resources, not data sources
 		if res.Mode != "managed" {
 			continue
 		}
 
-		addrBase := getAddressBase(res) // e.g., "module.vpc.aws_subnet.private"
+		addrBase := getAddressBase(res)  // e.g., "module.vpc.aws_subnet.private"
 		modulePath := getModulePath(res) // e.g., "module.vpc"
 
-		// Track Total Resources per module
+		// Track totals.
 		if modulePath != "" {
 			countInstances(&res, func() { moduleTotal[modulePath]++ })
 		}
 
-		// Check for unused instances.
+		// Check usage.
 		for i, inst := range res.Instances {
-			// Extract resource identifiers.
+			// Extract identifiers.
 			var attrs ParsedAttribute
 			if err := json.Unmarshal(inst.Attributes, &attrs); err != nil {
 				continue
 			}
 
-			// Determine if unused.
+			// Determine unused.
 			isUnused := false
 			if attrs.ID != "" && unusedMap[attrs.ID] {
 				isUnused = true
@@ -71,10 +69,8 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 			if isUnused {
 				// Build resource address.
 				fullAddr := addrBase
-				// Handle indexed resources.
-				
-				
-				
+				// Handle index.
+
 				if len(res.Instances) > 1 {
 					fullAddr = fmt.Sprintf("%s[%d]", addrBase, i)
 				}
@@ -91,10 +87,10 @@ func Analyze(unused []*graph.Node, state *TerraformState) *AnalysisReport {
 		}
 	}
 
-	// 3. Aggregate module results.
+	// 3. Aggregate results.
 	for mod, total := range moduleTotal {
 		unusedCount := moduleUnused[mod]
-		
+
 		// If NO unused resources in this module, skip
 		if unusedCount == 0 {
 			continue

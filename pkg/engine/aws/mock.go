@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
+// MockScanner populates the graph with synthetic data.
 type MockScanner struct {
 	Graph *graph.Graph
 }
@@ -16,17 +17,18 @@ func NewMockScanner(g *graph.Graph) *MockScanner {
 	return &MockScanner{Graph: g}
 }
 
+// Scan generates mock resources with various waste states.
 func (s *MockScanner) Scan(ctx context.Context) error {
 	// Simulate network latency.
 	time.Sleep(100 * time.Millisecond)
 
-	// Stopped Instance (Unused).
+	// Create a stopped EC2 instance (potential waste).
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:instance/i-0mock1234567890", "AWS::EC2::Instance", map[string]interface{}{
 		"State":      "stopped",
 		"LaunchTime": time.Now().Add(-60 * 24 * time.Hour), // 60 days old
 	})
 
-	// Unattached Volume (Auditor Test).
+	// Create an unattached EBS volume.
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mock1234567890", "AWS::EC2::Volume", map[string]interface{}{
 		"State": "available",
 		"Size":  100, // GB
@@ -39,15 +41,14 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// Unused Volume (Attached to stopped instance).
-	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockZombie", "AWS::EC2::Volume", map[string]interface{}{
+	// Create an unused volume that is technically "in-use" but by a zombie resource.
+	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockPseudoUse", "AWS::EC2::Volume", map[string]interface{}{
 		"State":               "in-use",
 		"AttachedInstanceId":  "i-0mock1234567890",
 		"DeleteOnTermination": false,
 	})
 
-	// Idle NAT Gateway.
-	// Triggers NetworkAnalysisHeuristic
+	// Create an idle NAT Gateway.
 	natArn := "arn:aws:ec2:us-east-1:123456789012:natgateway/nat-0mock12345"
 	s.Graph.AddNode(natArn, "aws_nat_gateway", map[string]interface{}{
 		"State":            "available",
@@ -57,16 +58,14 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region":           "us-east-1",
 	})
 
-	// Mock Snapshot (Time Machine Test).
-	// Parent volume is vol-0mock1234567890 (which is waste)
+	// Create a snapshot linked to the waste volume.
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:snapshot/snap-0mockChild", "AWS::EC2::Snapshot", map[string]interface{}{
 		"State":      "completed",
 		"VolumeId":   "vol-0mock1234567890", // Links to waste vol
 		"VolumeSize": 100,
 	})
 
-	// Safe-Release Elastic IP (No Cost).
-	// Triggers NetworkAnalysisHeuristic
+	// Create a properly configured Elastic IP (Safe).
 	eipArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mock123"
 	s.Graph.AddNode(eipArn, "aws_eip", map[string]interface{}{
 		"PublicIp":      "203.0.113.10",
@@ -75,7 +74,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"FoundInDNS":    false, // Safe
 	})
 
-	// Unattached EIP (Waste).
+	// Create an unused Elastic IP (Waste).
 	eipDangerArn := "arn:aws:ec2:us-east-1:123456789012:eip/eipalloc-0mockDanger"
 	s.Graph.AddNode(eipDangerArn, "aws_eip", map[string]interface{}{
 		"PublicIp":      "203.0.113.99",
@@ -85,7 +84,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"DNSZone":       "production.com",
 	})
 
-	// S3 Lifecycle Gap (Missing Abort Rule).
+	// Create an S3 bucket with incomplete multipart uploads.
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket-iceberg", "AWS::S3::Bucket", map[string]interface{}{
 		"Name":              "mock-bucket-iceberg",
 		"HasAbortLifecycle": false,
@@ -95,7 +94,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Bucket":    "mock-bucket-iceberg",
 	})
 
-	// 5e. Legacy EBS
+	// Create a legacy gp2 volume.
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockGp2", "AWS::EC2::Volume", map[string]interface{}{
 		"State":       "in-use",
 		"Size":        int32(500), // 500GB
@@ -104,7 +103,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region":      "us-east-1",
 	})
 
-	// 5g. Aged AMI (New Heuristic Test)
+	// Create an aged AMI.
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockAged", "AWS::EC2::AMI", map[string]interface{}{
 		"Name":         "legacy-server-backup-2023",
 		"State":        "available",
@@ -112,7 +111,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"CreateTime":   time.Now().Add(-100 * 24 * time.Hour), // 100 days old
 	})
 
-	// 5h. Ignored AMI (Explicit True) -> SHOULD NOT APPEAR
+	// Create an AMI explicitly ignored via tags.
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreTrue", "AWS::EC2::AMI", map[string]interface{}{
 		"Name":         "important-backup",
 		"State":        "available",
@@ -123,8 +122,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		},
 	})
 
-	// 5i. Ignored AMI (Duration Pass) -> SHOULD NOT APPEAR
-	// Age: 100d. Ignore: 120d. (100 < 120, so valid/ignored)
+	// Ignored AMI (Pass).
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreDurationPass", "AWS::EC2::AMI", map[string]interface{}{
 		"Name":         "semi-old-backup",
 		"State":        "available",
@@ -135,8 +133,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		},
 	})
 
-	// 5j. Ignored AMI (Duration Fail) -> SHOULD APPEAR AS WASTE
-	// Age: 100d. Ignore: 30d. (100 > 30, so expired/waste)
+	// Ignored AMI (Fail).
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:image/ami-0mockIgnoreDurationFail", "AWS::EC2::AMI", map[string]interface{}{
 		"Name":         "expired-backup",
 		"State":        "available",
@@ -147,16 +144,11 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		},
 	})
 
-	// 5f. Orphaned ELB (Graph-based)
-	// Needs to be tagged with a cluster that is also waste (or missing?)
-	// ... (Rest of existing mocks)
+	// Orphaned ELB.
 
 	// ... (Truncating for clarity, keeping required context)
 
-	// 5c. Orphaned ELB (Graph-based)
-	// Needs to be tagged with a cluster that is also waste (or missing?)
-	// UnusedEKS heuristic checks for cluster existence.
-	// Let's create an Unused Cluster first.
+	// Create an orphaned Load Balancer attached to a deleted cluster.
 	zombieClusterArn := "arn:aws:eks:us-east-1:123456789012:cluster/legacy-dev-cluster"
 	s.Graph.AddNode(zombieClusterArn, "AWS::EKS::Cluster", map[string]interface{}{
 		"Name":                "legacy-dev-cluster",
@@ -178,7 +170,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 			"Region": "us-east-1",
 		})
 
-	// 5d. Ghost Node Group (Graph-based)
+	// Create a phantom EKS Node Group.
 	s.Graph.AddNode("arn:aws:eks:us-east-1:123456789012:nodegroup/production-cluster/failed-scaling-group", "AWS::EKS::NodeGroup", map[string]interface{}{
 		"NodegroupName":     "failed-scaling-group",
 		"ClusterName":       "production-cluster",
@@ -188,8 +180,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Region":            "us-east-1",
 	})
 
-	// 5e. Manual Waste Simulation (Metric types where CW is nil)
-	// RDS Stopped
+	// Create a stopped RDS instance.
 	s.Graph.AddNode("arn:aws:rds:us-east-1:123456789012:db:legacy-postgres", "AWS::RDS::DBInstance", map[string]interface{}{
 		"DBInstanceIdentifier": "legacy-postgres",
 		"Status":               "stopped",
@@ -197,7 +188,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 	// RDSHeuristic handles stopped instances without CloudWatch metrics.
 
-	// Unused ELB (Manual Waste Simulation)
+	// Create an unused Application Load Balancer.
 	elbArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/unused-internal-lb/50dc6c495c0c9999"
 	s.Graph.AddNode(elbArn, "AWS::ElasticLoadBalancingV2::LoadBalancer", map[string]interface{}{
 		"State":  "active",
@@ -212,7 +203,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// Right-Sizing EC2 (Manual Waste Simulation)
+	// Create an oversized EC2 instance.
 	ec2Arn := "arn:aws:ec2:us-east-1:123456789012:instance/i-0mockHuge"
 	s.Graph.AddNode(ec2Arn, "AWS::EC2::Instance", map[string]interface{}{
 		"InstanceType": "c5.4xlarge",
@@ -228,12 +219,12 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		s.Graph.Mu.Unlock()
 	}
 
-	// Stale S3 Multipart Upload.
+	// Create a stale multipart upload.
 	s.Graph.AddNode("arn:aws:s3:::mock-bucket/upload-1", "AWS::S3::MultipartUpload", map[string]interface{}{
 		"Initiated": time.Now().Add(-10 * 24 * time.Hour), // 10 days old
 	})
 
-	// ECS: Idle Cluster (The Money Saver).
+	// Create an idle ECS Cluster.
 	clusterArn := "arn:aws:ecs:us-east-1:123456789012:cluster/production-unused"
 	s.Graph.AddNode(clusterArn, "AWS::ECS::Cluster", map[string]interface{}{
 		"Name":                              "production-unused",
@@ -244,7 +235,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"ActiveServicesCount":               0,
 		"Region":                            "us-east-1",
 	})
-	// Add Container Instance (Old enough to be waste)
+	// Create a container instance for the idle cluster.
 	s.Graph.AddNode(clusterArn+"/container-instance/ci-mock-1", "AWS::ECS::ContainerInstance", map[string]interface{}{
 		"ClusterArn":   clusterArn,
 		"RegisteredAt": time.Now().Add(-24 * time.Hour),
@@ -252,7 +243,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 	s.Graph.AddTypedEdge(clusterArn, clusterArn+"/container-instance/ci-mock-1", graph.EdgeType("HAS_INSTANCE"), 1)
 
-	// ECS: Empty Service (Crash Loop).
+	// Create a service that fails to place tasks (Empty Service).
 	serviceArn := "arn:aws:ecs:us-east-1:123456789012:service/frontend-cluster/payment-service-broken"
 	s.Graph.AddNode(serviceArn, "AWS::ECS::Service", map[string]interface{}{
 		"Name":           "payment-service-broken",
@@ -269,14 +260,14 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		},
 		"Region": "us-east-1",
 	})
-	// Link to cluster (which is NOT waste, but service IS)
+	// Create a placeholder cluster node for linking.
 	frontendClusterArn := "arn:aws:ecs:us-east-1:123456789012:cluster/frontend-cluster"
 	s.Graph.AddNode(frontendClusterArn, "AWS::ECS::Cluster", map[string]interface{}{
 		"Name": "frontend-cluster",
 	})
 	s.Graph.AddTypedEdge(frontendClusterArn, serviceArn, graph.EdgeTypeContains, 1)
 
-	// 9. ECS: Healthy Production Topology (Harmony Test)
+	// Create a healthy ECS topology for contrast.
 	prodMockCluster := "arn:aws:ecs:us-east-1:123456789012:cluster/production-cluster"
 	s.Graph.AddNode(prodMockCluster, "AWS::ECS::Cluster", map[string]interface{}{
 		"Name":                "production-cluster",
@@ -285,7 +276,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"ActiveServicesCount": 2,
 	})
 
-	// Service A: Auth (Healthy)
+	// Create a healthy Service (A).
 	authSvc := "arn:aws:ecs:us-east-1:123456789012:service/production-cluster/auth-service"
 	s.Graph.AddNode(authSvc, "AWS::ECS::Service", map[string]interface{}{
 		"Name":         "auth-service",
@@ -294,8 +285,8 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		"Status":       "ACTIVE",
 	})
 	s.Graph.AddTypedEdge(prodMockCluster, authSvc, graph.EdgeTypeContains, 1)
-	
-	// Task A1 (Running)
+
+	// Create a healthy Task (A1).
 	taskA1 := "arn:aws:ecs:us-east-1:123456789012:task/production-cluster/auth-task-uuid-1"
 	s.Graph.AddNode(taskA1, "AWS::ECS::Task", map[string]interface{}{
 		"Name":           "auth-task-uuid-1",
@@ -305,7 +296,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 	s.Graph.AddTypedEdge(authSvc, taskA1, graph.EdgeTypeRuns, 1)
 
-	// Service B: Payment (Healthy)
+	// Create a healthy Service (B).
 	paymentSvc := "arn:aws:ecs:us-east-1:123456789012:service/production-cluster/payment-service"
 	s.Graph.AddNode(paymentSvc, "AWS::ECS::Service", map[string]interface{}{
 		"Name":         "payment-service",
@@ -315,7 +306,7 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 	})
 	s.Graph.AddTypedEdge(prodMockCluster, paymentSvc, graph.EdgeTypeContains, 1)
 
-	// 6. Ignored Resource (Should NOT appear in TUI)
+	// Create a volume ignored by tag.
 	s.Graph.AddNode("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockIGNORED", "AWS::EC2::Volume", map[string]interface{}{
 		"State": "available",
 		"Tags": map[string]string{
@@ -323,13 +314,10 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		},
 	})
 	s.Graph.MarkWaste("arn:aws:ec2:us-east-1:123456789012:volume/vol-0mockIGNORED", 100)
-	// Pre-set costs as Pricing Client is unavailable in mock mode.
+	// Set costs.
 
-	// Let's set costs here on the graph nodes directly.
-
-	// Scenario 10: Inefficient Monolith Fleet simulation for Autonomy Engine.
-	// Scenario: 5x m5.large instances running a legacy app.
-	// Solver should recommend migrating to c6g.large.
+	// Scenario 10: Monolith Fleet.
+	// Simulate 5x m5.large instances running a legacy app.
 	for i := 0; i < 5; i++ {
 		arn := fmt.Sprintf("arn:aws:ec2:us-east-1:123456789012:instance/i-0mockMonolith-%d", i)
 		s.Graph.AddNode(arn, "AWS::EC2::Instance", map[string]interface{}{
@@ -351,8 +339,8 @@ func (s *MockScanner) Scan(ctx context.Context) error {
 		}
 	}
 
-	// Scenario 11: High Performance Compute (HPC) simulation for Autonomy Engine.
-	// Scenario: 2x c5.4xlarge instances
+	// Scenario 11: High Performance Computing (HPC) Simulation.
+	// Simulate 2x c5.4xlarge instances.
 	for i := 0; i < 2; i++ {
 		arn := fmt.Sprintf("arn:aws:ec2:us-east-1:123456789012:instance/i-0mockHPC-%d", i)
 		s.Graph.AddNode(arn, "AWS::EC2::Instance", map[string]interface{}{

@@ -9,11 +9,11 @@ import (
 
 // Snapshot represents a point-in-time state.
 type Snapshot struct {
-	Timestamp      int64             `json:"timestamp"`       // Unix Epoch
-	TotalMonthlyCost float64           `json:"monthly_cost"`    // Estimated monthly cost.
-	ResourceCounts map[string]int    `json:"resource_counts"` // Resource counts by type.
-	WasteCount     int               `json:"waste_count"`     // Total number of flagged resources
-	Vector         Vector            `json:"-"`               // Derived state vector.
+	Timestamp        int64          `json:"timestamp"`
+	TotalMonthlyCost float64        `json:"monthly_cost"`
+	ResourceCounts   map[string]int `json:"resource_counts"`
+	WasteCount       int            `json:"waste_count"`
+	Vector           Vector         `json:"-"`
 }
 
 // Backend defines the storage interface for snapshots.
@@ -48,13 +48,24 @@ func (c *Client) LoadWindow(n int) ([]Snapshot, error) {
 	return c.backend.Load(n)
 }
 
+// NewLocalBackend creates a file-based backend at the specified path.
+func NewLocalBackend(path string) *FileBackend {
+	return &FileBackend{Path: path}
+}
+
 // FileBackend implements local filesystem storage.
-type FileBackend struct{}
+type FileBackend struct {
+	Path string
+}
 
 func (b *FileBackend) Append(s Snapshot) error {
-	path, err := GetLedgerPath()
-	if err != nil {
-		return err
+	path := b.Path
+	if path == "" {
+		var err error
+		path, err = GetLedgerPath()
+		if err != nil {
+			return err
+		}
 	}
 
 	dir := filepath.Dir(path)
@@ -80,9 +91,13 @@ func (b *FileBackend) Append(s Snapshot) error {
 }
 
 func (b *FileBackend) Load(n int) ([]Snapshot, error) {
-	path, err := GetLedgerPath()
-	if err != nil {
-		return nil, err
+	path := b.Path
+	if path == "" {
+		var err error
+		path, err = GetLedgerPath()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	f, err := os.Open(path)

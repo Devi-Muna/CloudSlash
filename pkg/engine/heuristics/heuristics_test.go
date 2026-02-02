@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 func TestZombieEBSHeuristic(t *testing.T) {
@@ -40,7 +40,8 @@ func TestZombieEBSHeuristic(t *testing.T) {
 
 	// 3. Run Heuristic
 	h := &UnattachedVolumeHeuristic{}
-	if err := h.Run(ctx, g); err != nil {
+	_, err := h.Run(ctx, g)
+	if err != nil {
 		t.Fatalf("Heuristic run failed: %v", err)
 	}
 
@@ -88,7 +89,8 @@ func TestS3MultipartHeuristic(t *testing.T) {
 
 	// 3. Run Heuristic
 	h := &S3MultipartHeuristic{}
-	if err := h.Run(ctx, g); err != nil {
+	_, err := h.Run(ctx, g)
+	if err != nil {
 		t.Fatalf("Heuristic run failed: %v", err)
 	}
 

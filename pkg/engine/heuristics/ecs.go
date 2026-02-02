@@ -6,30 +6,33 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine/aws"
-	internalconfig "github.com/DrSkyle/cloudslash/pkg/config"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	internalconfig "github.com/DrSkyle/cloudslash/v2/pkg/config"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/aws"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	awsecs "github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-// IdleClusterHeuristic detects active clusters with no tasks.
+// IdleClusterHeuristic checks idle clusters.
 type IdleClusterHeuristic struct {
 	Config internalconfig.IdleClusterConfig
 }
 
+// Name returns the name of the heuristic.
 func (h *IdleClusterHeuristic) Name() string { return "IdleClusterHeuristic" }
 
-func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+// Run executes the heuristic analysis.
+func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var clusters []*graph.Node
 	// Index instances.
 	instancesByCluster := make(map[string][]*graph.Node)
 
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::ECS::Cluster" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::ECS::Cluster" {
 			clusters = append(clusters, node)
 		}
-		if node.Type == "AWS::ECS::ContainerInstance" {
+		if node.TypeStr() == "AWS::ECS::ContainerInstance" {
 			if clusterArn, ok := node.Properties["ClusterArn"].(string); ok {
 				instancesByCluster[clusterArn] = append(instancesByCluster[clusterArn], node)
 			}
@@ -42,11 +45,11 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		// Check 1: Capacity validation.
 		regInstances, _ := cluster.Properties["RegisteredContainerInstancesCount"].(int)
 		if regInstances == 0 {
-			// Skip empty/Fargate clusters.
+			// Skip empty.
 			continue
 		}
 
-		// Check 2: Zero workload.
+		// 2. Check workload.
 		runningTasks, _ := cluster.Properties["RunningTasksCount"].(int)
 		pendingTasks, _ := cluster.Properties["PendingTasksCount"].(int)
 
@@ -54,55 +57,55 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			continue
 		}
 
-		// Check 3: Zero active services.
+		// 3. Check services.
 		activeServices, _ := cluster.Properties["ActiveServicesCount"].(int)
 		if activeServices > 0 {
-			// Active services imply intent.
+
 			continue
 		}
 
-		// Verify instance uptime stability.
+		// Check uptime.
 		isWaste := true
 
-		instances := instancesByCluster[cluster.ID]
-		
+		instances := instancesByCluster[cluster.IDStr()]
+
 		uptimeThreshold := h.Config.UptimeThreshold
 		if uptimeThreshold == 0 {
 			uptimeThreshold = 1 * time.Hour // Default
 		}
 
-		// Check for recent scaling activity.
-		// Confirm stability.
-		
+
+
 		if len(instances) == 0 {
-			// Skip inconsistent state.
+			// Skip inconsistent.
 			isWaste = false
 		} else {
 			for _, inst := range instances {
 				registeredAt, ok := inst.Properties["RegisteredAt"].(time.Time)
 				if ok {
 					if time.Since(registeredAt) > uptimeThreshold {
-						// Instance stable.
+						// Stable.
 					} else {
-						// Fresh instance detected. Abort.
+						// Fresh instance.
 						isWaste = false
 						break
 					}
 				}
 			}
 
-				// Cluster is stably idle.
+			// Idle.
 		}
 
 		if isWaste {
-			g.MarkWaste(cluster.ID, 85)
+			g.MarkWaste(cluster.IDStr(), 85)
+			stats.ItemsFound++
 
 			reason := fmt.Sprintf("Idle Cluster: %d active Container Instances (>1h uptime) with 0 running tasks.", regInstances)
 			cluster.Properties["Reason"] = reason
 		}
 	}
 
-	return nil
+	return stats, nil
 }
 
 // EmptyServiceHeuristic detects stuck services.
@@ -111,13 +114,16 @@ type EmptyServiceHeuristic struct {
 	ECS *aws.ECSScanner
 }
 
+// Name returns the name of the heuristic.
 func (h *EmptyServiceHeuristic) Name() string { return "EmptyServiceHeuristic" }
 
-func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+// Run executes the heuristic analysis.
+func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var services []*graph.Node
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::ECS::Service" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::ECS::Service" {
 			services = append(services, node)
 		}
 	}
@@ -128,11 +134,11 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		running, _ := service.Properties["RunningCount"].(int)
 
 		if desired > 0 && running == 0 {
-			// Diagnose stuck service.
+			// Diagnose.
 			events, _ := service.Properties["Events"].([]string)
 			diagnosis := "Reason: Service is failing to start tasks."
 
-			// Analyze failure events.
+			// Analyze events.
 			for _, event := range events {
 				if strings.Contains(event, "unable to place a task") {
 					diagnosis = "Reason: Insufficient Capacity (Infrastructure Issue)."
@@ -151,20 +157,19 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				}
 			}
 
-			// Check for missing ECR image.
+			// Check ECR.
 			if h.ECS != nil && h.ECR != nil {
 				taskDefARN, _ := service.Properties["TaskDefinition"].(string)
 				if taskDefARN != "" {
-					// Describe Task Definition.
-					// Optimization: Only check broken services.
+					// Describe task.
 					tdOut, err := h.ECS.Client.DescribeTaskDefinition(ctx, &awsecs.DescribeTaskDefinitionInput{
 						TaskDefinition: &taskDefARN,
 					})
 					if err == nil && tdOut.TaskDefinition != nil && len(tdOut.TaskDefinition.ContainerDefinitions) > 0 {
-						// Check primary container.
+						// Check container.
 						imageURI := *tdOut.TaskDefinition.ContainerDefinitions[0].Image
 						if imageURI != "" {
-							// Verify ECR image existence.
+							// Verify existence.
 							exists, err := h.ECR.CheckImageExists(ctx, imageURI)
 							if err == nil && !exists {
 								diagnosis = "Reason: Broken Artifact. Image not found in ECR."
@@ -174,10 +179,11 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				}
 			}
 
-			g.MarkWaste(service.ID, 90)
+			g.MarkWaste(service.IDStr(), 90)
 			service.Properties["Reason"] = fmt.Sprintf("STUCK Service. Desired: %d, Running: 0. %s", desired, diagnosis)
+			stats.ItemsFound++
 		}
 	}
 
-	return nil
+	return stats, nil
 }

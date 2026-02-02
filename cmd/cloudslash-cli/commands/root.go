@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine"
-	"github.com/DrSkyle/cloudslash/pkg/version"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -26,8 +26,7 @@ var rootCmd = &cobra.Command{
     
 Identify. Audit. Optimize.`,
 	Version: version.Current,
-	// Explicitly nil Run to ensure the help text is displayed by default.
-	Run: nil,
+	Run:     nil, // Forces help text display
 }
 
 func Execute() {
@@ -40,7 +39,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Register persistent flags available to this command and all subcommands.
 	rootCmd.PersistentFlags().StringVar(&config.Region, "region", "us-east-1", "AWS Region")
 	rootCmd.PersistentFlags().StringVar(&config.TFStatePath, "tfstate", "terraform.tfstate", "Path to web.tfstate")
 	rootCmd.PersistentFlags().BoolVar(&config.AllProfiles, "all-profiles", false, "Scan all AWS profiles")
@@ -54,7 +52,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.OutputDir, "output-dir", "cloudslash-out", "Directory for artifacts")
 	rootCmd.PersistentFlags().StringVar(&config.OtelEndpoint, "otel-endpoint", "", "OpenTelemetry Exporter Endpoint (HTTP)")
 
-	// Bind pflags to viper for hierarchical configuration resolution (Flag > Env > Config).
 	viper.BindPFlag("region", rootCmd.PersistentFlags().Lookup("region"))
 	viper.BindPFlag("tfstate", rootCmd.PersistentFlags().Lookup("tfstate"))
 	viper.BindPFlag("all_profiles", rootCmd.PersistentFlags().Lookup("all-profiles"))
@@ -68,7 +65,6 @@ func init() {
 	viper.BindPFlag("output_dir", rootCmd.PersistentFlags().Lookup("output-dir"))
 	viper.BindPFlag("otel_endpoint", rootCmd.PersistentFlags().Lookup("otel-endpoint"))
 
-	// Internal debugging flags.
 	rootCmd.PersistentFlags().BoolVar(&config.MockMode, "mock", false, "Run in Mock Mode")
 	rootCmd.PersistentFlags().MarkHidden("mock")
 
@@ -77,12 +73,11 @@ func init() {
 	})
 
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Check for newer versions during primary operations.
+		// Check for updates on major commands.
 		if cmd.Name() == "help" || cmd.Name() == "scan" || cmd.Name() == "update" {
 			checkUpdate()
 		}
 
-		// Hydrate the configuration object from resolved viper values.
 		config.Region = viper.GetString("region")
 		config.TFStatePath = viper.GetString("tfstate")
 		config.AllProfiles = viper.GetBool("all_profiles")
@@ -113,12 +108,12 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("$HOME/.cloudslash")
-	
+
 	viper.SetEnvPrefix("CLOUDSLASH")
-	viper.AutomaticEnv() // Read in environment variables that match
+	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
-		// Config loaded successfully.
+		// Configuration loaded.
 	}
 }
 
@@ -144,7 +139,7 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 		}
 	}
 	fmt.Println("")
-	
+
 	fmt.Println(titleStyle.Render("EXAMPLES"))
 	fmt.Println("  cloudslash scan                          # Interactive Mode (TUI)")
 	fmt.Println("  cloudslash scan --headless --region ...  # CI/CD Mode (No TUI)")
@@ -166,7 +161,6 @@ func renderFutureGlassHelp(cmd *cobra.Command) {
 }
 
 func safeWriteConfig() {
-	// Persist the default configuration, creating the file if it doesn't exist.
 	if err := viper.SafeWriteConfig(); err != nil {
 		if err2 := viper.WriteConfig(); err2 != nil {
 			// Fallback: manually create the file if viper fails to resolve the path.

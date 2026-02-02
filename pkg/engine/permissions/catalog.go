@@ -49,10 +49,10 @@ var Catalog = map[string][]string{
 		"lambda:GetFunction", // For runtime details
 		"lambda:ListTags",
 	},
-    "CloudWatch": {
-        "cloudwatch:GetMetricData",
-        "cloudwatch:ListMetrics",
-    },
+	"CloudWatch": {
+		"cloudwatch:GetMetricData",
+		"cloudwatch:ListMetrics",
+	},
 }
 
 // CorePermissions returns the absolute minimum permissions needed for the engine to boot.

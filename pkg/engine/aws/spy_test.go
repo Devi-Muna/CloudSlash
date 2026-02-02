@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
@@ -45,13 +45,13 @@ func (s *SpyClient) DescribeInstanceTypes(ctx context.Context, params *ec2.Descr
 
 // Mutating Methods (Trap)
 // Note: These methods are NOT in the EC2Client interface used by EC2Scanner (which is GOOD).
-// If EC2Scanner were to start using them, we'd have to add them to the interface, 
+// If EC2Scanner were to start using them, we'd have to add them to the interface,
 // and this test would fail to compile unless we added them here too.
-// 
+//
 // To make this a runtime test, we should conceptually check if the *Scanner* calls anything dangerous.
-// Since Go is statically typed, if the Scanner *tried* to call TerminateInstances on the interface, 
+// Since Go is statically typed, if the Scanner *tried* to call TerminateInstances on the interface,
 // the interface definition in ec2.go would explicitly list it.
-// 
+//
 // Verification Strategy:
 // 1. We assert that the `EC2Client` interface in `ec2.go` DOES NOT contain Terminate/Delete methods.
 //    (This is implicitly checked because if it did, SpyClient would fail to implement it without them).
@@ -60,7 +60,7 @@ func (s *SpyClient) DescribeInstanceTypes(ctx context.Context, params *ec2.Descr
 func TestSafetyGuarantee(t *testing.T) {
 	spy := &SpyClient{}
 	g := graph.NewGraph()
-	
+
 	// Inject Spy
 	scanner := &EC2Scanner{
 		Client: spy, // Go Check 1: If EC2Scanner requires mutating methods in interface, this breaks.
@@ -72,13 +72,14 @@ func TestSafetyGuarantee(t *testing.T) {
 	// Run all scans
 	// If any of these internally called a mutating method (e.g. via type assertion or side channel),
 	// we'd want to catch it. But we can't easily catch type assertions to raw client here.
-	// The best proof is that we provided a Spy that *only* does reads. 
+	// The best proof is that we provided a Spy that *only* does reads.
 	// If the code successfully runs using *only* this interface, it is incapable of mutation via this client.
-	
+
 	if err := scanner.ScanInstances(ctx); err != nil {
 		// Ignore mock errors, we filter for mutations
 	}
-	if err := scanner.ScanVolumes(ctx); err != nil {}
+	if err := scanner.ScanVolumes(ctx); err != nil {
+	}
 	// ... run others
 
 	// Check Mutations
@@ -89,9 +90,9 @@ func TestSafetyGuarantee(t *testing.T) {
 	// Double Check: Verify interface compliance manually for "Delete" substring?
 	// Not easy in Go reflection at runtime for static interface.
 	// But we can check if any *calls* we tracked were mutations.
-	// Since we didn't implement TerminateInstances, if Scanner called it, it would be a compile error 
+	// Since we didn't implement TerminateInstances, if Scanner called it, it would be a compile error
 	// OR panic if it was dynamically typed.
-	
+
 	t.Log("Safety Guarantee Verified: Scanner only utilizes Read-Only Interface methods.")
 }
 

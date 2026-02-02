@@ -4,16 +4,17 @@ import (
 	"context"
 	"strings"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
+// EIPScanner scans Elastic IPs.
 type EIPScanner struct {
-	Client   *ec2.Client
+	Client    *ec2.Client
 	R53Client *route53.Client
-	Graph    *graph.Graph
+	Graph     *graph.Graph
 }
 
 func NewEIPScanner(cfg aws.Config, g *graph.Graph) *EIPScanner {
@@ -24,7 +25,7 @@ func NewEIPScanner(cfg aws.Config, g *graph.Graph) *EIPScanner {
 	}
 }
 
-// ScanAddresses discovers Elastic IP addresses (EIPs).
+// ScanAddresses discovers Elastic IPs.
 func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 	out, err := s.Client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if err != nil {
@@ -36,8 +37,8 @@ func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 		id := *addr.AllocationId
 
 		props := map[string]interface{}{
-			"Service": "EIP",
-			"PublicIp": ip,
+			"Service":      "EIP",
+			"PublicIp":     ip,
 			"AllocationId": id,
 		}
 
@@ -50,38 +51,43 @@ func (s *EIPScanner) ScanAddresses(ctx context.Context) error {
 		}
 
 		s.Graph.AddNode(id, "aws_eip", props)
-		
-		// Verify DNS usage to prevent dangling records.
+
+		// Check for DNS records pointing to this IP.
 		go s.checkDNS(ctx, id, ip)
 	}
 	return nil
 }
 
+// checkDNS checks Route53 for IP records.
 func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 	// List Hosted Zones.
 	zonesPaginator := route53.NewListHostedZonesPaginator(s.R53Client, &route53.ListHostedZonesInput{})
-	
+
 	foundInDNS := false
 	badZone := ""
-	
+
 	for zonesPaginator.HasMorePages() {
 		page, err := zonesPaginator.NextPage(ctx)
-		if err != nil { break }
-		
+		if err != nil {
+			break
+		}
+
 		for _, zone := range page.HostedZones {
-			// Search records within zone.
-			// Scan records (Route53 lacks value filtering).
-			
+			// Search zone.
+			// Scan records.
+
 			recPaginator := route53.NewListResourceRecordSetsPaginator(s.R53Client, &route53.ListResourceRecordSetsInput{
 				HostedZoneId: zone.Id,
 			})
-			
+
 			for recPaginator.HasMorePages() {
 				recPage, err := recPaginator.NextPage(ctx)
-				if err != nil { break }
-				
+				if err != nil {
+					break
+				}
+
 				for _, rec := range recPage.ResourceRecordSets {
-					// Check ResourceRecords
+					// Check records.
 					for _, rr := range rec.ResourceRecords {
 						if rr.Value != nil && strings.Contains(*rr.Value, ip) {
 							foundInDNS = true
@@ -89,15 +95,22 @@ func (s *EIPScanner) checkDNS(ctx context.Context, id, ip string) {
 							break
 						}
 					}
-					if foundInDNS { break }
+					if foundInDNS {
+						break
+					}
 				}
-				if foundInDNS { break }
+				if foundInDNS {
+					break
+				}
 			}
-			if foundInDNS { break }
+			if foundInDNS {
+				break
+			}
 		}
-		if foundInDNS { break }
+		if foundInDNS {
+			break
+		}
 	}
-	
 
 	node := s.Graph.GetNode(id)
 	if node != nil {

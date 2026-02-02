@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/version"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -29,7 +29,7 @@ func (m Model) viewHUD() string {
 		savings += fmt.Sprintf(" ($%.0f/yr)", m.totalSavings*12)
 	}
 
-	// Risk Score (Mock logic for now, or derived from graph).
+	// Aggregate Risk Assessment.
 	riskLevel := "LOW"
 	riskColor := subtle
 	if m.totalSavings > 100 {
@@ -41,20 +41,17 @@ func (m Model) viewHUD() string {
 		riskColor = danger
 	}
 
-	// Assemble Segments
-	// [ CLOUDSLASH ] [ TASKS: 12/40 ] [ WASTE: $... ] [ RISK: ... ]
+	// Assemble HUD Segments: [TITLE] [STATUS] [WASTE] [RISK]
 
 	// Top Status Bar
 	m.Graph.Mu.RLock()
-	count := len(m.Graph.Nodes)
+	nodeCount := len(m.Graph.GetNodes())
 	m.Graph.Mu.RUnlock()
-	segTitle := highlight.Render(fmt.Sprintf(" %s %s [%s] | %s | %d Resources Scanned", version.AppName, version.Current, version.License, m.Region, count))
+	segTitle := highlight.Render(fmt.Sprintf(" %s %s [%s] | %s | %d Resources Scanned", version.AppName, version.Current, version.License, m.Region, nodeCount))
 	// Status Segment (Progress Bar or Static Status)
 	var segStatus string
 	if m.scanning {
-		// "Scanning..." label is implicit or added before?
-		// Let's just use the bar. The user wanted: "Scanning AWS Region us-east-1 [████] 80%"
-		// We can add the text prefix.
+
 		segStatus = lipgloss.JoinHorizontal(lipgloss.Center,
 			statusColor.Render("Scanning... "),
 			m.progress.View(),
@@ -70,11 +67,6 @@ func (m Model) viewHUD() string {
 	if width < 0 {
 		width = 0
 	}
-
-	// Simple Layout: Left aligned for now to be safe, or flex
-	// Left: Title + Status
-	// Right: Waste + Risk
-	// For TUI, simpler is often better. Let's do a join.
 
 	// Using lipgloss for layout
 	left := lipgloss.JoinHorizontal(lipgloss.Center, segTitle, "  ", segStatus)

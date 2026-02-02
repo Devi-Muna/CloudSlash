@@ -5,32 +5,36 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
-// StorageOptimizationHeuristic detects storage inefficiency.
+// StorageOptimizationHeuristic checks storage.
 type StorageOptimizationHeuristic struct{}
 
 func (h *StorageOptimizationHeuristic) Name() string { return "StorageOptimization" }
 
-func (h *StorageOptimizationHeuristic) Run(ctx context.Context, g *graph.Graph) error {
-	h.Analyze(g)
-	return nil
+func (h *StorageOptimizationHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	return h.Analyze(g), nil
 }
 
-func (h *StorageOptimizationHeuristic) Analyze(g *graph.Graph) {
+func (h *StorageOptimizationHeuristic) Analyze(g *graph.Graph) *HeuristicStats {
+	stats := &HeuristicStats{}
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, n := range g.Nodes {
-		switch n.Type {
+	for _, node := range g.GetNodes() {
+		switch node.TypeStr() {
 		case "AWS::S3::MultipartUpload":
-			h.analyzeMultipart(n)
+			if h.analyzeMultipart(node) {
+				stats.ItemsFound++
+				// Minimal cost.
+			}
 		}
 	}
+	return stats
 }
 
-func (h *StorageOptimizationHeuristic) analyzeMultipart(n *graph.Node) {
+func (h *StorageOptimizationHeuristic) analyzeMultipart(n *graph.Node) bool {
 	init, _ := n.Properties["Initiated"].(time.Time)
 	dayz := int(time.Since(init).Hours() / 24)
 
@@ -39,5 +43,7 @@ func (h *StorageOptimizationHeuristic) analyzeMultipart(n *graph.Node) {
 		n.RiskScore = 20
 		n.Properties["Reason"] = fmt.Sprintf("Incomplete Multipart Upload: Initiated %d days ago.", dayz)
 		n.Properties["FixRecommendation"] = "Add AbortIncompleteMultipartUpload Lifecycle Rule (7 days)."
+		return true
 	}
+	return false
 }

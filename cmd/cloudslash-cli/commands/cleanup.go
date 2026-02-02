@@ -7,11 +7,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine/aws"
-	"github.com/DrSkyle/cloudslash/pkg/engine/audit"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/engine/heuristics"
-	"github.com/DrSkyle/cloudslash/pkg/engine/swarm"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/audit"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/aws"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/heuristics"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/remediation"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/swarm"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/storage"
 	"github.com/spf13/cobra"
 )
 
@@ -38,28 +40,27 @@ var CleanupCmd = &cobra.Command{
 		engine := swarm.NewEngine()
 		engine.Start(ctx)
 
-		// Execute a headless scan to build the infrastructure graph.
+
+
 		fmt.Println("\n[SCAN] Analyzing infrastructure topology...")
-		client, err := aws.NewClient(ctx, config.Region, "", config.Verbose) // Default region/profile.
+		client, err := aws.NewClient(ctx, config.Region, "", config.Verbose)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
 
-		// Initialize the heuristics engine.
+		// Initialize heuristics.
 		hEngine := heuristics.NewEngine()
 		hEngine.Register(&heuristics.UnattachedVolumeHeuristic{Pricing: nil})
-		// Register additional heuristics as needed.
 
-		// Execute the specific volume scan module.
 		ec2 := aws.NewEC2Scanner(client.Config, g)
 		ec2.ScanVolumes(ctx)
 		hEngine.Run(ctx, g)
 
-		// Identify waste resources in the graph.
+		// Filter for waste nodes.
 		g.Mu.RLock()
 		var waste []*graph.Node
-		for _, node := range g.Nodes {
+		for _, node := range g.GetNodes() {
 			if node.IsWaste {
 				waste = append(waste, node)
 			}
@@ -76,11 +77,14 @@ var CleanupCmd = &cobra.Command{
 		deleter := aws.NewDeleter(client.Config)
 
 		for _, item := range waste {
-			fmt.Printf("\n[TARGET] %s (%s)\n", item.ID, item.Type)
+			fmt.Printf("\n[TARGET] %s (%s)\n", item.IDStr(), item.TypeStr())
 			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
 
-			// Check for dependent resources that might be impacted.
-			dependents := g.GetUpstream(item.ID)
+			fmt.Printf("\n[TARGET] %s (%s)\n", item.IDStr(), item.TypeStr())
+			fmt.Printf(" Reason: %s\n", item.Properties["Reason"])
+
+			// Check dependencies.
+			dependents := g.GetUpstream(item.IDStr())
 			if len(dependents) > 0 {
 				activeDeps := 0
 				exampleDep := ""
@@ -106,15 +110,19 @@ var CleanupCmd = &cobra.Command{
 			if scanner.Scan() {
 				ans := strings.ToLower(strings.TrimSpace(scanner.Text()))
 				if ans == "y" {
-					fmt.Printf("    Deleting %s... ", item.ID)
-					// Verify the deletion request with the cloud provider.
-					err := deleter.DeleteVolume(ctx, item.ID)
+					fmt.Printf("    [Safety] initializing Lazarus Protocol for %s...\n", item.IDStr())
+
+					store := storage.NewLocalStore(".cloudslash/tombstones")
+
+					// Execute safe deletion.
+					err := remediation.ExecuteSafeDeletion(ctx, item, deleter, store)
 					if err != nil {
-						fmt.Printf("FAILED: %v\n", err)
-					} else {
-						fmt.Printf("Successfully deleted.\n")
-						audit.LogAction("DELETED", item.ID, item.Type, item.Cost, fmt.Sprintf("%v", item.Properties["Reason"]))
+						fmt.Printf("    [FATAL] Safety Check Failed: %v\n    ABORTING DELETION.\n", err)
+						continue
 					}
+
+					fmt.Printf("    [Success] Resource securely remediated.\n")
+					audit.LogAction("DELETED", item.IDStr(), item.TypeStr(), item.Cost, fmt.Sprintf("%v", item.Properties["Reason"]))
 				} else {
 					fmt.Println("    Skipped.")
 				}

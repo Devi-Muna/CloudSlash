@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/version"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 )
 
 // GenerateDashboard generates an interactive HTML dashboard.
 func GenerateDashboard(g *graph.Graph, path string) error {
-	items := extractItems(g) // Extract items.
+	items := extractItems(g)
 
 	// Compute statistics.
 	totalCost := 0.0
@@ -298,14 +298,14 @@ func GenerateDashboard(g *graph.Graph, path string) error {
                 const badgeClass = item.risk_score > 50 ? 'JUNK' : (item.action === 'JUSTIFIED' ? 'JUSTIFIED' : 'REVIEW');
                 const costStyle = item.monthly_cost > 0 ? 'color: #FF3366; font-weight: bold;' : 'color: #94A3B8;';
 
-                tr.innerHTML = `+"`"+`
-                    <td><span style="opacity:0.8; font-weight: 500;">`+"`"+` + item.type.replace('AWS::', '') + `+"`"+`</span></td>
-                    <td style="font-weight:600; color: #fff;">`+"`"+` + item.resource_id + `+"`"+`</td>
-                    <td>`+"`"+` + item.region + `+"`"+`</td>
-                    <td style="`+"`"+` + costStyle + `+"`"+`">`+"`"+` + currency.format(item.monthly_cost) + `+"`"+`</td>
-                    <td><span class="badge `+"`"+` + badgeClass + `+"`"+`">`+"`"+` + item.action + `+"`"+`</span></td>
-                    <td style="color: #94A3B8;">`+"`"+` + item.audit_detail + `+"`"+`</td>
-                `+"`"+`;
+                tr.innerHTML = ` + "`" + `
+                    <td><span style="opacity:0.8; font-weight: 500;">` + "`" + ` + item.type.replace('AWS::', '') + ` + "`" + `</span></td>
+                    <td style="font-weight:600; color: #fff;">` + "`" + ` + item.resource_id + ` + "`" + `</td>
+                    <td>` + "`" + ` + item.region + ` + "`" + `</td>
+                    <td style="` + "`" + ` + costStyle + ` + "`" + `">` + "`" + ` + currency.format(item.monthly_cost) + ` + "`" + `</td>
+                    <td><span class="badge ` + "`" + ` + badgeClass + ` + "`" + `">` + "`" + ` + item.action + ` + "`" + `</span></td>
+                    <td style="color: #94A3B8;">` + "`" + ` + item.audit_detail + ` + "`" + `</td>
+                ` + "`" + `;
                 tbody.appendChild(tr);
             });
         }
@@ -735,38 +735,37 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 
 	// 2. Add graph nodes.
 	currentIndex := 1
-	for _, n := range g.Nodes {
-		idToIndex[n.ID] = currentIndex
-		name := extractID(n.ID)
+	for _, n := range g.GetNodes() {
+		idToIndex[n.IDStr()] = currentIndex
+		name := extractID(n.IDStr())
 		nodes = append(nodes, SankeyNode{Name: name, Waste: n.IsWaste})
 		currentIndex++
 	}
 
-	// 3. Create links.
-	for sourceIdx, edges := range g.Edges {
-		if sourceIdx >= len(g.Nodes) { continue }
-		sourceNode := g.Nodes[sourceIdx]
-		srcIdx, ok1 := idToIndex[sourceNode.ID]
+	// Create links.
+	allNodes := g.GetNodes()
+	for _, sourceNode := range allNodes {
+		edges := g.GetEdges(sourceNode.Index)
+
+		srcIdx, ok1 := idToIndex[sourceNode.IDStr()]
 		if !ok1 {
 			continue
 		}
 
 		for _, e := range edges {
 			targetNode := g.GetNodeByID(e.TargetID)
-			if targetNode == nil { continue }
-			tgtIdx, ok2 := idToIndex[targetNode.ID]
+			if targetNode == nil {
+				continue
+			}
+			tgtIdx, ok2 := idToIndex[targetNode.IDStr()]
 			if !ok2 {
 				continue
 			}
 
 			// Calculate link weight based on cost.
-			
-			
-			
-			
 
 			// Weight link by target cost.
-			
+
 			val := 8.0
 			if targetNode != nil && targetNode.Cost > 0 {
 				val += math.Log10(targetNode.Cost+1) * 8
@@ -782,11 +781,11 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 
 	// 4. Link gateways to Internet.
 	// Find IGWs and link INTERNET -> IGW
-	for _, n := range g.Nodes {
-		if n.Type == "AWS::EC2::InternetGateway" {
+	for _, n := range g.GetNodes() {
+		if n.TypeStr() == "AWS::EC2::InternetGateway" {
 			links = append(links, SankeyLink{
 				Source: 0, // Internet
-				Target: idToIndex[n.ID],
+				Target: idToIndex[n.IDStr()],
 				Value:  10.0, // Fat pipe
 			})
 		}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
@@ -23,26 +23,25 @@ func NewScanner(client *Client, g *graph.Graph) *Scanner {
 	}
 }
 
-func (s *Scanner) Scan(ctx context.Context) error {
+func (s *Scanner) Name() string { return "K8sScanner" }
+
+func (s *Scanner) Scan(ctx context.Context, g *graph.Graph) error {
 	if s.Client == nil {
-		return nil // Graceful skip if no client
+		return nil
 	}
 
-	// 1. Initialize SharedInformerFactory
-	// "Best in the World" generic pattern: Local Cache + Watch
-	// Resync every 10 minutes to ensure eventual consistency
+	// Initialize SharedInformerFactory.
+	// Resync every 10m for consistency.
 	factory := informers.NewSharedInformerFactory(s.Client.Clientset, 10*time.Minute)
 
-	// 2. Initialize Listers (binds Informers to the factory)
+	// Initialize Listers.
 	nodeLister := factory.Core().V1().Nodes().Lister()
 	podLister := factory.Core().V1().Pods().Lister()
 
-	// 3. Start Informers & Wait for Cache Sync
-	// This establishes the Watch connection without blocking the main thread initially
+	// Start Informers.
 	factory.Start(ctx.Done())
 
-	// Wait for the local cache to fully populate from the API server
-	// This prevents "empty list" bugs on startup
+	// Wait for cache sync.
 	synced := factory.WaitForCacheSync(ctx.Done())
 	for kind, ok := range synced {
 		if !ok {
@@ -50,7 +49,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 	}
 
-	// 4. Query Local Cache (0% Load on API Server)
+	// Query Local Cache.
 	nodes, err := nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("failed to list k8s nodes from cache: %v", err)
@@ -66,12 +65,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Map NodeGroup Name -> Data
 	nodeGroups := make(map[string]*NodeGroupData)
 
-	// Note: Lister returns []*corev1.Node (pointers)
+	// Iterate nodes.
 	for _, node := range nodes {
 		// EKS specific label
 		ngName, ok := node.Labels["eks.amazonaws.com/nodegroup"]
 		if !ok {
-			continue // Not an EKS Node Group node
+			continue
 		}
 
 		if _, exists := nodeGroups[ngName]; !exists {
@@ -82,7 +81,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		nodeGroups[ngName].NodeNames = append(nodeGroups[ngName].NodeNames, node.Name)
 	}
 
-	// List ALL Pods from local cache
+	// List all pods.
 	allPods, err := podLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("failed to list all pods from cache: %v", err)
@@ -96,7 +95,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 	}
 
-	// Process Groups
+	// Process Groups.
 	for ngName, ng := range nodeGroups {
 		realWorkloadCount := 0
 		totalNodeCount := len(ng.NodeNames)
@@ -105,12 +104,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			pods := podsByNode[nodeName]
 
 			for _, pod := range pods {
-				// Zombie Pod Check.
+				// Skip finished pods.
 				if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 					continue
 				}
 
-				// Infra Check (DaemonSet).
+				// Skip DaemonSets.
 				isDaemonSet := false
 				for _, ref := range pod.OwnerReferences {
 					if ref.Kind == "DaemonSet" {
@@ -122,17 +121,17 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					continue
 				}
 
-				// Mirror Check.
+				// Skip static mirror pods.
 				if _, isMirror := pod.Annotations["kubernetes.io/config.mirror"]; isMirror {
 					continue
 				}
 
-				// Namespace Safety Net.
+				// Skip system namespace.
 				if pod.Namespace == "kube-system" {
 					continue
 				}
 
-				// IT IS SIGNAL
+				// Active workload.
 				realWorkloadCount++
 			}
 		}

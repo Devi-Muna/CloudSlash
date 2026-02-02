@@ -4,14 +4,15 @@ import (
 	"context"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
+// VpcEndpointScanner scans Interface Endpoints.
 type VpcEndpointScanner struct {
 	Client   *ec2.Client
 	CWClient *cloudwatch.Client
@@ -26,7 +27,7 @@ func NewVpcEndpointScanner(cfg aws.Config, g *graph.Graph) *VpcEndpointScanner {
 	}
 }
 
-// ScanEndpoints discovers Interface VPC Endpoints.
+// ScanEndpoints scans endpoints and checks traffic.
 func (s *VpcEndpointScanner) ScanEndpoints(ctx context.Context) error {
 	paginator := ec2.NewDescribeVpcEndpointsPaginator(s.Client, &ec2.DescribeVpcEndpointsInput{
 		Filters: []types.Filter{
@@ -36,36 +37,41 @@ func (s *VpcEndpointScanner) ScanEndpoints(ctx context.Context) error {
 
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		for _, ep := range page.VpcEndpoints {
 			id := *ep.VpcEndpointId
-			
+
 			props := map[string]interface{}{
-				"Service": "VpcEndpoint",
-				"Type":    "Interface",
-				"VpcId":   *ep.VpcId,
+				"Service":     "VpcEndpoint",
+				"Type":        "Interface",
+				"VpcId":       *ep.VpcId,
 				"ServiceName": *ep.ServiceName,
-				"State":   string(ep.State),
+				"State":       string(ep.State),
 			}
-			
+
 			s.Graph.AddNode(id, "aws_vpc_endpoint", props)
-			
+
 			go s.checkFlow(ctx, id, props)
 		}
 	}
 	return nil
 }
 
+// checkFlow queries bytes processed (30 days).
 func (s *VpcEndpointScanner) checkFlow(ctx context.Context, id string, props map[string]interface{}) {
 	node := s.Graph.GetNode(id)
-	if node == nil { return }
-	
-	// Check bytes processed.
-	
+	if node == nil {
+		return
+	}
+
+	// Check bytes.
+
 	endTime := time.Now()
 	startTime := endTime.Add(-30 * 24 * time.Hour) // 30 Days
-	
+
 	queries := []cwtypes.MetricDataQuery{
 		{
 			Id: aws.String("m_bytes"),
@@ -80,21 +86,23 @@ func (s *VpcEndpointScanner) checkFlow(ctx context.Context, id string, props map
 			},
 		},
 	}
-	
+
 	out, err := s.CWClient.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 		MetricDataQueries: queries,
 		StartTime:         &startTime,
 		EndTime:           &endTime,
 	})
-	if err != nil { return }
-	
+	if err != nil {
+		return
+	}
+
 	totalBytes := 0.0
 	for _, res := range out.MetricDataResults {
 		for _, v := range res.Values {
 			totalBytes += v
 		}
 	}
-	
+
 	s.Graph.Mu.Lock()
 	node.Properties["SumBytesProcessed30d"] = totalBytes
 	s.Graph.Mu.Unlock()

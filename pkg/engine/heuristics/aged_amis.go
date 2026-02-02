@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 type AgedAMIHeuristic struct{}
@@ -13,24 +13,25 @@ func (h *AgedAMIHeuristic) Name() string {
 	return "AgedAMIs"
 }
 
-func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	// Identify candidates.
-	// Gather candidates to avoid lock contention.
+	// Avoid lock contention.
 	g.Mu.RLock()
 	var candidates []string
 
 	cutoff := time.Now().AddDate(0, -3, 0)
 	timeLayout := "2006-01-02T15:04:05.000Z"
 
-	for id, node := range g.Nodes {
-		if node.Type != "AWS::EC2::AMI" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() != "AWS::EC2::AMI" {
 			continue
 		}
 
-		// Check creation age.
+		// Check age.
 		creationTime, ok := node.Properties["CreateTime"].(time.Time)
 		if !ok {
-			// Fallback: Parse string date.
+			// Parse date.
 			dateStr, ok := node.Properties["CreationDate"].(string)
 			if !ok || dateStr == "" {
 				continue
@@ -43,45 +44,43 @@ func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		if creationTime.After(cutoff) {
-			continue // Less than 90 days old
+			continue
 		}
 
 		// Check usages.
 		isUsed := false
-		if int(id) < len(g.ReverseEdges) {
-			upstream := g.ReverseEdges[id]
-			for _, edge := range upstream {
-				if edge.Type == graph.EdgeTypeUses {
-					isUsed = true
-					break
-				}
+		upstream := g.GetReverseEdges(node.Index)
+		for _, edge := range upstream {
+			if edge.Type == graph.EdgeTypeUses {
+				isUsed = true
+				break
 			}
 		}
 
 		if !isUsed {
-			candidates = append(candidates, node.ID)
+			candidates = append(candidates, node.IDStr())
 		}
 	}
 	g.Mu.RUnlock()
 
-	// Mark candidates as waste.
+	// Mark waste.
 	for _, arn := range candidates {
-		// MarkWaste respects ignore tags.
+		// Respect ignore tags.
 		g.MarkWaste(arn, 40)
 
 		// Enrich metadata.
-		// Add details if not ignored.
-		// Re-acquire lock.
 		node := g.GetNode(arn)
 		if node != nil {
 			g.Mu.Lock()
 			if node.IsWaste {
 				node.Properties["Reason"] = "Aged Artifact: AMI is > 90 days old and has no active instances."
 				node.Cost = 1.00 // Approx storage cost
+				stats.ItemsFound++
+				stats.ProjectedSavings += node.Cost
 			}
 			g.Mu.Unlock()
 		}
 	}
 
-	return nil
+	return stats, nil
 }

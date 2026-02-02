@@ -1,11 +1,13 @@
 package lazarus
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
+
+	"github.com/DrSkyle/cloudslash/v2/pkg/storage"
+
 )
 
 // Tombstone represents the serialized "Soul" (Configuration) of a resource before deletion.
@@ -28,26 +30,20 @@ func NewTombstone(id, kind, region string, metadata map[string]interface{}) *Tom
 	}
 }
 
-// Save writes the tombstone to disk (e.g., .cloudslash/tombstones/{id}.json).
-func (t *Tombstone) Save(dir string) error {
-	path := filepath.Join(dir, fmt.Sprintf("%s.json", t.ResourceID))
-	
-	// Ensure directory exists
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create tombstone directory: %w", err)
-	}
-
+// Save writes the tombstone to the storage backend.
+func (t *Tombstone) Save(ctx context.Context, store storage.BlobStore) error {
+	key := fmt.Sprintf("%s.json", t.ResourceID)
 	data, err := json.MarshalIndent(t, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize tombstone: %w", err)
 	}
 
-	return os.WriteFile(path, data, 0600) // Secure permissions
+	return store.Put(ctx, key, data)
 }
 
-// LoadTombstone reads a tombstone from disk.
-func LoadTombstone(path string) (*Tombstone, error) {
-	data, err := os.ReadFile(path)
+// LoadTombstone reads a tombstone from storage.
+func LoadTombstone(ctx context.Context, store storage.BlobStore, key string) (*Tombstone, error) {
+	data, err := store.Get(ctx, key)
 	if err != nil {
 		return nil, err
 	}

@@ -5,21 +5,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
-// ElasticacheScanner manages ElastiCache discovery and metric analysis.
+// ElasticacheScanner scans ElastiCache clusters.
 type ElasticacheScanner struct {
 	Client   *elasticache.Client
 	CWClient *cloudwatch.Client
 	Graph    *graph.Graph
 }
 
-// NewElasticacheScanner initializes a new scanner.
+// NewElasticacheScanner initializes a scanner for ElastiCache resources.
 func NewElasticacheScanner(cfg aws.Config, g *graph.Graph) *ElasticacheScanner {
 	return &ElasticacheScanner{
 		Client:   elasticache.NewFromConfig(cfg),
@@ -28,8 +28,7 @@ func NewElasticacheScanner(cfg aws.Config, g *graph.Graph) *ElasticacheScanner {
 	}
 }
 
-// ScanClusters discovers clusters and metrics.
-// Analyzes metrics over a 7-day window.
+// ScanClusters scans clusters and analyzes metrics.
 func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 	paginator := elasticache.NewDescribeCacheClustersPaginator(s.Client, &elasticache.DescribeCacheClustersInput{
 		ShowCacheNodeInfo: aws.Bool(true),
@@ -42,27 +41,28 @@ func (s *ElasticacheScanner) ScanClusters(ctx context.Context) error {
 		}
 
 		for _, cluster := range page.CacheClusters {
-			// Note: Describes all cache nodes.
-			
-			// Group nodes by Cluster ID.
+
+
+			// Group by ClusterID.
 			id := *cluster.CacheClusterId
-			
+
 			props := map[string]interface{}{
-				"Service":        "Elasticache",
-				"Engine":         *cluster.Engine,
-				"Status":         *cluster.CacheClusterStatus,
-				"NodeType":       *cluster.CacheNodeType,
-				"EngineVersion":  *cluster.EngineVersion,
-				"NumCacheNodes":  cluster.NumCacheNodes,
+				"Service":       "Elasticache",
+				"Engine":        *cluster.Engine,
+				"Status":        *cluster.CacheClusterStatus,
+				"NodeType":      *cluster.CacheNodeType,
+				"EngineVersion": *cluster.EngineVersion,
+				"NumCacheNodes": cluster.NumCacheNodes,
 			}
-			// Fetch comprehensive metrics (Connections, Hits/Misses, CPU, Network).
-			
+			// Fetch metrics.
+
 			go s.enrichClusterMetrics(ctx, id, cluster.CacheNodeType, props)
 		}
 	}
 	return nil
 }
 
+// enrichClusterMetrics retrieves performance metrics.
 func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID string, nodeType *string, props map[string]interface{}) {
 	node := s.Graph.GetNode(clusterID)
 	// s.Graph.Mu.Unlock() - Removed, GetNode handles lock
@@ -74,7 +74,7 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 	endTime := time.Now()
 	startTime := endTime.Add(-7 * 24 * time.Hour) // 7-day window.
 
-	// Metrics to fetch.
+	// Metrics.
 	queries := []cwtypes.MetricDataQuery{
 		{
 			Id: aws.String("m_conn"),
@@ -137,7 +137,7 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 			},
 		},
 	}
-    
+
 	out, err := s.CWClient.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 		MetricDataQueries: queries,
 		StartTime:         &startTime,
@@ -149,18 +149,18 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 		return
 	}
 
-	// Parse metric results.
+	// Parse metrics.
 	var totalConn, totalHits, totalMisses, totalNet float64
-    var maxCPU float64
+	var maxCPU float64
 
 	for _, res := range out.MetricDataResults {
 		sum := 0.0
-        max := 0.0
+		max := 0.0
 		for _, val := range res.Values {
 			sum += val
-            if val > max {
-                max = val
-            }
+			if val > max {
+				max = val
+			}
 		}
 
 		switch *res.Id {
@@ -171,13 +171,13 @@ func (s *ElasticacheScanner) enrichClusterMetrics(ctx context.Context, clusterID
 		case "m_misses":
 			totalMisses = sum
 		case "m_cpu":
-			maxCPU = max // Capture peak CPU utilization.
+			maxCPU = max // Peak CPU.
 		case "m_net":
 			totalNet = sum
 		}
 	}
 
-	// Update node properties.
+	// Update node.
 	s.Graph.Mu.Lock()
 	node.Properties["SumConnections7d"] = totalConn
 	node.Properties["SumHits7d"] = totalHits

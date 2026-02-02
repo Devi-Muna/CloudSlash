@@ -45,6 +45,34 @@ jobs:
           command: go test -v -race -short ./...
 
   # ---------------------------------------------------------
+  # Mock E2E Test (Feature Verification)
+  # ---------------------------------------------------------
+  test-mock:
+    docker:
+      - image: cimg/go:1.21
+    steps:
+      - checkout
+      # 1. DOWNLOAD THE BINARY from Job 1
+      - attach_workspace:
+          at: .
+      - run:
+          name: "Run Full Feature Mock Scan"
+          command: |
+            chmod +x cloudslash
+            ./cloudslash scan --mock --headless --output-dir ./mock-out
+      - run:
+          name: "Verify Artifacts"
+          command: |
+            if [ ! -f "./mock-out/remediation_plan.json" ]; then
+              echo "FAIL: Mock scan failed to generate remediation plan"
+              exit 1
+            fi
+            if [ ! -f "./mock-out/report.html" ]; then
+              echo "FAIL: Mock scan failed to generate HTML report"
+              exit 1
+            fi
+
+  # ---------------------------------------------------------
   # Integration Test
   # ---------------------------------------------------------
   verify-lazarus:
@@ -130,6 +158,9 @@ workflows:
     jobs:
       - build-binary
       - test-unit
+      - test-mock:
+          requires:
+            - build-binary
       - verify-lazarus:
           context: cloudslash-aws
           requires:

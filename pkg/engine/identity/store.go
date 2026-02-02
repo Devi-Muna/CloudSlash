@@ -10,11 +10,11 @@ import (
 
 // Mapping represents a confirmed link between a Git Author and a Messaging User (Slack).
 type Mapping struct {
-	GitAuthor   string `json:"git_author"`   // e.g., "poppie"
-	SlackUserID string `json:"slack_id"`     // e.g., "U12345"
-	NiceName    string `json:"nice_name"`    // e.g., "Jane Doe"
-	Confidence  float64 `json:"confidence"`  // 0.0 to 1.0
-	Verified    bool    `json:"verified"`    // True if manually confirmed or email match
+	GitAuthor   string  `json:"git_author"` // e.g., "poppie"
+	SlackUserID string  `json:"slack_id"`   // e.g., "U12345"
+	NiceName    string  `json:"nice_name"`  // e.g., "Jane Doe"
+	Confidence  float64 `json:"confidence"` // 0.0 to 1.0
+	Verified    bool    `json:"verified"`   // True if manually confirmed or email match
 }
 
 // Store handles the persistence of identity mappings.

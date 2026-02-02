@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine/aws"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/aws"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 type Detective struct {
@@ -17,10 +17,10 @@ func NewDetective(ct *aws.CloudTrailClient) *Detective {
 	return &Detective{CT: ct}
 }
 
-// IdentifyOwner resolves resource ownership.
+// IdentifyOwner resolves ownership.
 // Strategy: Tags > CloudTrail.
 func (d *Detective) IdentifyOwner(ctx context.Context, node *graph.Node) string {
-	// Check ownership tags.
+	// Check tags.
 	if node.Properties != nil {
 		tags := []string{"Owner", "owner", "CreatedBy", "created_by", "Creator", "creator", "Contact", "contact", "User", "user"}
 		for _, t := range tags {
@@ -38,9 +38,9 @@ func (d *Detective) IdentifyOwner(ctx context.Context, node *graph.Node) string 
 	// Lookup CloudTrail creator.
 	if d.CT != nil {
 		// Extract Resource ID.
-		resourceID := node.ID
-		
-		// Parse ARN patterns.
+		resourceID := node.IDStr()
+
+		// Parse ARN.
 		if strings.Contains(resourceID, "/") {
 			parts := strings.Split(resourceID, "/")
 			resourceID = parts[len(parts)-1]
@@ -58,12 +58,12 @@ func (d *Detective) IdentifyOwner(ctx context.Context, node *graph.Node) string 
 	return "UNCLAIMED"
 }
 
-// InvestigateGraph enriches waste nodes with ownership data.
+// InvestigateGraph adds ownership data.
 func (d *Detective) InvestigateGraph(ctx context.Context, g *graph.Graph) {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.Nodes {
+	for _, node := range g.GetNodes() {
 		if node.IsWaste {
 			owner := d.IdentifyOwner(ctx, node)
 			if node.Properties == nil {

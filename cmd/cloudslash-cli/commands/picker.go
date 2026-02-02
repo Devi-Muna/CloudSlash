@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	internalaws "github.com/DrSkyle/cloudslash/v2/pkg/engine/aws"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	internalaws "github.com/DrSkyle/cloudslash/pkg/engine/aws"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -22,16 +22,16 @@ type regionModel struct {
 func initialRegionModel() regionModel {
 	return regionModel{
 		choices: []string{
-			// US
+			// US Regions
 			"us-east-1", "us-east-2", "us-west-1", "us-west-2",
-			// Europe
+			// European Regions
 			"eu-central-1", "eu-central-2", "eu-west-1", "eu-west-2", "eu-west-3", "eu-north-1", "eu-south-1", "eu-south-2",
-			// APAC
+			// Asia Pacific Regions
 			"ap-south-1", "ap-south-2", "ap-southeast-1", "ap-southeast-2", "ap-southeast-3", "ap-southeast-4",
 			"ap-northeast-1", "ap-northeast-2", "ap-northeast-3", "ap-east-1",
-			// Americas
+			// Americas (excluding US)
 			"ca-central-1", "ca-west-1", "sa-east-1",
-			// Africa / Middle East
+			// Africa & Middle East
 			"af-south-1", "me-south-1", "me-central-1", "il-central-1",
 		},
 		selected: make(map[int]struct{}),
@@ -52,15 +52,13 @@ func (m regionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > 0 {
 				m.cursor--
 			} else {
-				// Wrap selection to bottom.
-				m.cursor = len(m.choices) - 1
+				m.cursor = len(m.choices) - 1 // Wrap bottom
 			}
 		case "down", "j":
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			} else {
-				// Wrap selection to top.
-				m.cursor = 0
+				m.cursor = 0 // Wrap top
 			}
 		case " ", "x":
 			_, ok := m.selected[m.cursor]
@@ -81,7 +79,7 @@ func (m regionModel) View() string {
 	s.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render("? Which regions do you want to scan?"))
 	s.WriteString("\n\n")
 
-	// Handle pagination logic for the region list.
+	// Calculate pagination boundaries.
 	windowHeight := 10
 	start := 0
 	end := len(m.choices)
@@ -119,7 +117,7 @@ func (m regionModel) View() string {
 		line := fmt.Sprintf("%s [%s] %s", cursor, checked, choice)
 		s.WriteString(style.Render(line) + "\n")
 	}
-	
+
 	if len(m.choices) > windowHeight {
 		s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(fmt.Sprintf("\n... %d more regions (use arrow keys) ...\n", len(m.choices)-end)))
 	}
@@ -130,7 +128,6 @@ func (m regionModel) View() string {
 
 func (m regionModel) GetSelectedRegions() []string {
 	var selected []string
-	// Default to 'us-east-1' if no selection is made.
 	if len(m.selected) == 0 {
 		return []string{"us-east-1"}
 	}
@@ -141,22 +138,24 @@ func (m regionModel) GetSelectedRegions() []string {
 }
 
 func PromptForRegions() ([]string, error) {
-	// Attempt dynamic region discovery via AWS API.
+	// Try AWS API discovery first.
 	dynamicRegions, err := fetchDynamicRegions()
 	if err == nil && len(dynamicRegions) > 0 {
-		p := tea.NewProgram(regionModel {
-			choices: dynamicRegions,
+		p := tea.NewProgram(regionModel{
+			choices:  dynamicRegions,
 			selected: make(map[int]struct{}),
 		})
 		m, err := p.Run()
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		if regionModel, ok := m.(regionModel); ok {
 			return regionModel.GetSelectedRegions(), nil
 		}
 		return []string{"us-east-1"}, nil
 	}
 
-	// Fallback to the static region list if API fails.
+	// Fallback to static list.
 	p := tea.NewProgram(initialRegionModel())
 	m, err := p.Run()
 	if err != nil {
@@ -173,18 +172,17 @@ func fetchDynamicRegions() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// Initialize a robust AWS client using the default profile.
 	client, err := internalaws.NewClient(ctx, "us-east-1", "", false)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create the EC2 service client.
+	// Create EC2 client.
 	ec2Client := ec2.NewFromConfig(client.Config)
-	
-	// Fetch available regions.
+
+	// Fetch regions.
 	resp, err := ec2Client.DescribeRegions(ctx, &ec2.DescribeRegionsInput{
-		AllRegions: aws.Bool(true), // Include opt-in regions.
+		AllRegions: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err

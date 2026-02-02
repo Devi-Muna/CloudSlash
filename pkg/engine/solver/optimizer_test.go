@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/DrSkyle/cloudslash/pkg/config"
-	"github.com/DrSkyle/cloudslash/pkg/engine/oracle"
-	"github.com/DrSkyle/cloudslash/pkg/engine/policy"
-	"github.com/DrSkyle/cloudslash/pkg/engine/tetris"
+	"github.com/DrSkyle/cloudslash/v2/pkg/config"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/oracle"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/policy"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/tetris"
 )
 
 func TestSolveHeterogeneous(t *testing.T) {
 	// 1. Setup
 	// "Small": $1/hr, 1 CPU
 	// "Large": $10/hr, 12 CPU (Efficiency: $0.83/CPU) -> Workhorse
-	
+
 	// Scenario: Need 13 CPUs.
 	// Homogenous Small: 13 * $1 = $13
 	// Homogenous Large: 2 * $10 = $20 (Capacity 24, Used 13)
@@ -28,7 +28,7 @@ func TestSolveHeterogeneous(t *testing.T) {
 	workloads := []*tetris.Item{}
 	for i := 0; i < 13; i++ {
 		workloads = append(workloads, &tetris.Item{
-			ID: fmt.Sprintf("pod-%d", i),
+			ID:         fmt.Sprintf("pod-%d", i),
 			Dimensions: tetris.Dimensions{CPU: 1000, RAM: 1024},
 		})
 	}
@@ -72,11 +72,11 @@ func TestSolveHeterogeneous(t *testing.T) {
 
 func TestSolveHomogenousFallback(t *testing.T) {
 	// Scenario: Need 10 CPUs.
-	// Large holds 12. 
+	// Large holds 12.
 	// Hetero logic should just pick 1 Large ($10).
 	// Small ($1) x 10 = $10.
 	// Tie. But Large is "Workhorse" so it might win on preference or efficiency first.
-	
+
 	// Let's make Large $9.0 (Cheaper)
 	// Small $1.0
 	// 10 Items.
@@ -92,7 +92,7 @@ func TestSolveHomogenousFallback(t *testing.T) {
 	workloads := []*tetris.Item{}
 	for i := 0; i < 10; i++ {
 		workloads = append(workloads, &tetris.Item{
-			ID: fmt.Sprintf("pod-%d", i),
+			ID:         fmt.Sprintf("pod-%d", i),
 			Dimensions: tetris.Dimensions{CPU: 1000, RAM: 1024},
 		})
 	}

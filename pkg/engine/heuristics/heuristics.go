@@ -6,37 +6,40 @@ import (
 	"strings"
 	"time"
 
-	internalaws "github.com/DrSkyle/cloudslash/pkg/engine/aws"
-	internalconfig "github.com/DrSkyle/cloudslash/pkg/config"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/engine/pricing"
+	internalconfig "github.com/DrSkyle/cloudslash/v2/pkg/config"
+	internalaws "github.com/DrSkyle/cloudslash/v2/pkg/engine/aws"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/pricing"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
-// NATGatewayHeuristic detects unused NAT Gateways.
+// NATGatewayHeuristic detects unused NATs.
 type NATGatewayHeuristic struct {
 	CW      *internalaws.CloudWatchClient
 	Pricing *pricing.Client
 }
 
+
 func (h *NATGatewayHeuristic) Name() string { return "NATGatewayHeuristic" }
 
-func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var natGateways []*graph.Node
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::EC2::NatGateway" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::EC2::NatGateway" {
 			natGateways = append(natGateways, node)
 		}
 	}
 	g.Mu.RUnlock()
 
 	for _, node := range natGateways {
+		// ... (metric logic)
 		endTime := time.Now()
 		startTime := endTime.Add(-7 * 24 * time.Hour)
 		var id string
-		fmt.Sscanf(node.ID, "arn:aws:ec2:region:account:natgateway/%s", &id)
+		fmt.Sscanf(node.IDStr(), "arn:aws:ec2:region:account:natgateway/%s", &id)
 		if id == "" {
 			continue
 		}
@@ -45,9 +48,8 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			{Name: aws.String("NatGatewayId"), Value: aws.String(id)},
 		}
 
-		// Guard: Skip honeypot ID.
 		if id == "nat-0deadbeef" {
-			return fmt.Errorf("CloudSlash: VNAT_Err - Invalid NAT Gateway ID detected")
+			return nil, fmt.Errorf("CloudSlash: VNAT_Err - Invalid NAT Gateway ID detected")
 		}
 
 		maxConns, err := h.CW.GetMetricMax(ctx, "AWS/NATGateway", "ActiveConnectionCount", dims, startTime, endTime)
@@ -60,31 +62,35 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		if maxConns < 5 && sumBytes < 1e9 {
-			g.MarkWaste(node.ID, 80)
+			g.MarkWaste(node.IDStr(), 80)
 			node.Properties["Reason"] = fmt.Sprintf("Unused NAT Gateway: MaxConns=%.0f, BytesOut=%.0f", maxConns, sumBytes)
+			stats.ItemsFound++
 
 			if h.Pricing != nil {
-				// Cost estimation (us-east-1 baseline).
 				cost, err := h.Pricing.GetNATGatewayPrice(ctx, "us-east-1")
 				if err == nil {
 					node.Cost = cost
+					stats.ProjectedSavings += cost
 				}
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// UnattachedVolumeHeuristic detects unattached or idle volumes.
+// UnattachedVolumeHeuristic detects idle volumes.
 type UnattachedVolumeHeuristic struct {
 	Pricing *pricing.Client
 	Config  internalconfig.UnattachedVolumeConfig
 }
 
+
 func (h *UnattachedVolumeHeuristic) Name() string { return "UnattachedVolumeHeuristic" }
 
-func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
+	// ... (prep)
 	type volumeData struct {
 		Node             *graph.Node
 		State            string
@@ -95,8 +101,8 @@ func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) err
 	}
 	var volumes []volumeData
 
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::EC2::Volume" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::EC2::Volume" {
 			sizeVal := 0
 			if s, ok := node.Properties["Size"].(int32); ok {
 				sizeVal = int(s)
@@ -131,15 +137,11 @@ func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			reason = "Unattached EBS Volume"
 		} else if vol.State == "in-use" && vol.AttachedInstance != "" {
 			instanceARN := fmt.Sprintf("arn:aws:ec2:region:account:instance/%s", vol.AttachedInstance)
-
-
-			// GetNode handles locking internally for node retrieval
 			instanceNode := g.GetNode(instanceARN)
 			var instanceState string
 			var launchTime time.Time
-			
+
 			if instanceNode != nil {
-				// Lock for property access.
 				g.Mu.RLock()
 				instanceState, _ = instanceNode.Properties["State"].(string)
 				launchTime, _ = instanceNode.Properties["LaunchTime"].(time.Time)
@@ -149,9 +151,9 @@ func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			if instanceNode != nil {
 				thresholdDays := h.Config.UnusedDays
 				if thresholdDays == 0 {
-					thresholdDays = 30 // Default
+					thresholdDays = 30
 				}
-				
+
 				if instanceState == "stopped" && time.Since(launchTime) > time.Duration(thresholdDays)*24*time.Hour && !vol.DeleteOnTerm {
 					isWaste = true
 					score = 70
@@ -161,33 +163,37 @@ func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) err
 		}
 
 		if isWaste {
-			g.MarkWaste(vol.Node.ID, score)
+			g.MarkWaste(vol.Node.IDStr(), score)
 			vol.Node.Properties["Reason"] = reason
+			stats.ItemsFound++
 
 			if h.Pricing != nil && vol.Size > 0 {
 				cost, err := h.Pricing.GetEBSPrice(ctx, "us-east-1", vol.Type, vol.Size)
 				if err == nil {
 					vol.Node.Cost = cost
+					stats.ProjectedSavings += cost
 				}
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// ElasticIPHeuristic detects unused or wasted EIPs.
+// ElasticIPHeuristic detects unused EIPs.
 type ElasticIPHeuristic struct {
 	Pricing *pricing.Client
 }
 
+
 func (h *ElasticIPHeuristic) Name() string { return "ElasticIPHeuristic" }
 
-func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.Nodes {
-		if node.Type != "AWS::EC2::EIP" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() != "AWS::EC2::EIP" {
 			continue
 		}
 
@@ -196,11 +202,13 @@ func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 			node.IsWaste = true
 			node.RiskScore = 50
 			node.Properties["Reason"] = "Unattached Elastic IP"
+			stats.ItemsFound++
 
 			if h.Pricing != nil {
 				cost, err := h.Pricing.GetEIPPrice(ctx, "us-east-1")
 				if err == nil {
 					node.Cost = cost
+					stats.ProjectedSavings += cost
 				}
 			}
 			continue
@@ -214,25 +222,28 @@ func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				node.IsWaste = true
 				node.RiskScore = 60
 				node.Properties["Reason"] = "Elastic IP attached to stopped instance"
+				stats.ItemsFound++
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// S3MultipartHeuristic detects stale multipart uploads.
-type S3MultipartHeuristic struct{
+// S3MultipartHeuristic detects stale uploads.
+type S3MultipartHeuristic struct {
 	Config internalconfig.S3MultipartConfig
 }
 
+
 func (h *S3MultipartHeuristic) Name() string { return "S3MultipartHeuristic" }
 
-func (h *S3MultipartHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *S3MultipartHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::S3::MultipartUpload" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::S3::MultipartUpload" {
 			initiated, ok := node.Properties["Initiated"].(time.Time)
 			threshold := h.Config.AgeThreshold
 			if threshold == 0 {
@@ -243,24 +254,27 @@ func (h *S3MultipartHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 				node.IsWaste = true
 				node.RiskScore = 40
 				node.Properties["Reason"] = fmt.Sprintf("Stale S3 Multipart Upload (> %s)", threshold)
+				stats.ItemsFound++
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// RDSHeuristic detects idle or stopped DB instances.
+// RDSHeuristic detects idle DBs.
 type RDSHeuristic struct {
 	CW *internalaws.CloudWatchClient
 }
 
+
 func (h *RDSHeuristic) Name() string { return "RDSHeuristic" }
 
-func (h *RDSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *RDSHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var rdsInstances []*graph.Node
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::RDS::DBInstance" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::RDS::DBInstance" {
 			rdsInstances = append(rdsInstances, node)
 		}
 	}
@@ -270,15 +284,17 @@ func (h *RDSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		status, _ := node.Properties["Status"].(string)
 
 		if status == "stopped" {
-			g.MarkWaste(node.ID, 80)
+			g.MarkWaste(node.IDStr(), 80)
 			node.Properties["Reason"] = "RDS Instance is stopped"
+			stats.ItemsFound++
 			continue
 		}
 
+		// ... (Metric Checks)
 		endTime := time.Now()
 		startTime := endTime.Add(-7 * 24 * time.Hour)
 		var id string
-		fmt.Sscanf(node.ID, "arn:aws:rds:region:account:db:%s", &id)
+		fmt.Sscanf(node.IDStr(), "arn:aws:rds:region:account:db:%s", &id)
 		if id == "" {
 			continue
 		}
@@ -293,35 +309,39 @@ func (h *RDSHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		if maxConns == 0 {
-			g.MarkWaste(node.ID, 60)
+			g.MarkWaste(node.IDStr(), 60)
 			node.Properties["Reason"] = "RDS Instance has 0 connections in 7 days"
+			stats.ItemsFound++
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// ELBHeuristic detects unused Load Balancers.
+// ELBHeuristic detects unused ELBs.
 type ELBHeuristic struct {
 	CW *internalaws.CloudWatchClient
 }
 
+
 func (h *ELBHeuristic) Name() string { return "ELBHeuristic" }
 
-func (h *ELBHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *ELBHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var elbs []*graph.Node
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::ElasticLoadBalancingV2::LoadBalancer" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::ElasticLoadBalancingV2::LoadBalancer" {
 			elbs = append(elbs, node)
 		}
 	}
 	g.Mu.RUnlock()
 
 	for _, node := range elbs {
+		// ... (Logic)
 		endTime := time.Now()
 		startTime := endTime.Add(-7 * 24 * time.Hour)
 		var lbDimValue string
-		parts := strings.Split(node.ID, ":loadbalancer/")
+		parts := strings.Split(node.IDStr(), ":loadbalancer/")
 		if len(parts) > 1 {
 			lbDimValue = parts[1]
 		} else {
@@ -338,32 +358,36 @@ func (h *ELBHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		}
 
 		if requestCount < 10 {
-			g.MarkWaste(node.ID, 70)
+			g.MarkWaste(node.IDStr(), 70)
 			node.Properties["Reason"] = fmt.Sprintf("ELB unused: Only %.0f requests in 7 days", requestCount)
+			stats.ItemsFound++
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// UnderutilizedInstanceHeuristic identifies right-sizing candidates.
+// UnderutilizedInstanceHeuristic checks right-sizing.
 type UnderutilizedInstanceHeuristic struct {
 	CW      *internalaws.CloudWatchClient
 	Pricing *pricing.Client
 }
 
+
 func (h *UnderutilizedInstanceHeuristic) Name() string { return "UnderutilizedInstanceHeuristic" }
 
-func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var instances []*graph.Node
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::EC2::Instance" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::EC2::Instance" {
 			instances = append(instances, node)
 		}
 	}
 	g.Mu.RUnlock()
 
 	for _, node := range instances {
+		// ... logic
 		state, _ := node.Properties["State"].(string)
 		if state != "running" {
 			continue
@@ -371,7 +395,7 @@ func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph
 
 		instanceType, _ := node.Properties["InstanceType"].(string)
 		instanceID := ""
-		if parts := strings.Split(node.ID, "/"); len(parts) > 1 {
+		if parts := strings.Split(node.IDStr(), "/"); len(parts) > 1 {
 			instanceID = parts[len(parts)-1]
 		}
 		if instanceID == "" {
@@ -384,18 +408,27 @@ func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph
 			{Name: aws.String("InstanceId"), Value: aws.String(instanceID)},
 		}
 
+		// History Fetch (Safe to ignore error)
+		if h.CW != nil {
+			cpuHistory, _ := h.CW.GetMetricHistory(ctx, "AWS/EC2", "CPUUtilization", dims, startTime, endTime)
+			node.Properties["MetricsHistoryCPU"] = cpuHistory
+			netHistory, _ := h.CW.GetMetricHistory(ctx, "AWS/EC2", "NetworkIn", dims, startTime, endTime)
+			node.Properties["MetricsHistoryNet"] = netHistory
+		}
+
 		maxCPU, err := h.CW.GetMetricMax(ctx, "AWS/EC2", "CPUUtilization", dims, startTime, endTime)
 		if err != nil {
 			continue
 		}
 
 		if maxCPU < 5.0 {
-			g.MarkWaste(node.ID, 60)
+			g.MarkWaste(node.IDStr(), 60)
 			node.Properties["Reason"] = fmt.Sprintf("Right-Sizing Opportunity: Max CPU %.2f%% < 5%% over 7 days", maxCPU)
+			stats.ItemsFound++
 
 			if h.Pricing != nil {
 				region := "us-east-1"
-				parts := strings.Split(node.ID, ":")
+				parts := strings.Split(node.IDStr(), ":")
 				if len(parts) > 3 {
 					region = parts[3]
 				}
@@ -403,32 +436,35 @@ func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph
 				cost, err := h.Pricing.GetEC2InstancePrice(ctx, region, instanceType)
 				if err == nil {
 					node.Cost = cost
+					stats.ProjectedSavings += cost
 				}
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// TagComplianceHeuristic enforces tagging policy.
+// TagComplianceHeuristic checks tags.
 type TagComplianceHeuristic struct {
 	RequiredTags []string
 }
 
+
 func (h *TagComplianceHeuristic) Name() string { return "TagComplianceHeuristic" }
 
-func (h *TagComplianceHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *TagComplianceHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
 	if len(h.RequiredTags) == 0 {
-		return nil
+		return nil, nil
 	}
+	stats := &HeuristicStats{}
 
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.Nodes {
+	for _, node := range g.GetNodes() {
 		tags, ok := node.Properties["Tags"].(map[string]string)
 		if !ok {
-			if node.Type == "AWS::EC2::Instance" || node.Type == "AWS::EC2::Volume" {
+			if node.TypeStr() == "AWS::EC2::Instance" || node.TypeStr() == "AWS::EC2::Volume" {
 				tags = make(map[string]string)
 			} else {
 				continue
@@ -451,31 +487,34 @@ func (h *TagComplianceHeuristic) Run(ctx context.Context, g *graph.Graph) error 
 				node.IsWaste = true
 				node.RiskScore = 40
 				node.Properties["Reason"] = fmt.Sprintf("Compliance Violation: Missing Tags: %s", strings.Join(missing, ", "))
+				stats.ItemsFound++
 			} else {
 				currentReason, _ := node.Properties["Reason"].(string)
 				node.Properties["Reason"] = currentReason + fmt.Sprintf("; Compliance: Missing %s", strings.Join(missing, ", "))
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// IAMHeuristic analyzes instance profile permissions.
+// IAMHeuristic analyzes permissions.
 type IAMHeuristic struct {
 	IAM *internalaws.IAMClient
 }
 
+
 func (h *IAMHeuristic) Name() string { return "IAMHeuristic" }
 
-func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
 	if h.IAM == nil {
-		return nil
+		return nil, nil
 	}
+	stats := &HeuristicStats{}
 
 	g.Mu.RLock()
 	var instances []*graph.Node
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::EC2::Instance" {
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::EC2::Instance" {
 			instances = append(instances, node)
 		}
 	}
@@ -486,12 +525,10 @@ func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		if !ok {
 			continue
 		}
-
 		arn, _ := profile["Arn"].(string)
 		if arn == "" {
 			continue
 		}
-
 		parts := strings.Split(arn, "/")
 		if len(parts) < 2 {
 			continue
@@ -506,44 +543,43 @@ func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		for _, roleArn := range roles {
 			risks, err := h.IAM.SimulatePrivileges(ctx, roleArn)
 			if err == nil && len(risks) > 0 {
-				g.MarkWaste(node.ID, 95)
-				node.Properties["Reason"] = fmt.Sprintf("SECURITY ALERT: Formal Verification confirmed dangerous permission(s) on Instance Profile '%s': %s", 
-					profileName, strings.Join(risks, ", "))
+				g.MarkWaste(node.IDStr(), 95)
+				node.Properties["Reason"] = fmt.Sprintf("SECURITY ALERT: Formal Verification confirmed dangerous permission(s) on Instance Profile '%s': %s", profileName, strings.Join(risks, ", "))
+				stats.ItemsFound++
 			}
 		}
 	}
-	return nil
+	return stats, nil
 }
 
-// SnapshotChildrenHeuristic identifies snapshots of wasted volumes.
+// SnapshotChildrenHeuristic checks snapshots.
 type SnapshotChildrenHeuristic struct {
 	Pricing *pricing.Client
 }
 
+
 func (h *SnapshotChildrenHeuristic) Name() string { return "SnapshotChildrenHeuristic" }
 
-func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var snapshots []*graph.Node
 	wasteVolumes := make(map[string]bool)
 
-	// Index unused volumes.
-	for _, node := range g.Nodes {
-		if node.Type == "AWS::EC2::Volume" && node.IsWaste {
-			// Parse Volume ID.
-			parts := strings.Split(node.ID, "/")
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::EC2::Volume" && node.IsWaste {
+			parts := strings.Split(node.IDStr(), "/")
 			if len(parts) > 1 {
 				volID := parts[len(parts)-1]
 				wasteVolumes[volID] = true
 			}
 		}
-		if node.Type == "AWS::EC2::Snapshot" {
+		if node.TypeStr() == "AWS::EC2::Snapshot" {
 			snapshots = append(snapshots, node)
 		}
 	}
 	g.Mu.RUnlock()
 
-	// Cross-reference snapshots.
 	for _, snap := range snapshots {
 		volID, ok := snap.Properties["VolumeId"].(string)
 		if !ok || volID == "" {
@@ -551,11 +587,10 @@ func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) err
 		}
 
 		if wasteVolumes[volID] {
-			// Found snapshot of unused volume.
-			g.MarkWaste(snap.ID, 90) // High confidence
+			g.MarkWaste(snap.IDStr(), 90)
 			snap.Properties["Reason"] = fmt.Sprintf("Snapshot of Unused Volume (%s)", volID)
+			stats.ItemsFound++
 
-			// Estimated ownership cost.
 			sizeGB := 0
 			if s, ok := snap.Properties["VolumeSize"].(int32); ok {
 				sizeGB = int(s)
@@ -564,10 +599,12 @@ func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) err
 			}
 
 			if sizeGB > 0 {
-				snap.Cost = float64(sizeGB) * 0.05
+				cost := float64(sizeGB) * 0.05
+				snap.Cost = cost
+				stats.ProjectedSavings += cost
 			}
 		}
 	}
 
-	return nil
+	return stats, nil
 }

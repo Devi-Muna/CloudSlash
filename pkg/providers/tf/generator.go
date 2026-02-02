@@ -3,12 +3,13 @@ package tf
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/config"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/version"
+	"github.com/DrSkyle/cloudslash/v2/pkg/config"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 )
 
 type Generator struct {
@@ -19,6 +20,8 @@ type Generator struct {
 func NewGenerator(g *graph.Graph, s *State) *Generator {
 	return &Generator{Graph: g, State: s}
 }
+
+var safeIDRegex = regexp.MustCompile("^[a-zA-Z0-9._/-]+$")
 
 // GenerateWasteTF creates Terraform resource blocks for waste.
 func (g *Generator) GenerateWasteTF(path string) error {
@@ -31,18 +34,18 @@ func (g *Generator) GenerateWasteTF(path string) error {
 	g.Graph.Mu.RLock()
 	defer g.Graph.Mu.RUnlock()
 
-	for _, node := range g.Graph.Nodes {
+	for _, node := range g.Graph.GetNodes() {
 		if !node.IsWaste {
 			continue
 		}
 
-		tfType := mapResourceTypeToTF(node.Type)
+		tfType := mapResourceTypeToTF(node.TypeStr())
 		if tfType == "" {
 			continue // Skip unsupported types.
 		}
 
 		// Generate sanitized resource name.
-		tfName := sanitizeName(node.ID)
+		tfName := sanitizeName(node.IDStr())
 
 		fmt.Fprintf(f, "resource \"%s\" \"%s\" {\n", tfType, tfName)
 		// Write import metadata.
@@ -72,22 +75,26 @@ func (g *Generator) GenerateImportScript(path string) error {
 	g.Graph.Mu.RLock()
 	defer g.Graph.Mu.RUnlock()
 
-	for _, node := range g.Graph.Nodes {
+	for _, node := range g.Graph.GetNodes() {
 		if !node.IsWaste {
 			continue
 		}
 
-		tfType := mapResourceTypeToTF(node.Type)
+		tfType := mapResourceTypeToTF(node.TypeStr())
 		if tfType == "" {
 			continue
 		}
 
-		tfName := sanitizeName(node.ID)
+		tfName := sanitizeName(node.IDStr())
 
 		// Resolve resource ID.
-		resourceID := extractResourceID(node.ID, node.Type)
+		resourceID := extractResourceID(node.IDStr(), node.TypeStr())
+		if !safeIDRegex.MatchString(resourceID) {
+			fmt.Fprintf(f, "# SKIP: unsafe resource ID detected: %s\n", resourceID)
+			continue
+		}
 
-		fmt.Fprintf(f, "terraform import %s.%s %s\n", tfType, tfName, resourceID)
+		fmt.Fprintf(f, "terraform import '%s.%s' '%s'\n", tfType, tfName, resourceID)
 	}
 	return nil
 }
@@ -107,28 +114,30 @@ func (g *Generator) GenerateDestroyPlan(path string) error {
 	defer g.Graph.Mu.RUnlock()
 
 	totalWaste := 0
-	for _, node := range g.Graph.Nodes {
+	for _, node := range g.Graph.GetNodes() {
 		if !node.IsWaste {
 			continue
 		}
 		totalWaste++
 
-		fmt.Fprintf(f, "[%d] %s (%s)\n", node.RiskScore, node.ID, node.Type)
+		fmt.Fprintf(f, "[%d] %s (%s)\n", node.RiskScore, node.IDStr(), node.TypeStr())
 		if reason, ok := node.Properties["Reason"].(string); ok {
 			fmt.Fprintf(f, "    Reason: %s\n", reason)
 		}
 
 		// Handle S3 Multipart Uploads.
-		if node.Type == "AWS::S3::MultipartUpload" {
+		if node.TypeStr() == "AWS::S3::MultipartUpload" {
 			bucket, _ := node.Properties["Bucket"].(string)
 			key, _ := node.Properties["Key"].(string)
 			uploadId, _ := node.Properties["UploadId"].(string)
-			fmt.Fprintf(f, "    Command: aws s3api abort-multipart-upload --bucket %s --key \"%s\" --upload-id %s\n", bucket, key, uploadId)
+			// Safety check
+			if safeIDRegex.MatchString(bucket) && safeIDRegex.MatchString(key) && safeIDRegex.MatchString(uploadId) {
+				fmt.Fprintf(f, "    Command: aws s3api abort-multipart-upload --bucket %s --key \"%s\" --upload-id %s\n", bucket, key, uploadId)
+			}
 		}
 		fmt.Fprintf(f, "\n")
 	}
 
-	fmt.Fprintf(f, "Total Waste Items: %d\n", totalWaste)
 	fmt.Fprintf(f, "Total Waste Items: %d\n", totalWaste)
 	return nil
 }
@@ -197,7 +206,7 @@ echo -e "${CYAN}[3/3] Removing Unused Resources...${NC}"
 		stateMap = g.State.GetResourceMapping()
 	}
 
-	for _, node := range g.Graph.Nodes {
+	for _, node := range g.Graph.GetNodes() {
 		if !node.IsWaste {
 			continue
 		}
@@ -207,7 +216,7 @@ echo -e "${CYAN}[3/3] Removing Unused Resources...${NC}"
 			continue
 		}
 
-		tfType := mapResourceTypeToTF(node.Type)
+		tfType := mapResourceTypeToTF(node.TypeStr())
 		if tfType == "" {
 			continue
 		}
@@ -215,22 +224,40 @@ echo -e "${CYAN}[3/3] Removing Unused Resources...${NC}"
 		// Find resource address.
 		resourceName := ""
 
-		if addr, ok := stateMap[node.ID]; ok {
+		if addr, ok := stateMap[node.IDStr()]; ok {
 			resourceName = addr
 		} else {
 			// Attempt shortened ID match.
-			shortID := extractResourceID(node.ID, node.Type)
+			shortID := extractResourceID(node.IDStr(), node.TypeStr())
 			if addr, ok := stateMap[shortID]; ok {
 				resourceName = addr
 			}
 		}
 
-		fmt.Fprintf(f, "echo \" -> Removing %s (%s)...\"\n", node.ID, node.Properties["Reason"])
+		// Security Check: Ensure node ID is safe before echoing.
+		if !safeIDRegex.MatchString(node.IDStr()) {
+			fmt.Fprintf(f, "# SKIP: unsafe resource ID detected in graph: %s\n", node.IDStr())
+			continue
+		}
+
+		// Sanitize/Quote the 'Reason' property to prevent injection if it contains quotes/shell chars.
+		reason := "Waste identified"
+		if r, ok := node.Properties["Reason"].(string); ok {
+			// Basic sanitization: escape double quotes, remove newlines
+			reason = strings.ReplaceAll(r, "\"", "\\\"")
+			reason = strings.ReplaceAll(reason, "\n", " ")
+		}
+
+		fmt.Fprintf(f, "echo \" -> Removing %s (%s)...\"\n", node.IDStr(), reason)
 		if resourceName != "" {
+			// Check reasonable chars in resourceName (tf addresses are usually safe but minimal checking)
+			// Generally strictly alphanumeric, dots, underscores, dashes, brackets.
+			// Just quoting it should be enough for bash safety if we assume tf state keys aren't poisoned (riskier assumption but standard)
+			// We can use single quotes.
 			fmt.Fprintf(f, "terraform state rm '%s' || echo \"    (Resource not found in state, skipping)\"\n", resourceName)
 		} else {
 			fmt.Fprintf(f, "# Warning: Could not resolve address in local state. Suggested command:\n")
-			fmt.Fprintf(f, "# terraform state rm %s.<NAME>\n", tfType)
+			fmt.Fprintf(f, "# terraform state rm '%s.<NAME>'\n", tfType)
 		}
 		fmt.Fprintf(f, "\n")
 	}
@@ -272,172 +299,18 @@ func sanitizeName(id string) string {
 func extractResourceID(arn, awsType string) string {
 	// Extract suffix from ARN.
 	parts := strings.Split(arn, "/")
+	var id string
 	if len(parts) > 1 {
-		return parts[len(parts)-1]
-	}
-	return arn
-}
-
-// GenerateDeletionScript creates deletion script.
-func (g *Generator) GenerateDeletionScript(path string) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	// Generate Header.
-	fmt.Fprintf(f, "#!/bin/bash\n")
-	fmt.Fprintf(f, "# CloudSlash Resource Deletion Sequence (%s)\n", version.Current)
-	fmt.Fprintf(f, "# WARNING: This script will DESTROY resources. Use with caution.\n\n")
-
-	// Collect Waste Nodes.
-	g.Graph.Mu.RLock()
-	var wasteNodes []*graph.Node
-	for _, n := range g.Graph.Nodes {
-		if n.IsWaste && !n.Ignored {
-			wasteNodes = append(wasteNodes, n)
-		}
-	}
-	g.Graph.Mu.RUnlock()
-
-	if len(wasteNodes) == 0 {
-		fmt.Fprintf(f, "echo 'No waste to delete! System clean.'\n")
-		return nil
+		id = parts[len(parts)-1]
+	} else {
+		id = arn
 	}
 
-	// Topological Sort (Reverse Dependency Order).
-	// Reverse topological sort for safe deletion.
-	
-	creationOrder, err := g.Graph.TopologicalSort(wasteNodes)
-	if err != nil {
-		fmt.Fprintf(f, "# ERROR: Cyclic dependency detected. Manual intervention required.\n")
-		fmt.Fprintf(f, "# %v\n", err)
-		return nil
+	// FAANG SAFETY CHECK
+	if !safeIDRegex.MatchString(id) {
+		return "UNSAFE_ID_DETECTED"
 	}
-
-	// Reverse order.
-	sortedVertices := make([]*graph.Node, len(creationOrder))
-	for i, n := range creationOrder {
-		sortedVertices[len(creationOrder)-1-i] = n
-	}
-
-	// Generate Commands.
-	fmt.Fprintf(f, "echo 'Initializing Deletion Sequence...'\n")
-	fmt.Fprintf(f, "echo 'Found %d resources to terminate.'\n\n", len(sortedVertices))
-
-	for i, node := range sortedVertices {
-		cmd := mapToCLI(node)
-		if cmd == "" {
-			fmt.Fprintf(f, "# [%d] Manually delete: %s (%s)\n", i+1, node.ID, node.Type)
-			continue
-		}
-
-		fmt.Fprintf(f, "# [%d] Deleting %s (%s)...\n", i+1, node.ID, node.Type)
-		// Wait for network interface detach.
-		if node.Type == "AWS::EC2::NetworkInterface" {
-			fmt.Fprintf(f, "sleep 5\n")
-		}
-		fmt.Fprintf(f, "%s\n", cmd)
-		// Add error check
-		fmt.Fprintf(f, "if [ $? -eq 0 ]; then echo '  -> Deleted.'; else echo '  -> FAILED.'; fi\n\n")
-	}
-
-	return nil
-}
-
-func mapToCLI(n *graph.Node) string {
-	// Extract ID.
-	id := extractResourceID(n.ID, n.Type)
-	region := "us-east-1"
-	if r, ok := n.Properties["Region"].(string); ok {
-		region = r
-	}
-
-	base := fmt.Sprintf("aws --region %s", region)
-
-	// Generate CLI command by type.
-	switch strings.ToLower(n.Type) {
-	case "aws::ec2::instance":
-		return fmt.Sprintf("%s ec2 terminate-instances --instance-ids %s", base, id)
-	case "aws::ec2::volume":
-		return fmt.Sprintf("%s ec2 delete-volume --volume-id %s", base, id)
-	case "aws::ec2::securitygroup", "aws_security_group":
-		return fmt.Sprintf("%s ec2 delete-security-group --group-id %s", base, id)
-	case "aws::ec2::networkinterface":
-		return fmt.Sprintf("%s ec2 delete-network-interface --network-interface-id %s", base, id)
-	case "aws::ec2::natgateway", "aws_nat_gateway":
-		return fmt.Sprintf("%s ec2 delete-nat-gateway --nat-gateway-id %s", base, id)
-	case "aws::ec2::eip", "aws_eip":
-		return fmt.Sprintf("%s ec2 release-address --allocation-id %s", base, id)
-	case "aws::s3::bucket", "aws_s3_bucket":
-		return fmt.Sprintf("%s s3 rb s3://%s --force", base, id)
-	case "aws::lambda::function", "aws_lambda_function":
-		parts := strings.Split(n.ID, ":")
-		funcName := parts[len(parts)-1]
-		if n.Properties["FunctionName"] != nil {
-			funcName = n.Properties["FunctionName"].(string)
-		}
-		return fmt.Sprintf("%s lambda delete-function --function-name %s", base, funcName)
-	case "aws::eks::cluster":
-		// ID for cluster is usually Name or ARN
-		clusterName := extractResourceID(n.ID, n.Type)
-		if n.Properties["Name"] != nil {
-			clusterName = n.Properties["Name"].(string)
-		}
-		return fmt.Sprintf("%s eks delete-cluster --name %s", base, clusterName)
-	case "aws::eks::nodegroup":
-		cluster := "unknown-cluster"
-		if n.Properties["ClusterName"] != nil {
-			cluster = n.Properties["ClusterName"].(string)
-		}
-		ngName := extractResourceID(n.ID, n.Type)
-		if n.Properties["NodegroupName"] != nil {
-			ngName = n.Properties["NodegroupName"].(string)
-		}
-		return fmt.Sprintf("%s eks delete-nodegroup --cluster-name %s --nodegroup-name %s", base, cluster, ngName)
-	case "aws::ecs::service":
-		cluster := "default"
-		if n.Properties["ClusterArn"] != nil {
-			cluster = extractResourceID(n.Properties["ClusterArn"].(string), "cluster")
-		}
-		svcName := extractResourceID(n.ID, n.Type)
-		if n.Properties["Name"] != nil {
-			svcName = n.Properties["Name"].(string)
-		}
-		// Force delete service.
-		return fmt.Sprintf("%s ecs delete-service --cluster %s --service %s --force", base, cluster, svcName)
-	case "aws::ecs::cluster":
-		return fmt.Sprintf("%s ecs delete-cluster --cluster %s", base, id)
-	case "aws::rds::dbinstance":
-		return fmt.Sprintf("%s rds delete-db-instance --db-instance-identifier %s --skip-final-snapshot", base, id)
-	case "aws::elasticloadbalancingv2::loadbalancer":
-		return fmt.Sprintf("%s elbv2 delete-load-balancer --load-balancer-arn %s", base, n.ID)
-	case "aws::ec2::snapshot":
-		
-		id := extractResourceID(n.ID, n.Type)
-		return fmt.Sprintf("%s ec2 delete-snapshot --snapshot-id %s", base, id)
-	case "aws_subnet", "aws::ec2::subnet":
-		id := extractResourceID(n.ID, n.Type)
-		
-		if strings.HasPrefix(id, "arn:") {
-			
-			parts := strings.Split(id, "/")
-			id = parts[len(parts)-1]
-		}
-		return fmt.Sprintf("%s ec2 delete-subnet --subnet-id %s", base, id)
-	case "aws::ec2::vpc", "aws_vpc":
-		id := extractResourceID(n.ID, n.Type)
-		if strings.HasPrefix(id, "arn:") {
-			parts := strings.Split(id, "/")
-			id = parts[len(parts)-1]
-		}
-		return fmt.Sprintf("%s ec2 delete-vpc --vpc-id %s", base, id)
-	case "aws::s3::multipartupload":
-		// Multipart upload CLI generation not implemented.
-		return ""
-	}
-	return ""
+	return id
 }
 
 // GenerateRestorationPlan creates restoration config.
@@ -466,20 +339,24 @@ func (g *Generator) GenerateRestorationPlan(path string) error {
 	fmt.Fprintf(f, "provider \"aws\" {\n  region = \"%s\" # Default, override via env var if needed\n}\n\n", config.DefaultRegion)
 
 	count := 0
-	for _, node := range g.Graph.Nodes {
+	for _, node := range g.Graph.GetNodes() {
 		if !node.IsWaste {
 			continue
 		}
 
-		resourceID := extractResourceID(node.ID, node.Type)
-		tfType := mapResourceTypeToTF(node.Type)
+		resourceID := extractResourceID(node.IDStr(), node.TypeStr())
+		if resourceID == "UNSAFE_ID_DETECTED" {
+			continue
+		}
+
+		tfType := mapResourceTypeToTF(node.TypeStr())
 
 		if tfType != "" {
 			// Sanitize ID.
 			safeID := strings.ReplaceAll(resourceID, "-", "_")
 			safeID = strings.ReplaceAll(safeID, ".", "_")
 			safeID = strings.ReplaceAll(safeID, "/", "_")
-			
+
 			fmt.Fprintf(f, "import {\n")
 			fmt.Fprintf(f, "  to = %s.restore_%s\n", tfType, safeID)
 			fmt.Fprintf(f, "  id = \"%s\"\n", resourceID)

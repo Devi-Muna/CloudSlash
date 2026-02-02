@@ -1,7 +1,6 @@
 package identity
 
-import (
-)
+import ()
 
 // UserProvider defines the interface for looking up users in an external directory (Slack, LDAP).
 type UserProvider interface {
@@ -57,7 +56,7 @@ func (r *Resolver) Resolve(gitName, gitEmail string) (Mapping, ResolutionStatus)
 	// Enterprise mode configuration disables fuzzy matching by default for safety.
 	// Requires standard fuzzy matching library integration.
 	// For this release, strict matching is enforced.
-	
+
 	// 4. Unknown - Require Human Intervention
 	return Mapping{
 		GitAuthor: gitName,

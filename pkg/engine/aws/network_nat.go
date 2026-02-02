@@ -5,14 +5,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
+// NATScanner scans NAT Gateways.
 type NATScanner struct {
 	Client   *ec2.Client
 	CWClient *cloudwatch.Client
@@ -27,7 +28,7 @@ func NewNATScanner(cfg aws.Config, g *graph.Graph) *NATScanner {
 	}
 }
 
-// ScanNATGateways discovers NAT Gateways and metrics.
+// ScanNATGateways scans NAT Gateways and checks traffic.
 func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 	paginator := ec2.NewDescribeNatGatewaysPaginator(s.Client, &ec2.DescribeNatGatewaysInput{})
 
@@ -41,24 +42,24 @@ func (s *NATScanner) ScanNATGateways(ctx context.Context) error {
 			if nat.State != types.NatGatewayStateAvailable {
 				continue
 			}
-			
+
 			id := *nat.NatGatewayId
 			vpcId := *nat.VpcId
-			
+
 			props := map[string]interface{}{
-				"Service": "NATGateway",
-				"VpcId":   vpcId,
+				"Service":  "NATGateway",
+				"VpcId":    vpcId,
 				"SubnetId": *nat.SubnetId,
-				"State": string(nat.State),
+				"State":    string(nat.State),
 				"PublicIp": extractPublicIp(nat.NatGatewayAddresses),
 			}
-			
+
 			s.Graph.AddNode(id, "aws_nat_gateway", props)
-			
-			// Fetch connection metrics.
+
+			// Check traffic volume.
 			go s.checkTraffic(ctx, id, props)
-			
-			// Analyze network topology for idleness.
+
+			// Check for active clients in associated subnets.
 			go s.checkEmptyRoom(ctx, id, vpcId)
 		}
 	}
@@ -72,9 +73,12 @@ func extractPublicIp(addrs []types.NatGatewayAddress) string {
 	return ""
 }
 
+// checkTraffic queries connections (7 days).
 func (s *NATScanner) checkTraffic(ctx context.Context, id string, props map[string]interface{}) {
 	node := s.Graph.GetNode(id)
-	if node == nil { return }
+	if node == nil {
+		return
+	}
 
 	endTime := time.Now()
 	startTime := endTime.Add(-7 * 24 * time.Hour)
@@ -93,40 +97,44 @@ func (s *NATScanner) checkTraffic(ctx context.Context, id string, props map[stri
 			},
 		},
 	}
-	
+
 	out, err := s.CWClient.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 		MetricDataQueries: queries,
 		StartTime:         &startTime,
 		EndTime:           &endTime,
 	})
-	
-	if err != nil { return }
-	
+
+	if err != nil {
+		return
+	}
+
 	totalConns := 0.0
 	for _, res := range out.MetricDataResults {
 		for _, v := range res.Values {
 			totalConns += v
 		}
 	}
-	
+
 	s.Graph.Mu.Lock()
 	node.Properties["SumConnections7d"] = totalConns
 	s.Graph.Mu.Unlock()
 }
 
-// checkEmptyRoom determines if the NAT Gateway serves active instances.
+// checkEmptyRoom checks for active clients in subnets.
 func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId string) {
-	// Identify associated Route Tables.
+	// Find Route Tables.
 	routeReq := &ec2.DescribeRouteTablesInput{
 		Filters: []types.Filter{
 			{Name: aws.String("vpc-id"), Values: []string{vpcId}},
 			{Name: aws.String("route.nat-gateway-id"), Values: []string{natId}},
 		},
 	}
-	
+
 	rtOut, err := s.Client.DescribeRouteTables(ctx, routeReq)
-	if err != nil { return }
-	
+	if err != nil {
+		return
+	}
+
 	subnets := make(map[string]bool)
 	var rtbIds []string
 	for _, rt := range rtOut.RouteTables {
@@ -139,51 +147,53 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 			}
 		}
 	}
-	
-	// Store Route Tables for visualization.
+
+	// Store RouteTables.
 	node := s.Graph.GetNode(natId)
 	if node != nil {
 		s.Graph.Mu.Lock()
 		node.Properties["RouteTables"] = rtbIds
 		s.Graph.Mu.Unlock()
 	}
-	
+
 	if len(subnets) == 0 {
-		// Handle NATs with no subnet associations.
+		// Handle orphans.
 		s.updateActiveCount(natId, 0)
 		return
 	}
-	
-	// Scan subnets for active ENIs.
+
+	// Scan ENIs.
 	activeENICount := 0
 	var emptySubnetIds []string
-	
+
 	for subnetId := range subnets {
-		// List network interfaces.
+		// List ENIs.
 		eniReq := &ec2.DescribeNetworkInterfacesInput{
 			Filters: []types.Filter{
 				{Name: aws.String("subnet-id"), Values: []string{subnetId}},
 			},
 		}
-		
+
 		eniOut, err := s.Client.DescribeNetworkInterfaces(ctx, eniReq)
-		if err != nil { continue }
-		
+		if err != nil {
+			continue
+		}
+
 		subnetActive := 0
 		for _, eni := range eniOut.NetworkInterfaces {
-			// Exclude AWS-managed interfaces.
+			// Exclude AWS-managed.
 			if eni.InterfaceType == types.NetworkInterfaceTypeNatGateway {
 				continue // Self
 			}
-			
-			// Check Attachment
+
+			// Check Attachment.
 			if eni.Attachment != nil && eni.Attachment.InstanceId != nil {
 				instId := *eni.Attachment.InstanceId
-				
+
 				instOut, err := s.Client.DescribeInstances(ctx, &ec2.DescribeInstancesInput{
 					InstanceIds: []string{instId},
 				})
-				
+
 				if err == nil && len(instOut.Reservations) > 0 {
 					state := instOut.Reservations[0].Instances[0].State.Name
 					if state == types.InstanceStateNameRunning {
@@ -193,22 +203,21 @@ func (s *NATScanner) checkEmptyRoom(ctx context.Context, natId string, vpcId str
 				}
 			} else {
 				if strings.ToLower(string(eni.InterfaceType)) == "interface" {
-                     if eni.RequesterManaged != nil && *eni.RequesterManaged {
-                         continue // AWS Managed
-                     }
-                     if eni.Status == types.NetworkInterfaceStatusInUse {
-                         subnetActive++
-                         activeENICount++
-                     }
+					if eni.RequesterManaged != nil && *eni.RequesterManaged {
+						continue // AWS Managed
+					}
+					if eni.Status == types.NetworkInterfaceStatusInUse {
+						subnetActive++
+						activeENICount++
+					}
 				}
 			}
 		}
-		
+
 		if subnetActive == 0 {
 			emptySubnetIds = append(emptySubnetIds, subnetId)
 		}
 	}
-	
 
 	nodeRedecl := s.Graph.GetNode(natId)
 	if nodeRedecl != nil {

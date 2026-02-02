@@ -4,22 +4,20 @@ import (
 	"fmt"
 )
 
-// TopologicalSort performs a topological sort on the graph logic.
-// Returns nodes in dependency order (Leaf -> Root).
-// Generates reverse topological order for deletion.
+// TopologicalSort resolves dependency order.
+// Returns nodes sorted from independent leaves to dependent roots.
 func (g *Graph) TopologicalSort(nodes []*Node) ([]*Node, error) {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
 
-	visited := make(map[string]bool)
-	tempMark := make(map[string]bool)
+	visited := make(map[uint32]bool)
+	tempMark := make(map[uint32]bool)
 	var sorted []*Node
 	var cycleError error
 
-	// Sort subset of nodes based on internal dependencies.
-
-	// Create lookup map.
-	subsetMap := make(map[string]bool)
+	// Sort subset based on dependencies.
+	// Build node set.
+	subsetMap := make(map[uint32]bool)
 	for _, n := range nodes {
 		subsetMap[n.ID] = true
 	}
@@ -27,7 +25,7 @@ func (g *Graph) TopologicalSort(nodes []*Node) ([]*Node, error) {
 	var visit func(n *Node)
 	visit = func(n *Node) {
 		if tempMark[n.ID] {
-			cycleError = fmt.Errorf("cycle detected involving %s", n.ID)
+			cycleError = fmt.Errorf("cycle detected involving %s", n.IDStr())
 			return
 		}
 		if visited[n.ID] {
@@ -36,19 +34,16 @@ func (g *Graph) TopologicalSort(nodes []*Node) ([]*Node, error) {
 
 		tempMark[n.ID] = true
 
-
-		if int(n.Index) < len(g.Edges) {
-			edges := g.Edges[n.Index]
-			for _, edge := range edges {
-				// Traverse dependencies within the target subset.
-
-				// Check if target is in subset (by ID lookup)
-				// TargetID is uint32
-				if int(edge.TargetID) < len(g.Nodes) {
-					targetNode := g.Nodes[edge.TargetID]
-					if subsetMap[targetNode.ID] {
-						visit(targetNode)
-					}
+		// Retrieve edges.
+		edges := g.Store.GetEdges(n.Index)
+		for _, edge := range edges {
+			// Traverse dependencies.
+			// Check if target is in subset.
+			// TargetID is uint32
+			targetNode := g.Store.GetNode(edge.TargetID)
+			if targetNode != nil {
+				if subsetMap[targetNode.ID] {
+					visit(targetNode)
 				}
 			}
 		}
@@ -65,6 +60,11 @@ func (g *Graph) TopologicalSort(nodes []*Node) ([]*Node, error) {
 				return nil, cycleError
 			}
 		}
+	}
+
+	// Reverse to safe deletion order.
+	for i, j := 0, len(sorted)-1; i < j; i, j = i+1, j-1 {
+		sorted[i], sorted[j] = sorted[j], sorted[i]
 	}
 
 	return sorted, nil

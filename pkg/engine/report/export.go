@@ -7,27 +7,27 @@ import (
 	"os"
 	"sort"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
-// ExportItem represents a single row in the export.
+// ExportItem represents a row in the export.
 type ExportItem struct {
-	ResourceID       string  `json:"resource_id"`
-	Type             string  `json:"type"`
-	Region           string  `json:"region"`
-	NameTag          string  `json:"name_tag"`
-	MonthlyCost      float64 `json:"monthly_cost"`
-	RiskScore        int     `json:"risk_score"`
-	AuditDetail      string  `json:"audit_detail"`
-	OwnerARN         string  `json:"owner_arn"`
-	Action           string  `json:"action"`
+	ResourceID  string  `json:"resource_id"`
+	Type        string  `json:"type"`
+	Region      string  `json:"region"`
+	NameTag     string  `json:"name_tag"`
+	MonthlyCost float64 `json:"monthly_cost"`
+	RiskScore   int     `json:"risk_score"`
+	AuditDetail string  `json:"audit_detail"`
+	OwnerARN    string  `json:"owner_arn"`
+	Action      string  `json:"action"`
 }
 
 // GenerateCSV exports findings to CSV.
 func GenerateCSV(g *graph.Graph, path string) error {
 	items := extractItems(g)
 
-	// Sort by cost (descending).
+	// Sort by cost.
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].MonthlyCost > items[j].MonthlyCost
 	})
@@ -99,7 +99,7 @@ func extractItems(g *graph.Graph) []ExportItem {
 	defer g.Mu.RUnlock()
 
 	var items []ExportItem
-	for _, node := range g.Nodes {
+	for _, node := range g.GetNodes() {
 		if node.IsWaste {
 			region, _ := node.Properties["Region"].(string)
 			if region == "" {
@@ -112,7 +112,7 @@ func extractItems(g *graph.Graph) []ExportItem {
 			}
 
 			reason, _ := node.Properties["Reason"].(string)
-			
+
 			// Extract Name tag.
 			nameTag := ""
 			if tags, ok := node.Properties["Tags"].(map[string]string); ok {
@@ -131,15 +131,15 @@ func extractItems(g *graph.Graph) []ExportItem {
 			}
 
 			items = append(items, ExportItem{
-				ResourceID:       node.ID,
-				Type:             node.Type,
-				Region:           region,
-				NameTag:          nameTag,
-				MonthlyCost:      node.Cost,
-				RiskScore:        node.RiskScore,
-				AuditDetail:      reason,
-				OwnerARN:         owner,
-				Action:           action,
+				ResourceID:  node.IDStr(),
+				Type:        node.TypeStr(),
+				Region:      region,
+				NameTag:     nameTag,
+				MonthlyCost: node.Cost,
+				RiskScore:   node.RiskScore,
+				AuditDetail: reason,
+				OwnerARN:    owner,
+				Action:      action,
 			})
 		}
 	}

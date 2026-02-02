@@ -37,7 +37,7 @@ type Instance struct {
 	Attributes map[string]interface{} `json:"attributes"`
 }
 
-// BackendConfig represents the parsed remote backend configuration.
+// BackendConfig remote backend.
 type BackendConfig struct {
 	Type   string
 	Bucket string
@@ -45,16 +45,15 @@ type BackendConfig struct {
 	Region string
 }
 
-// LoadState smart-loads the state from file or remote backend.
+// LoadState loads state.
 func LoadState(ctx context.Context, path string) (*State, error) {
-	// 1. Try Local File
+	// 1. Try Local.
 	if info, err := os.Stat(path); err == nil && !info.IsDir() {
 		return ParseStateFile(path)
 	}
 
-	// 2. Try Remote Backend Detection (if path is a dir or not found)
-	// If path is a file that doesn't exist, we assume it might be a dir assumption or usage error, 
-	// but if user passed "." or a dir, we search there.
+	// 2. Try Remote.
+	// Search path.
 	searchDir := path
 	if path == "" {
 		searchDir = "."
@@ -71,9 +70,9 @@ func LoadState(ctx context.Context, path string) (*State, error) {
 	return nil, fmt.Errorf("no state file found at '%s' and no remote backend detected", path)
 }
 
-// ParseStateFile reads local state file.
+// ParseStateFile reads local state.
 func ParseStateFile(path string) (*State, error) {
-	// Safety Check: Is state locked?
+	// Check lock.
 	lockPath := fmt.Sprintf("%s.lock.info", path)
 	if _, err := os.Stat(lockPath); err == nil {
 		return nil, fmt.Errorf("terraform state is locked (lock file found: %s). Aborting to prevent race condition", lockPath)
@@ -92,7 +91,7 @@ func ParseStateFile(path string) (*State, error) {
 	return &state, nil
 }
 
-// DetectBackend scans the directory for HCL files defining a backend.
+// DetectBackend scans for backend.
 func DetectBackend(rootDir string) (*BackendConfig, error) {
 	parser := hclparse.NewParser()
 	var backend *BackendConfig
@@ -114,7 +113,7 @@ func DetectBackend(rootDir string) (*BackendConfig, error) {
 		// Parse HCL
 		f, diags := parser.ParseHCLFile(path)
 		if diags != nil && diags.HasErrors() {
-			// Ignore parse errors, best effort
+			// Ignore.
 			return nil
 		}
 
@@ -125,7 +124,7 @@ func DetectBackend(rootDir string) (*BackendConfig, error) {
 						if inner.Type == "backend" && len(inner.Labels) > 0 {
 							bType := inner.Labels[0]
 							if bType == "s3" {
-								// Found S3 Backend
+								// Found S3.
 								backend = &BackendConfig{Type: "s3"}
 								attrs := inner.Body.Attributes
 								if val, ok := attrs["bucket"]; ok {
@@ -160,7 +159,7 @@ func DetectBackend(rootDir string) (*BackendConfig, error) {
 	return nil, fmt.Errorf("no supported backend found")
 }
 
-// FetchRemoteState downloads the state from the backend.
+// FetchRemoteState downloads state.
 func FetchRemoteState(ctx context.Context, backend *BackendConfig) (*State, error) {
 	if backend.Type != "s3" {
 		return nil, fmt.Errorf("unsupported backend type: %s", backend.Type)
@@ -192,7 +191,7 @@ func FetchRemoteState(ctx context.Context, backend *BackendConfig) (*State, erro
 
 	var state State
 	if err := json.Unmarshal(data, &state); err != nil {
-		// Try to parse as wrapper if TF Cloud? S3 usually stores raw JSON.
+		// Parse error.
 		return nil, fmt.Errorf("failed to parse remote state JSON: %v", err)
 	}
 

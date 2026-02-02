@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/applicationautoscaling"
 	aaTypes "github.com/aws/aws-sdk-go-v2/service/applicationautoscaling/types"
@@ -12,7 +13,6 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
 type DynamoDBScanner struct {
@@ -31,8 +31,7 @@ func NewDynamoDBScanner(cfg aws.Config, g *graph.Graph) *DynamoDBScanner {
 	}
 }
 
-// ScanTables identifies tables with excessive provisioned capacity.
-// Analyzes usage metrics over a 30-day window.
+// ScanTables scans tables and analyzes metrics.
 func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 	paginator := dynamodb.NewListTablesPaginator(s.Client, &dynamodb.ListTablesInput{})
 
@@ -43,59 +42,60 @@ func (s *DynamoDBScanner) ScanTables(ctx context.Context) error {
 		}
 
 		for _, tableName := range page.TableNames {
-			// Retrieve table details.
+			// Describe table.
 			desc, err := s.Client.DescribeTable(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(tableName)})
 			if err != nil {
 				continue
 			}
 			table := desc.Table
 
-			// Filter for provisioned billing mode.
+			// Check billing mode.
 			isProvisioned := false
 			if table.BillingModeSummary != nil {
 				if table.BillingModeSummary.BillingMode == types.BillingModeProvisioned {
 					isProvisioned = true
 				}
 			} else {
-				// Handle legacy tables defaulting to provisioned mode.
+				// Handle legacy defaults where BillingModeSummary matches nil for Provisioned.
 				if table.ProvisionedThroughput != nil {
 					isProvisioned = true
 				}
 			}
 
 			if !isProvisioned {
-				continue // Skip On-Demand tables
+				continue // Skip On-Demand tables as they do not incur idle costs.
 			}
 
-			// Extract provisioned capacity values.
+			// Get capacity.
 			readCap := *table.ProvisionedThroughput.ReadCapacityUnits
 			writeCap := *table.ProvisionedThroughput.WriteCapacityUnits
 
 			props := map[string]interface{}{
-				"Service":        "DynamoDB",
-				"BillingMode":    "PROVISIONED",
-				"ProvisionedRCU": float64(readCap),
-				"ProvisionedWCU": float64(writeCap),
-				"TableSizeBytes": table.TableSizeBytes,
+				"Service":            "DynamoDB",
+				"BillingMode":        "PROVISIONED",
+				"ProvisionedRCU":     float64(readCap),
+				"ProvisionedWCU":     float64(writeCap),
+				"TableSizeBytes":     table.TableSizeBytes,
 				"GlobalTableVersion": table.GlobalTableVersion,
 			}
 
 			s.Graph.AddNode(tableName, "aws_dynamodb_table", props)
 
-			// Check for auto-scaling policies.
+			// Check auto-scaling.
 			go s.checkAutoScaling(ctx, tableName, props)
 
-			// Enrich node with consumed capacity metrics.
+			// Enrich metrics.
 			go s.enrichTableMetrics(ctx, tableName, props)
 		}
 	}
 	return nil
 }
 
+// checkAutoScaling checks for scaling policies.
 func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string, props map[string]interface{}) {
-	// Construct auto-scaling resource identifier.
+	// Resource ID.
 	resourceId := fmt.Sprintf("table/%s", tableName)
-    
+
 	out, err := s.AAClient.DescribeScalingPolicies(ctx, &applicationautoscaling.DescribeScalingPoliciesInput{
 		ServiceNamespace: aaTypes.ServiceNamespaceDynamodb,
 		ResourceId:       aws.String(resourceId),
@@ -108,7 +108,7 @@ func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string
 		}
 	}
 
-	// Verify node existence.
+	// Update node.
 	node := s.Graph.GetNode(tableName)
 	if node != nil {
 		s.Graph.Mu.Lock()
@@ -117,15 +117,18 @@ func (s *DynamoDBScanner) checkAutoScaling(ctx context.Context, tableName string
 	}
 }
 
+// enrichTableMetrics adds CloudWatch metrics.
 func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName string, props map[string]interface{}) {
-	// Retrieve table node.
+	// Get node.
 	node := s.Graph.GetNode(tableName)
 
 	if node == nil {
 		return
 	}
 	exists := true
-	if !exists { return }
+	if !exists {
+		return
+	}
 
 	endTime := time.Now()
 	startTime := endTime.Add(-30 * 24 * time.Hour) // 30 Days
@@ -162,11 +165,13 @@ func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName stri
 		StartTime:         &startTime,
 		EndTime:           &endTime,
 	})
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	var avgConsumedRCU, avgConsumedWCU float64
-	// Calculate average daily consumption.
-	
+	// Calc avg daily.
+
 	for _, res := range out.MetricDataResults {
 		totalSum := 0.0
 		count := 0.0
@@ -174,12 +179,12 @@ func (s *DynamoDBScanner) enrichTableMetrics(ctx context.Context, tableName stri
 			totalSum += v
 			count++
 		}
-		
+
 		avgDailySum := 0.0
 		if count > 0 {
 			avgDailySum = totalSum / count
 		}
-		
+
 		avgPerSec := avgDailySum / 86400.0
 
 		if *res.Id == "m_consumed_read" {

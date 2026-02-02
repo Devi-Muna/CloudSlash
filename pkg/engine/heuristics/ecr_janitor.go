@@ -3,7 +3,7 @@ package heuristics
 import (
 	"context"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 type ECRJanitorHeuristic struct{}
@@ -12,16 +12,17 @@ func (h *ECRJanitorHeuristic) Name() string {
 	return "ECRJanitor"
 }
 
-func (h *ECRJanitorHeuristic) Run(ctx context.Context, g *graph.Graph) error {
+func (h *ECRJanitorHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	stats := &HeuristicStats{}
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.Nodes {
+	for _, node := range g.GetNodes() {
 		if node.Ignored {
 			continue
 		}
 
-		if node.Type != "AWS::ECR::Repository" {
+		if node.TypeStr() != "AWS::ECR::Repository" {
 			continue
 		}
 
@@ -29,16 +30,18 @@ func (h *ECRJanitorHeuristic) Run(ctx context.Context, g *graph.Graph) error {
 		wasteBytes, _ := node.Properties["WasteBytes"].(int64)
 		wasteGB := float64(wasteBytes) / 1024 / 1024 / 1024
 
-		// Check for missing policy and waste.
+		// Check policy and waste.
 		if !hasPolicy && wasteBytes > 0 {
 			node.IsWaste = true
 			node.RiskScore = 20 // Low risk (Untagged + Unpulled)
 			node.Properties["Reason"] = "No Lifecycle Policy & Untagged Images > 90d old."
 
-			// Estimated storage cost ($0.10/GB).
+			// Est. cost.
 			node.Cost = wasteGB * 0.10
+			stats.ItemsFound++
+			stats.ProjectedSavings += node.Cost
 		}
 	}
 
-	return nil
+	return stats, nil
 }

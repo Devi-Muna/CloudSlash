@@ -22,7 +22,7 @@ func TestPricingCache(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	cacheFile := filepath.Join(tmpDir, "pricing.json")
-	
+
 	// Create dummy AWS config
 	cfg, _ := config.LoadDefaultConfig(context.TODO(), config.WithRegion("us-east-1"))
 
@@ -52,10 +52,10 @@ func TestPricingCache(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cache hit failed: %v", err)
 	}
-	
+
 	// Check computation (hourly * 730)
-	if price != expectedPrice * 730 {
-		t.Errorf("Expected monthly price %.2f, got %.2f", expectedPrice * 730, price)
+	if price != expectedPrice*730 {
+		t.Errorf("Expected monthly price %.2f, got %.2f", expectedPrice*730, price)
 	}
 
 	// 3. Test Miss/Expiry: Inject expired entry
@@ -64,7 +64,7 @@ func TestPricingCache(t *testing.T) {
 		Price:     0.50,
 		Timestamp: time.Now().Add(-20 * 24 * time.Hour).Unix(), // 20 days old (Over 15 days)
 	}
-	
+
 	// This should try to fetch from AWS and fail (no creds)
 	_, err = c.GetEC2InstancePrice(context.Background(), "us-east-1", "expired.large")
 	if err == nil {
@@ -73,14 +73,14 @@ func TestPricingCache(t *testing.T) {
 
 	// 4. Persistence Test
 	c.saveCache()
-	
+
 	// New client reading same file
 	c2 := &Client{
 		cache:     make(map[string]PriceRecord),
 		cachePath: cacheFile,
 	}
 	c2.loadCache()
-	
+
 	if val, ok := c2.cache[cacheKey]; !ok || val.Price != expectedPrice {
 		t.Errorf("Persistence failed. Expected %.4f, got %+v", expectedPrice, val)
 	}

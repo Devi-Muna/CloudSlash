@@ -1,14 +1,17 @@
 package graph
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/sys/intern"
+	"github.com/DrSkyle/cloudslash/v2/pkg/sys/intern"
 )
+
+var ErrGraphClosed = errors.New("graph is closed")
 
 type EdgeType string
 
@@ -16,9 +19,9 @@ const (
 	EdgeTypeAttachedTo EdgeType = "AttachedTo"
 	EdgeTypeSecuredBy  EdgeType = "SecuredBy"
 	EdgeTypeContains   EdgeType = "Contains"
-	EdgeTypeRuns       EdgeType = "Runs" // Added for ECS Task relationships
+	EdgeTypeRuns       EdgeType = "Runs" // Container orchestration.
 	EdgeTypeFlowsTo    EdgeType = "FlowsTo"
-	EdgeTypeUses       EdgeType = "Uses"    // Added for Instance->AMI or similar dependencies
+	EdgeTypeUses       EdgeType = "Uses" // Dependency.
 	EdgeTypeUnknown    EdgeType = "Unknown"
 )
 
@@ -39,9 +42,10 @@ type Edge struct {
 
 type Node struct {
 	Index          uint32
-	ID             string
-	Type           string
+	ID             uint32
+	Type           uint32
 	Properties     map[string]interface{}
+	TypedData      interface{} // Underlying resource struct.
 	IsWaste        bool
 	WasteReason    string
 	Justified      bool
@@ -51,6 +55,16 @@ type Node struct {
 	Cost           float64
 	SourceLocation string
 	Reachability   ReachabilityState
+}
+
+// IDStr returns the string representation of the Node ID.
+func (n *Node) IDStr() string {
+	return intern.GetStr(n.ID)
+}
+
+// TypeStr returns the string representation of the Node Type.
+func (n *Node) TypeStr() string {
+	return intern.GetStr(n.Type)
 }
 
 type GraphMetadata struct {
@@ -64,174 +78,153 @@ type ScopeError struct {
 }
 
 type GraphOp struct {
-	Kind       string // "Node" or "Edge"
-	ID         string
-	Type       string
-	Props      map[string]interface{}
-	SourceID   string
-	TargetID   string
-	EdgeType   EdgeType
-	Weight     int
+	Kind      string // "Node" or "Edge"
+	ID        string // For Node ops, the string ID
+	Type      string // For Node ops, the string Type
+	Props     map[string]interface{}
+	TypedData interface{} // For Node ops
+	SourceID  string      // For Edge ops, the string SourceID
+	TargetID  string      // For Edge ops, the string TargetID
+	EdgeType  EdgeType
+	Weight    int
 }
 
 type Graph struct {
-	Mu           sync.RWMutex
-	Nodes        []*Node
-	Edges        [][]Edge
-	ReverseEdges [][]Edge
-	idMap        map[string]uint32
-	Metadata     GraphMetadata
-	
-	// Pipeline Architecture
+	Mu       sync.RWMutex
+	Store    GraphStore
+	Metadata GraphMetadata
+
+	// Optimization
+	DSU *UnionFind
+
+	// Pipeline
 	opChan    chan GraphOp
 	buildDone chan struct{}
+	quitChan  chan struct{}
+	closed    bool
 }
 
 func NewGraph() *Graph {
 	g := &Graph{
-		Nodes:        make([]*Node, 0, 1000),
-		Edges:        make([][]Edge, 0, 1000),
-		ReverseEdges: make([][]Edge, 0, 1000),
-		idMap:        make(map[string]uint32),
-		Metadata:     GraphMetadata{Partial: false},
-		opChan:       make(chan GraphOp, 10000), // Buffered Channel
-		buildDone:    make(chan struct{}),
+		Store:     NewMemoryStore(),
+		Metadata:  GraphMetadata{Partial: false},
+		DSU:       NewUnionFind(1024), // Initial capacity
+		opChan:    make(chan GraphOp, 10000),
+		buildDone: make(chan struct{}),
+		quitChan:  make(chan struct{}),
+		closed:    false,
 	}
-	
-	// Start the Single-Threaded Builder (The Actor)
-	g.StartBuilder()
+
+	// Start builder goroutine
+	go g.builderLoop()
 	return g
 }
 
-func (g *Graph) StartBuilder() {
-	go func() {
-		defer close(g.buildDone)
-		for op := range g.opChan {
-			g.Mu.Lock()
-			switch op.Kind {
-			case "Node":
-				g.unsafeAddNode(op.ID, op.Type, op.Props)
-			case "Edge":
-				g.unsafeAddEdge(op.SourceID, op.TargetID, op.EdgeType, op.Weight)
-			}
-			g.Mu.Unlock()
-		}
-	}()
-}
-
-// CloseAndWait seals the ingestion pipeline and waits for the builder to finish.
-// After this returns, the graph is immutable and safe for parallel reads.
+// CloseAndWait finalizes the graph.
+// It uses a sentinel value to stop the builder loop safely without closing the channel,
+// preventing panics in concurrent writers.
 func (g *Graph) CloseAndWait() {
-	close(g.opChan)
+	g.Mu.Lock()
+	if g.closed {
+		g.Mu.Unlock()
+		return
+	}
+	g.closed = true
+	g.Mu.Unlock()
+
+	// Signal exit via dedicated channel (non-blocking)
+	close(g.quitChan)
 	<-g.buildDone
 }
 
+func (g *Graph) builderLoop() {
+	defer close(g.buildDone)
+
+	// Op handler closure
+	handle := func(op GraphOp) {
+		g.Mu.Lock()
+		switch op.Kind {
+		case "Node":
+			g.unsafeAddNode(op.ID, op.Type, op.Props, op.TypedData)
+		case "Edge":
+			g.unsafeAddEdge(op.SourceID, op.TargetID, op.EdgeType, op.Weight)
+		}
+		g.Mu.Unlock()
+	}
+
+	for {
+		select {
+		case <-g.quitChan:
+			// Drain remaining ops (best effort)
+			for len(g.opChan) > 0 {
+				select {
+				case op := <-g.opChan:
+					handle(op)
+				default:
+					// Empty
+				}
+			}
+			return
+
+		case op := <-g.opChan:
+			handle(op)
+		}
+	}
+}
+
 func (g *Graph) AddError(scope string, err error) {
-	// Metadata updates still need locks if accessed during scan, 
-	// or we could add them to the pipeline opChan too. 
-	// For simplicity and safety, we keep the lock here.
+	// Lock required.
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
-	
-	g.Metadata.Partial = true
+
 	g.Metadata.FailedScopes = append(g.Metadata.FailedScopes, ScopeError{
 		Scope: scope,
 		Error: err.Error(),
 	})
 }
 
-// GetNodes returns a snapshot of all current nodes.
-func (g *Graph) GetNodes() []*Node {
-	g.Mu.RLock()
-	defer g.Mu.RUnlock()
-	nodes := make([]*Node, len(g.Nodes))
-	copy(nodes, g.Nodes)
-	return nodes
+func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) error {
+	return g.AddTypedNode(id, resourceType, props, nil)
 }
 
-// GetID returns the internal integer ID for a given string ID (ARN).
-// Returns 0, false if not found.
-func (g *Graph) GetID(id string) (uint32, bool) {
-	// Read lock.
+func (g *Graph) AddTypedNode(id, resourceType string, props map[string]interface{}, typedData interface{}) error {
 	g.Mu.RLock()
-	idx, ok := g.idMap[id]
+	if g.closed {
+		g.Mu.RUnlock()
+		return ErrGraphClosed
+	}
 	g.Mu.RUnlock()
-	return idx, ok
-}
 
-// GetNode returns the Node pointer for a given string ID.
-// Helper method for node retrieval.
-func (g *Graph) GetNode(id string) *Node {
-	idx, ok := g.GetID(id)
-	if !ok {
+	if id == "" {
 		return nil
 	}
-	g.Mu.RLock()
-	defer g.Mu.RUnlock()
-	if int(idx) < len(g.Nodes) {
-		return g.Nodes[idx]
-	}
-	return nil
-}
-
-// GetNodeByID returns the Node pointer for a given internal integer ID.
-func (g *Graph) GetNodeByID(idx uint32) *Node {
-	g.Mu.RLock()
-	defer g.Mu.RUnlock()
-	if int(idx) < len(g.Nodes) {
-		return g.Nodes[idx]
-	}
-	return nil
-}
-
-func (g *Graph) AddNode(id, resourceType string, props map[string]interface{}) {
-	if id == "" {
-		return
-	}
-	// Zero-Lock Push
+	// Queue operation; safe for concurrent use.
 	g.opChan <- GraphOp{
-		Kind:  "Node",
-		ID:    id,
-		Type:  resourceType,
-		Props: props,
+		Kind:      "Node",
+		ID:        id,
+		Type:      resourceType,
+		Props:     props,
+		TypedData: typedData,
 	}
+	return nil
 }
 
-// unsafeAddNode implements the logic without locks, running in the builder goroutine.
-func (g *Graph) unsafeAddNode(id, resourceType string, props map[string]interface{}) {
-	resourceType = intern.String(resourceType)
+func (g *Graph) AddEdge(sourceID, targetID string) error {
+	return g.AddTypedEdge(sourceID, targetID, EdgeTypeUnknown, 1)
+}
 
-	if idx, exists := g.idMap[id]; exists {
-		node := g.Nodes[idx]
-		for k, v := range props {
-			node.Properties[k] = v
-		}
-		if node.Type == intern.String("Unknown") && resourceType != intern.String("Unknown") {
-			node.Type = resourceType
-		}
-	} else {
-		newIdx := uint32(len(g.Nodes))
-		g.idMap[id] = newIdx
-		g.Nodes = append(g.Nodes, &Node{
-			Index:      newIdx,
-			ID:         id,
-			Type:       resourceType,
-			Properties: props,
-		})
-		g.Edges = append(g.Edges, nil)
-		g.ReverseEdges = append(g.ReverseEdges, nil)
+func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weight int) error {
+	g.Mu.RLock()
+	if g.closed {
+		g.Mu.RUnlock()
+		return ErrGraphClosed
 	}
-}
+	g.Mu.RUnlock()
 
-func (g *Graph) AddEdge(sourceID, targetID string) {
-	g.AddTypedEdge(sourceID, targetID, EdgeTypeUnknown, 1)
-}
-
-func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weight int) {
 	if sourceID == "" || targetID == "" {
-		return
+		return nil
 	}
-	// Zero-Lock Push
+	// Queue operation; safe for concurrent use.
 	g.opChan <- GraphOp{
 		Kind:     "Edge",
 		SourceID: sourceID,
@@ -239,77 +232,118 @@ func (g *Graph) AddTypedEdge(sourceID, targetID string, edgeType EdgeType, weigh
 		EdgeType: edgeType,
 		Weight:   weight,
 	}
+	return nil
 }
 
-// unsafeAddEdge implements logic without locks.
-func (g *Graph) unsafeAddEdge(sourceID, targetID string, edgeType EdgeType, weight int) {
-	// Verify nodes exist. If scanners yield edges before nodes (which happens),
-	// we must auto-vivify the nodes as "Unknown".
-	// Since we are single-threaded here, this is safe.
+// unsafeAddNode delegates to Store.
+func (g *Graph) unsafeAddNode(idStr, resourceTypeStr string, props map[string]interface{}, typedData interface{}) {
+	id := intern.Get(idStr)
+	resourceType := intern.Get(resourceTypeStr)
 
-	srcIdx, ok := g.idMap[sourceID]
-	if !ok {
-		srcIdx = uint32(len(g.Nodes))
-		g.idMap[sourceID] = srcIdx
-		g.Nodes = append(g.Nodes, &Node{Index: srcIdx, ID: sourceID, Type: intern.String("Unknown"), Properties: make(map[string]interface{})})
-		g.Edges = append(g.Edges, nil)
-		g.ReverseEdges = append(g.ReverseEdges, nil)
-	}
-
-	dstIdx, ok := g.idMap[targetID]
-	if !ok {
-		dstIdx = uint32(len(g.Nodes))
-		g.idMap[targetID] = dstIdx
-		g.Nodes = append(g.Nodes, &Node{Index: dstIdx, ID: targetID, Type: intern.String("Unknown"), Properties: make(map[string]interface{})})
-		g.Edges = append(g.Edges, nil)
-		g.ReverseEdges = append(g.ReverseEdges, nil)
-	}
-
-	// Add forward edge.
-	exists := false
-	for _, e := range g.Edges[srcIdx] {
-		if e.TargetID == dstIdx && e.Type == edgeType {
-			exists = true
-			break
-		}
-	}
-	if !exists {
-		g.Edges[srcIdx] = append(g.Edges[srcIdx], Edge{
-			TargetID: dstIdx,
-			Type:     edgeType,
-			Weight:   weight,
-			Metadata: make(map[string]interface{}),
+	// Check existence via Store
+	if existingID, ok := g.Store.GetNodeID(idStr); ok {
+		g.Store.UpdateNode(existingID, func(n *Node) {
+			for k, v := range props {
+				n.Properties[k] = v
+			}
+			if typedData != nil {
+				n.TypedData = typedData
+			}
+			if n.Type == intern.Get("Unknown") && resourceType != intern.Get("Unknown") {
+				n.Type = resourceType
+			}
 		})
-	}
-
-	// Add reverse edge.
-	revExists := false
-	for _, e := range g.ReverseEdges[dstIdx] {
-		if e.TargetID == srcIdx && e.Type == edgeType {
-			revExists = true
-			break
+	} else {
+		// Create new
+		node := &Node{
+			ID:         id,
+			Type:       resourceType,
+			Properties: props,
+			TypedData:  typedData,
 		}
-	}
-	if !revExists {
-		g.ReverseEdges[dstIdx] = append(g.ReverseEdges[dstIdx], Edge{
-			TargetID: srcIdx,
-			Type:     edgeType,
-			Weight:   weight,
-			Metadata: make(map[string]interface{}),
-		})
+		idx := g.Store.AddNode(node)
+
+		// Ensure DSU capacity
+		g.DSU.Resize(int(idx) + 1)
 	}
 }
 
-// GetConnectedComponent uses BFS to find all reachable nodes.
-func (g *Graph) GetConnectedComponent(startID string) []*Node {
+// unsafeAddEdge delegates to Store.
+func (g *Graph) unsafeAddEdge(sourceIDStr, targetIDStr string, edgeType EdgeType, weight int) {
+	// Auto-vivify missing nodes.
+
+	var srcIdx, dstIdx uint32
+
+	if idx, ok := g.Store.GetNodeID(sourceIDStr); ok {
+		srcIdx = idx
+	} else {
+		sid := intern.Get(sourceIDStr)
+		node := &Node{ID: sid, Type: intern.Get("Unknown"), Properties: make(map[string]interface{})}
+		srcIdx = g.Store.AddNode(node)
+		g.DSU.Resize(int(srcIdx) + 1)
+	}
+
+	if idx, ok := g.Store.GetNodeID(targetIDStr); ok {
+		dstIdx = idx
+	} else {
+		tid := intern.Get(targetIDStr)
+		node := &Node{ID: tid, Type: intern.Get("Unknown"), Properties: make(map[string]interface{})}
+		dstIdx = g.Store.AddNode(node)
+		g.DSU.Resize(int(dstIdx) + 1)
+	}
+
+	edge := Edge{
+		TargetID: dstIdx,
+		Type:     edgeType,
+		Weight:   weight,
+		Metadata: make(map[string]interface{}),
+	}
+	g.Store.AddEdge(srcIdx, edge)
+
+	// Validated merge.
+	g.DSU.Union(int(srcIdx), int(dstIdx))
+}
+
+// GetNodes returns all nodes.
+func (g *Graph) GetNodes() []*Node {
 	g.Mu.RLock()
 	defer g.Mu.RUnlock()
+	return g.Store.GetAllNodes()
+}
 
-	startIdx, ok := g.idMap[startID]
-	if !ok {
+// GetID delegates to Store.
+func (g *Graph) GetID(internedID uint32) (uint32, bool) {
+	// Get ID by interned value.
+	return g.Store.GetNodeID(intern.GetStr(internedID))
+}
+
+// GetNode delegates.
+func (g *Graph) GetNode(idStr string) *Node {
+	return g.Store.GetNodeByStringID(idStr)
+}
+
+// GetNodeByID delegates.
+func (g *Graph) GetNodeByID(idx uint32) *Node {
+	return g.Store.GetNode(idx)
+}
+
+func (g *Graph) GetEdges(nodeIdx uint32) []Edge {
+	return g.Store.GetEdges(nodeIdx)
+}
+
+func (g *Graph) GetReverseEdges(nodeIdx uint32) []Edge {
+	return g.Store.GetReverseEdges(nodeIdx)
+}
+
+// GetConnectedComponent uses BFS.
+func (g *Graph) GetConnectedComponent(startIDStr string) []*Node {
+	// Use store edges.
+	startNode := g.Store.GetNodeByStringID(startIDStr)
+	if startNode == nil {
 		return nil
 	}
 
+	startIdx := startNode.Index
 	visited := make(map[uint32]bool)
 	queue := []uint32{startIdx}
 	var component []*Node
@@ -323,163 +357,121 @@ func (g *Graph) GetConnectedComponent(startID string) []*Node {
 		}
 		visited[currentIdx] = true
 
-		if int(currentIdx) < len(g.Nodes) {
-			node := g.Nodes[currentIdx]
+		node := g.Store.GetNode(currentIdx)
+		if node != nil {
 			component = append(component, node)
 		}
 
 		// Forward
-		if int(currentIdx) < len(g.Edges) {
-			for _, edge := range g.Edges[currentIdx] {
-				if !visited[edge.TargetID] {
-					queue = append(queue, edge.TargetID)
-				}
+		for _, edge := range g.Store.GetEdges(currentIdx) {
+			if !visited[edge.TargetID] {
+				queue = append(queue, edge.TargetID)
 			}
 		}
 
 		// Reverse
-		if int(currentIdx) < len(g.ReverseEdges) {
-			for _, edge := range g.ReverseEdges[currentIdx] {
-				if !visited[edge.TargetID] {
-					queue = append(queue, edge.TargetID)
-				}
+		for _, edge := range g.Store.GetReverseEdges(currentIdx) {
+			if !visited[edge.TargetID] {
+				queue = append(queue, edge.TargetID)
 			}
 		}
 	}
-
 	return component
 }
 
-func (g *Graph) MarkWaste(id string, score int) {
+// AreConnected checks connectivity via DSU.
+func (g *Graph) AreConnected(id1, id2 string) bool {
+	idx1, ok1 := g.Store.GetNodeID(id1)
+	idx2, ok2 := g.Store.GetNodeID(id2)
+
+	if !ok1 || !ok2 {
+		return false
+	}
+
+	return g.DSU.Connected(int(idx1), int(idx2))
+}
+
+func (g *Graph) MarkWaste(idStr string, score int) {
+	// Mutex required for thread-safe store updates during concurrent heuristic analysis.
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	idx, ok := g.idMap[id]
+	idx, ok := g.Store.GetNodeID(idStr)
 	if !ok {
 		return
 	}
-	node := g.Nodes[idx]
 
-	// Check for ignore tags.
-	if tags, ok := node.Properties["Tags"].(map[string]string); ok {
-		if val, ok := tags["cloudslash:ignore"]; ok {
-			val = strings.ToLower(strings.TrimSpace(val))
+	g.Store.UpdateNode(idx, func(node *Node) {
+		// Check for ignore tags.
+		if tags, ok := node.Properties["Tags"].(map[string]string); ok {
+			if val, ok := tags["cloudslash:ignore"]; ok {
+				val = strings.ToLower(strings.TrimSpace(val))
 
-			if val == "true" {
-				return
-			}
-
-			if strings.HasPrefix(val, "cost<") {
-				limitStr := strings.TrimPrefix(val, "cost<")
-				if limit, err := strconv.ParseFloat(limitStr, 64); err == nil {
-					if node.Cost < limit {
-						return
-					}
-				}
-			}
-
-			if strings.HasPrefix(val, "justified:") {
-				node.IsWaste = true
-				node.Justified = true
-				node.Justification = strings.TrimPrefix(val, "justified:")
-				node.RiskScore = score
-				return
-			}
-
-			if ignoreUntil, err := time.Parse("2006-01-02", val); err == nil {
-				if time.Now().Before(ignoreUntil) {
+				if val == "true" {
 					return
 				}
-			}
 
-			// Check grace period.
-			if strings.HasSuffix(val, "d") || strings.HasSuffix(val, "h") {
-				hours := 0
-				var err error
-
-				if strings.HasSuffix(val, "d") {
-					daysStr := strings.TrimSuffix(val, "d")
-					days, _ := strconv.Atoi(daysStr)
-					hours = days * 24
-				} else {
-					hoursStr := strings.TrimSuffix(val, "h")
-					hours, _ = strconv.Atoi(hoursStr)
-				}
-
-				if err == nil {
-					var launchTime time.Time
-					foundTime := false
-
-					for _, key := range []string{"LaunchTime", "CreateTime", "StartTime", "Created"} {
-						if tVal, ok := node.Properties[key].(time.Time); ok {
-							launchTime = tVal
-							foundTime = true
-							break
-						}
-					}
-
-					if foundTime {
-						if time.Since(launchTime).Hours() < float64(hours) {
+				if strings.HasPrefix(val, "cost<") {
+					limitStr := strings.TrimPrefix(val, "cost<")
+					if limit, err := strconv.ParseFloat(limitStr, 64); err == nil {
+						if node.Cost < limit {
 							return
 						}
 					}
 				}
+
+				if strings.HasPrefix(val, "justified:") {
+					node.IsWaste = true
+					node.Justified = true
+					node.Justification = strings.TrimPrefix(val, "justified:")
+					node.RiskScore = score
+					return
+				}
+
+				if ignoreUntil, err := time.Parse("2006-01-02", val); err == nil {
+					if time.Now().Before(ignoreUntil) {
+						return
+					}
+				}
 			}
 		}
-	}
-
-	node.IsWaste = true
-	node.RiskScore = score
+		node.IsWaste = true
+		node.RiskScore = score
+	})
 }
 
 func (g *Graph) GetDownstream(id string) []string {
-	g.Mu.RLock()
-	defer g.Mu.RUnlock()
-
-	startIdx, ok := g.idMap[id]
+	idx, ok := g.Store.GetNodeID(id)
 	if !ok {
 		return nil
 	}
 
 	var downstream []string
-	if int(startIdx) < len(g.Edges) {
-		for _, e := range g.Edges[startIdx] {
-			// Resolve node IDs.
-			if int(e.TargetID) < len(g.Nodes) {
-				downstream = append(downstream, g.Nodes[e.TargetID].ID)
-			}
+	for _, e := range g.Store.GetEdges(idx) {
+		if node := g.Store.GetNode(e.TargetID); node != nil {
+			downstream = append(downstream, node.IDStr())
 		}
 	}
 	return downstream
 }
 
 func (g *Graph) GetUpstream(id string) []string {
-	g.Mu.RLock()
-	defer g.Mu.RUnlock()
-
-	startIdx, ok := g.idMap[id]
+	idx, ok := g.Store.GetNodeID(id)
 	if !ok {
 		return nil
 	}
 
 	var upstream []string
-	if int(startIdx) < len(g.ReverseEdges) {
-		for _, e := range g.ReverseEdges[startIdx] {
-			if int(e.TargetID) < len(g.Nodes) {
-				upstream = append(upstream, g.Nodes[e.TargetID].ID)
-			}
+	for _, e := range g.Store.GetReverseEdges(idx) {
+		if node := g.Store.GetNode(e.TargetID); node != nil {
+			upstream = append(upstream, node.IDStr())
 		}
 	}
 	return upstream
 }
 
 func (g *Graph) DumpStats() string {
-	g.Mu.RLock()
-	defer g.Mu.RUnlock()
-	
-	totalEdges := 0
-	for _, edges := range g.Edges {
-		totalEdges += len(edges)
-	}
-	return fmt.Sprintf("Nodes: %d | Edges: %d", len(g.Nodes), totalEdges)
+	// Basic stats.
+	count := g.Store.NodeCount()
+	return fmt.Sprintf("Nodes: %d | Storage: Memory", count)
 }

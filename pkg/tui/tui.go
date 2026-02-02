@@ -1,8 +1,8 @@
 package tui
 
 import (
-	"fmt"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -10,19 +10,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine/audit"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/audit"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
-	"github.com/DrSkyle/cloudslash/pkg/version"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/version"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -40,7 +38,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.quitting = true
 			return m, tea.Quit
-		
+
 		// View Toggle (Topology <-> List).
 		case "t":
 			if m.state == ViewStateTopology {
@@ -92,7 +90,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "m":
 				// Soft Delete: Mark resource for later cleanup without immediate destruction.
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
-					id := m.wasteItems[m.cursor].ID
+					id := m.wasteItems[m.cursor].IDStr()
 					// Simulate "Soft Delete" by logging the action and hiding the node.
 					// This simulates a tagging operation (e.g., TagResource("cloudslash:status", "to-delete")).
 					audit.LogAction("SOFT_DELETE", id, "MARKED", 0, "Marked for later collision")
@@ -101,17 +99,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "i":
 				// Ignore from List View
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
-					id := m.wasteItems[m.cursor].ID
+					id := m.wasteItems[m.cursor].IDStr()
 					m.ignoreNode(id)
-					// Stay in list view, but maybe adjust cursor if items shrink?
-					// The refreshData() call in the main loop or logic might shift things, 
-					// but m.ignoreNode changes the underlying graph. 
-					// m.refreshData() needs to be called to hide it.
+					// Refresh view state to reflect graph modification (hidden node).
 					m.refreshData()
 				}
 			case "y":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
-					txt := m.wasteItems[m.cursor].ID
+					txt := m.wasteItems[m.cursor].IDStr()
 					err := copyToClipboard(txt)
 					if err != nil {
 						copyToClipboardOSC52(txt)
@@ -122,13 +117,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "Y":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
-					copyToClipboard(m.wasteItems[m.cursor].ID) // ID is often ARN in Graph
+					copyToClipboard(m.wasteItems[m.cursor].IDStr()) // ID is often ARN in Graph
 				}
 			case "c":
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
 					// Copy JSON properties
 					node := m.wasteItems[m.cursor]
-					jsonStr := fmt.Sprintf("ID: %s\nType: %s\nCost: $%.2f\nProps: %v", node.ID, node.Type, node.Cost, node.Properties)
+					jsonStr := fmt.Sprintf("ID: %s\nType: %s\nCost: $%.2f\nProps: %v", node.IDStr(), node.TypeStr(), node.Cost, node.Properties)
 					copyToClipboard(jsonStr)
 				}
 			case "P", "p":
@@ -146,9 +141,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.refreshData()
 			case "R", "r":
-				// Simple toggle for now: All -> us-east-1 (example) -> All
-				// Use "Next Region" logic?
-				// Let's iterate unique regions in graph
+				// Cycle through available regions (Global -> Region A -> Region B -> Global).
+				// Dynamically enumerates regions present in the graph.
 				regions := m.getUniqueRegions()
 				if len(regions) > 0 {
 					// Find current index
@@ -182,7 +176,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "i":
 				// Ignore
 				if len(m.wasteItems) > 0 && m.cursor < len(m.wasteItems) {
-					id := m.wasteItems[m.cursor].ID
+					id := m.wasteItems[m.cursor].IDStr()
 					m.ignoreNode(id)
 					m.state = ViewStateList // return to list after action
 				}
@@ -283,12 +277,12 @@ func (m *Model) refreshData() {
 	m.Graph.Mu.RLock()
 	defer m.Graph.Mu.RUnlock()
 
-	for _, n := range m.Graph.Nodes {
+	for _, n := range m.Graph.GetNodes() {
 		if n.IsWaste && !n.Ignored {
 			if m.FilterMode == "High Confidence" {
 				isSafe := false
 				// 1. Safe Types (EIPs, Snapshots are usually standalone)
-				if n.Type == "AWS::EC2::EIP" || n.Type == "AWS::EC2::Snapshot" {
+				if n.TypeStr() == "AWS::EC2::EIP" || n.TypeStr() == "AWS::EC2::Snapshot" {
 					isSafe = true
 				}
 				// 2. High Confidence Scores (RiskScore represents specific probability of waste)
@@ -318,15 +312,14 @@ func (m *Model) refreshData() {
 	} else {
 		// Default: ID
 		sort.Slice(nodes, func(i, j int) bool {
-			return nodes[i].ID < nodes[j].ID
+			return nodes[i].IDStr() < nodes[j].IDStr()
 		})
 	}
 
 	m.totalSavings = total
 	m.wasteItems = nodes
-	
-	// Refresh topology logic too if in that view or always? 
-	// To be safe, let's keep it updated.
+
+	// Ensure topology view is synchronized with the latest graph state.
 	m.buildTopology()
 }
 
@@ -373,11 +366,11 @@ func getConsoleURL(node *graph.Node) string {
 		region = "us-east-1"
 	}
 
-	switch node.Type {
+	switch node.TypeStr() {
 	case "AWS::EC2::Instance":
-		return fmt.Sprintf("https://%s.console.aws.amazon.com/ec2/home?region=%s#InstanceDetails:instanceId=%s", region, region, node.ID)
+		return fmt.Sprintf("https://%s.console.aws.amazon.com/ec2/home?region=%s#InstanceDetails:instanceId=%s", region, region, node.IDStr())
 	case "AWS::S3::Bucket":
-		return fmt.Sprintf("https://s3.console.aws.amazon.com/s3/buckets/%s?region=%s", node.ID, region)
+		return fmt.Sprintf("https://s3.console.aws.amazon.com/s3/buckets/%s?region=%s", node.IDStr(), region)
 	}
 	return "https://console.aws.amazon.com"
 }
@@ -444,7 +437,7 @@ func (m Model) getUniqueRegions() []string {
 	defer m.Graph.Mu.RUnlock()
 	unique := make(map[string]bool)
 	var list []string
-	for _, n := range m.Graph.Nodes {
+	for _, n := range m.Graph.GetNodes() {
 		if n.IsWaste && !n.Ignored {
 			if r, ok := n.Properties["Region"].(string); ok {
 				if !unique[r] {
@@ -458,8 +451,6 @@ func (m Model) getUniqueRegions() []string {
 	return list
 }
 
-
-
 // PrintExitSummary renders the final status screen after the TUI has exited.
 // This prevents rendering artifacts/overlap with the TUI buffer.
 func PrintExitSummary(startTime time.Time, nodeCount int) {
@@ -469,7 +460,7 @@ func PrintExitSummary(startTime time.Time, nodeCount int) {
 	memMB := mem.Alloc / 1024 / 1024
 
 	stats := fmt.Sprintf("\n[SUCCESS] Scan Complete. Audited %d resources in %.2fs. (Memory: %dMB)\n", nodeCount, duration, memMB)
-	
+
 	// Exit View
 	s := "\n" +
 		lipgloss.NewStyle().

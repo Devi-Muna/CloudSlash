@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
 func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
@@ -47,7 +47,7 @@ func TestZombieEKSHeuristic_WithOrphanedELBs(t *testing.T) {
 	g.CloseAndWait()
 
 	// 2. Run Heuristic
-	err := heuristic.Run(ctx, g)
+	_, err := heuristic.Run(ctx, g)
 	if err != nil {
 		t.Fatalf("Heuristic run failed: %v", err)
 	}

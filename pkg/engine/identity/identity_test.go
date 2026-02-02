@@ -44,7 +44,7 @@ func TestIdentityResolution(t *testing.T) {
 	// Git says: "poppie" <jdoe@acme.corp>
 	// Expected: Match because email matches mock
 	mapping, status := resolver.Resolve("poppie", "jdoe@acme.corp")
-	
+
 	if status != StatusVerified {
 		t.Errorf("expected VERIFIED, got %s", status)
 	}
@@ -59,7 +59,7 @@ func TestIdentityResolution(t *testing.T) {
 	// Git says: "hacker" <evil@gmail.com>
 	// Expected: UNKNOWN (Confidence 0)
 	mapping2, status2 := resolver.Resolve("hacker", "evil@gmail.com")
-	
+
 	if status2 != StatusUnknown {
 		t.Errorf("expected UNKNOWN, got %s", status2)
 	}

@@ -14,8 +14,8 @@ func (m Model) viewDetails() string {
 	}
 	node := m.wasteItems[m.cursor]
 
-	// Render Header.
-	header := detailsHeaderStyle.Render(fmt.Sprintf("%s : %s", node.Type, node.ID))
+	// Header Display: Type and ID.
+	header := detailsHeaderStyle.Render(fmt.Sprintf("%s : %s", node.TypeStr(), node.IDStr()))
 
 	// Properties List.
 	var props []string
@@ -33,7 +33,7 @@ func (m Model) viewDetails() string {
 		props = append(props, line)
 	}
 
-	// Cost & Risk Section (Simulated "Intel").
+	// Resource Intelligence: Cost, Risk, and Reachability.
 	cost := fmt.Sprintf("MONTHLY WASTE: $%.2f", node.Cost)
 	risk := fmt.Sprintf("RISK SCORE:    %d/100", node.RiskScore)
 
@@ -43,36 +43,32 @@ func (m Model) viewDetails() string {
 		reach = "REACHABILITY:  connected"
 		reachStyle = special // Green
 	} else if node.Reachability == "DarkMatter" {
-		reach = "REACHABILITY:  DARK MATTER" // Scary!
-		reachStyle = danger                  // Red
+		reach = "REACHABILITY:  DARK MATTER"
+		reachStyle = danger // Red
 	}
 
-	history := []float64{0, 0, 0, 0, 0, 0, 0} // Default flatline
-	if h, ok := node.Properties["MetricsHistory"].([]float64); ok && len(h) > 0 {
-		history = h
-	}
-	// Mock active for demo if missing
-	if node.Cost > 50 && len(history) == 7 && history[0] == 0 {
-		history = []float64{0.1, 0.4, 0.2, 0.8, 0.5, 0.3, 0.1} // Mock spiky
-	}
+	cpuHistory, _ := node.Properties["MetricsHistoryCPU"].([]float64)
+	netHistory, _ := node.Properties["MetricsHistoryNet"].([]float64)
 
-	sparkline := renderSparkline(history)
+	cpuSpark := renderSparkline(cpuHistory)
+	netSpark := renderSparkline(netHistory)
 
 	intelBlock := lipgloss.JoinVertical(lipgloss.Left,
 		special.Render(cost),
 		danger.Render(risk),
 		reachStyle.Render(reach),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF")).Render(fmt.Sprintf("ACTIVITY:      %s", sparkline)),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF")).Render(fmt.Sprintf("CPU ACTIVITY:  %s", cpuSpark)),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#7D40FF")).Render(fmt.Sprintf("NET ACTIVITY:  %s", netSpark)),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#F05D5E")).Render("BLAME:         "+fmt.Sprintf("%v", node.Properties["Owner"])),
 	)
 
-	// Source Location (if available).
+	// IAC Provenance.
 	source := "Source: Unknown (Not managed by Terraform)"
 	if node.SourceLocation != "" {
 		source = fmt.Sprintf("Source: %s", node.SourceLocation)
 	}
 
-	// Keyboard shortcuts footer.
+	// Contextual Actions.
 	actions := []string{
 		"[I]gnore Resource",
 		"[O]pen in Console",

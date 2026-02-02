@@ -12,10 +12,10 @@ type Task func(ctx context.Context) error
 
 // Engine manages concurrent task execution.
 type Engine struct {
-	aimd   *AIMD
-	tasks  chan Task
-	wg     sync.WaitGroup
-	quit   chan struct{}
+	aimd       *AIMD
+	tasks      chan Task
+	wg         sync.WaitGroup
+	quit       chan struct{}
 	active     int
 	MaxWorkers int // MaxWorkers sets a hard ceiling on concurrency
 	mu         sync.Mutex
@@ -108,6 +108,10 @@ func (e *Engine) worker(ctx context.Context) {
 		e.active--
 		e.mu.Unlock()
 		e.wg.Done()
+
+		if r := recover(); r != nil {
+			panic(r)
+		}
 	}()
 
 	for {
@@ -129,8 +133,7 @@ func (e *Engine) worker(ctx context.Context) {
 			isThrottled := false
 			if err != nil {
 				if strings.Contains(err.Error(), "Throttling") || strings.Contains(err.Error(), "RateExceeded") {
-					// Note: Retries handled by caller.
-					continue
+					isThrottled = true
 				}
 			}
 

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine/report"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine/report"
 )
 
 // SlackClient handles Slack notifications.
@@ -24,14 +24,14 @@ func NewSlackClient(webhookURL string, channel string) *SlackClient {
 	}
 }
 
-// SendAnalysisReport sends a Block Kit summary.
+// SendAnalysisReport sends a summary.
 func (s *SlackClient) SendAnalysisReport(summary report.Summary) error {
 	if s.WebhookURL == "" {
 		return nil
 	}
 
 	payload := s.constructPayload(summary)
-	
+
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal slack payload: %w", err)
@@ -60,11 +60,11 @@ func (s *SlackClient) SendAnalysisReport(summary report.Summary) error {
 // constructPayload builds the message blocks.
 func (s *SlackClient) constructPayload(summary report.Summary) map[string]interface{} {
 	// Determine status icon.
-	statusIcon := "🟢" // Healthy.
+	statusIcon := "🟢"
 	if summary.TotalSavings > 1000 {
-		statusIcon = "🔴" // Critical.
+		statusIcon = "🔴"
 	} else if summary.TotalSavings > 0 {
-		statusIcon = "🟡" // Warning.
+		statusIcon = "🟡"
 	}
 
 	blocks := []map[string]interface{}{
@@ -131,7 +131,6 @@ func (s *SlackClient) constructPayload(summary report.Summary) map[string]interf
 
 	return payload
 }
-
 
 // SendBudgetAlert sends a cost velocity alert.
 func (s *SlackClient) SendBudgetAlert(velocity float64, acceleration float64) error {

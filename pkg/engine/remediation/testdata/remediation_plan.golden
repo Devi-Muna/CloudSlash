@@ -1,0 +1,497 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "actions": [
+    {
+      "id": "i-inst1",
+      "type": "AWS::EC2::Instance",
+      "operation": "STOP",
+      "description": "Tag and Stop EC2 Instance",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/i-inst1.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "i-inst1",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "STATUS_MATCH",
+          "params": {
+            "ID": "i-inst1",
+            "Region": "unknown",
+            "Value": "stopped"
+          }
+        }
+      ],
+      "rollback": {
+        "id": "i-inst1",
+        "type": "AWS::EC2::Instance",
+        "operation": "START",
+        "description": "Rollback: Start Instance",
+        "parameters": {
+          "Region": "unknown"
+        }
+      }
+    },
+    {
+      "id": "vol-del",
+      "type": "AWS::EC2::Volume",
+      "operation": "SNAPSHOT_AND_DELETE",
+      "description": "Snapshot, Tag and Delete EBS Volume",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/vol-del.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "vol-del",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vol-gp2",
+      "type": "AWS::EC2::Volume",
+      "operation": "MODIFY",
+      "description": "Upgrade Volume to gp3",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/vol-gp2.json",
+        "VolumeType": "gp3"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "vol-gp2",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "PROPERTY_MATCH",
+          "params": {
+            "ID": "vol-gp2",
+            "Property": "VolumeType",
+            "Region": "unknown",
+            "Value": "gp3"
+          }
+        }
+      ]
+    },
+    {
+      "id": "db-main",
+      "type": "AWS::RDS::DBInstance",
+      "operation": "STOP",
+      "description": "Tag and Stop RDS Instance",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/db-main.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "db-main",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "STATUS_MATCH",
+          "params": {
+            "ID": "db-main",
+            "Region": "unknown",
+            "Value": "stopped"
+          }
+        }
+      ],
+      "rollback": {
+        "id": "db-main",
+        "type": "AWS::RDS::DBInstance",
+        "operation": "START",
+        "description": "Rollback: Start DB Instance"
+      }
+    },
+    {
+      "id": "nat-123",
+      "type": "AWS::EC2::NatGateway",
+      "operation": "DELETE",
+      "description": "Delete NAT Gateway",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/nat-123.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "nat-123",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "nat-123",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "eipalloc-1",
+      "type": "AWS::EC2::EIP",
+      "operation": "RELEASE",
+      "description": "Release Elastic IP",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/eipalloc-1.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "eipalloc-1",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "eipalloc-1",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ami-old",
+      "type": "AWS::EC2::AMI",
+      "operation": "DEREGISTER",
+      "description": "Deregister AMI",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/ami-old.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "ami-old",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "ami-old",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "123",
+      "type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "operation": "DELETE",
+      "description": "Delete AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/123.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "123",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "123",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MyCluster",
+      "type": "AWS::ECS::Cluster",
+      "operation": "DELETE",
+      "description": "Delete AWS::ECS::Cluster",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/MyCluster.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "MyCluster",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "MyCluster",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MyService",
+      "type": "AWS::ECS::Service",
+      "operation": "DELETE",
+      "description": "Delete AWS::ECS::Service",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/MyService.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "MyService",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "MyService",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MyEKSCluster",
+      "type": "AWS::EKS::Cluster",
+      "operation": "DELETE",
+      "description": "Delete AWS::EKS::Cluster",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/MyEKSCluster.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "MyEKSCluster",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "MyEKSCluster",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ng-1",
+      "type": "AWS::EKS::NodeGroup",
+      "operation": "DELETE",
+      "description": "Delete AWS::EKS::NodeGroup",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/ng-1.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "ng-1",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "ng-1",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "my-repo",
+      "type": "AWS::ECR::Repository",
+      "operation": "DELETE",
+      "description": "Delete AWS::ECR::Repository",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/my-repo.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "my-repo",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "my-repo",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "my-func",
+      "type": "AWS::Lambda::Function",
+      "operation": "DELETE",
+      "description": "Delete AWS::Lambda::Function",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones/my-func.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "my-func",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "my-func",
+            "Region": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "id": "/aws/lambda/logs",
+      "type": "AWS::Logs::LogGroup",
+      "operation": "DELETE",
+      "description": "Delete AWS::Logs::LogGroup",
+      "parameters": {
+        "Region": "unknown",
+        "Tags": {
+          "CloudSlash:ExpiryDate": "2026-03-04",
+          "CloudSlash:Status": "Purgatory"
+        },
+        "TombstoneURI": "file://.cloudslash/tombstones//aws/lambda/logs.json"
+      },
+      "pre_conditions": [
+        {
+          "type": "EXISTS",
+          "params": {
+            "ID": "/aws/lambda/logs",
+            "Region": "unknown"
+          }
+        }
+      ],
+      "post_conditions": [
+        {
+          "type": "NOT_EXISTS",
+          "params": {
+            "ID": "/aws/lambda/logs",
+            "Region": "unknown"
+          }
+        }
+      ]
+    }
+  ]
+}

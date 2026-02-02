@@ -4,13 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	"github.com/DrSkyle/cloudslash/pkg/graph"
 )
 
+// LambdaScanner scans Lambda functions.
 type LambdaScanner struct {
 	Client   *lambda.Client
 	CWClient *cloudwatch.Client
@@ -25,8 +26,7 @@ func NewLambdaScanner(cfg aws.Config, g *graph.Graph) *LambdaScanner {
 	}
 }
 
-// ScanFunctions discovers Lambda functions and usage metrics.
-// Analyzes metrics over a 90-day window.
+// ScanFunctions scans functions and checks usage.
 func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 	paginator := lambda.NewListFunctionsPaginator(s.Client, &lambda.ListFunctionsInput{})
 
@@ -50,20 +50,23 @@ func (s *LambdaScanner) ScanFunctions(ctx context.Context) error {
 
 			s.Graph.AddNode(name, "aws_lambda_function", props)
 
-			// Check for function staleness (code rot).
+			// Analyze execution metrics to detect potential staleness (code rot).
 			go s.checkCodeRot(ctx, name, props)
 
-			// Check for version accumulation.
+			// Catalog function versions and aliases.
 			go s.scanVersionsAndAliases(ctx, name, arn)
 		}
 	}
 	return nil
 }
 
+// checkCodeRot checks invocations over 90 days.
 func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props map[string]interface{}) {
 	node := s.Graph.GetNode(funcName)
 	exists := (node != nil)
-	if !exists { return }
+	if !exists {
+		return
+	}
 
 	endTime := time.Now()
 	startTime := endTime.Add(-90 * 24 * time.Hour) // 90-day window.
@@ -89,7 +92,9 @@ func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props
 		EndTime:           &endTime,
 	})
 
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 
 	totalInvocations := 0.0
 	for _, res := range out.MetricDataResults {
@@ -103,10 +108,11 @@ func (s *LambdaScanner) checkCodeRot(ctx context.Context, funcName string, props
 	s.Graph.Mu.Unlock()
 }
 
+// scanVersionsAndAliases maps versions and aliases.
 func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName string, funcArn string) {
-	// Retrieve aliases to whitelist active versions.
+	// Get aliases.
 	aliases := make(map[string]bool) // Key: Version ID
-	
+
 	aPaginator := lambda.NewListAliasesPaginator(s.Client, &lambda.ListAliasesInput{FunctionName: aws.String(funcName)})
 	for aPaginator.HasMorePages() {
 		page, err := aPaginator.NextPage(ctx)
@@ -117,25 +123,26 @@ func (s *LambdaScanner) scanVersionsAndAliases(ctx context.Context, funcName str
 		}
 	}
 
-	// Retrieve all function versions.
+	// Get versions.
 	vPaginator := lambda.NewListVersionsByFunctionPaginator(s.Client, &lambda.ListVersionsByFunctionInput{FunctionName: aws.String(funcName)})
-	
+
 	var versions []string
 	var totalSize int64
 
 	for vPaginator.HasMorePages() {
 		page, err := vPaginator.NextPage(ctx)
-		if err != nil { break }
-		
+		if err != nil {
+			break
+		}
+
 		for _, v := range page.Versions {
 			if *v.Version == "$LATEST" {
-				continue // Exclude $LATEST alias.
+				continue // Exclude $LATEST.
 			}
 			versions = append(versions, *v.Version)
 			totalSize += v.CodeSize
 		}
 	}
-
 
 	node := s.Graph.GetNode(funcName)
 	if node != nil {

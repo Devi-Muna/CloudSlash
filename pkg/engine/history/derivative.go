@@ -7,18 +7,17 @@ import (
 
 // AnalysisResult contains derived cost signals.
 type AnalysisResult struct {
-	CurrentBurnRate   float64 // $/month
-	Velocity          float64 // Velocity is the first derivative (cost change rate).
-	Acceleration      float64 // Acceleration is the second derivative (rate of change of velocity).
-	
-	ProjectedBurn24h  float64 // Projected 24h burn rate.
-	TimeToBankrupt    time.Duration
-	
-	Alerts            []string
+	CurrentBurnRate float64 // $/month
+	Velocity        float64 // rate of cost change
+	Acceleration    float64 // rate of velocity change
+
+	ProjectedBurn24h float64 // Projected 24h burn rate.
+	TimeToBankrupt   time.Duration
+
+	Alerts []string
 }
 
 // Analyze calculates cost trends from historical snapshots.
-// Calculate derivatives and budget projections.
 func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	if len(history) < 2 {
 		return AnalysisResult{CurrentBurnRate: 0}
@@ -27,8 +26,8 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	current := history[len(history)-1]
 	prev := history[len(history)-2]
 
-	// Calculate velocity using finite difference.
-	timeDelta := float64(current.Timestamp - prev.Timestamp) / 3600.0
+	// Calculate velocity.
+	timeDelta := float64(current.Timestamp-prev.Timestamp) / 3600.0
 	if timeDelta == 0 {
 		return AnalysisResult{CurrentBurnRate: current.TotalMonthlyCost}
 	}
@@ -36,18 +35,18 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	costDelta := current.TotalMonthlyCost - prev.TotalMonthlyCost
 	velocity := costDelta / timeDelta
 
-	// Calculate acceleration (second-order).
+	// Calculate acceleration.
 	acceleration := 0.0
 	if len(history) >= 3 {
 		prev2 := history[len(history)-3]
-		timeDelta2 := float64(prev.Timestamp - prev2.Timestamp) / 3600.0
+		timeDelta2 := float64(prev.Timestamp-prev2.Timestamp) / 3600.0
 		if timeDelta2 > 0 {
 			prevVelocity := (prev.TotalMonthlyCost - prev2.TotalMonthlyCost) / timeDelta2
 			acceleration = (velocity - prevVelocity) / timeDelta
 		}
 	}
 
-	// Project burn using Taylor expansion.
+	// Project burn.
 	projectedBurn := current.TotalMonthlyCost + (velocity * 24) + (0.5 * acceleration * 24 * 24)
 
 	// Estimate Time-To-Bankrupt (TTB).
@@ -74,7 +73,7 @@ func Analyze(history []Snapshot, budget float64) AnalysisResult {
 	if acceleration > 500 {
 		alerts = append(alerts, fmt.Sprintf("[WARNING] SPEND ACCELERATION: Spending suggests exponential leak (+%.0f/h²)", acceleration))
 	}
-	
+
 	// Check for budget exhaustion risks.
 	if ttb > 0 && ttb < 24*time.Hour {
 		alerts = append(alerts, fmt.Sprintf("[CRITICAL] BUDGET EXHAUSTION: Budget exhaustion predicted in %s", ttb.Round(time.Minute)))

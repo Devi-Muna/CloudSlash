@@ -1,6 +1,7 @@
 package provenance
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -58,12 +59,12 @@ resource "aws_instance" "test" {
 	}
 
 	// Test Git Blame (Mocked)
-	// We override execCmd to call the TestHelperProcess
-	execCmd = fakeExecCommand
-	defer func() { execCmd = exec.Command }()
+	// We override execCmdContext to call the TestHelperProcess
+	execCmdContext = fakeExecCommandContext
+	defer func() { execCmdContext = exec.CommandContext }()
 
 	// We blame the instance_type line (line 4)
-	blame, err := GetBlame(loc.FilePath, 4, 4)
+	blame, err := GetBlame(context.Background(), loc.FilePath, 4, 4)
 	if err != nil {
 		t.Fatalf("GetBlame failed: %v", err)
 	}
@@ -78,11 +79,11 @@ resource "aws_instance" "test" {
 	t.Logf("Success! Blamed commit: %s by %s", blame.Hash, blame.Author)
 }
 
-// fakeExecCommand handles the mocking logic
-func fakeExecCommand(command string, args ...string) *exec.Cmd {
+// fakeExecCommandContext handles the mocking logic
+func fakeExecCommandContext(ctx context.Context, command string, args ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestHelperProcess", "--", command}
 	cs = append(cs, args...)
-	cmd := exec.Command(os.Args[0], cs...)
+	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
 	return cmd
 }
@@ -92,7 +93,7 @@ func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-	
+
 	// Print mock git blame porcelain output
 	// Format:
 	// <hash> <line> <line> <lines in group>
@@ -108,7 +109,7 @@ func TestHelperProcess(t *testing.T) {
 	// boundary
 	// filename <file>
 	// 	<content>
-	
+
 	fmt.Print(`8f3a21abcd 4 4 1
 author Jane Doe
 author-mail <jdoe@example.com>

@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/DrSkyle/cloudslash/pkg/engine"
+	"github.com/DrSkyle/cloudslash/v2/pkg/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +19,17 @@ Default output directory: ./cloudslash-out/`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Initializing Forensic Export...")
 		config.Headless = true
-		// Execute the scan to extract forensic data.
-		_, _, _, err := engine.Run(cmd.Context(), config)
+		// Execute a full scan to generate the report data.
+		eng, err := engine.New(cmd.Context(),
+			engine.WithLogger(config.Logger),
+			engine.WithConfig(config),
+			engine.WithConcurrency(config.MaxConcurrency),
+		)
+		if err != nil {
+			fmt.Printf("\n[ERROR] Export Failed (Init): %v\n", err)
+			return
+		}
+		_, _, _, err = eng.Run(cmd.Context())
 		if err != nil {
 			fmt.Printf("\n[ERROR] Export Failed: %v\n", err)
 			return

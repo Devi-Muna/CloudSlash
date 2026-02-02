@@ -24,7 +24,7 @@ brew install cloudslash
 ### Go Install
 
 ```bash
-go install github.com/DrSkyle/CloudSlash/cmd/cloudslash-cli@latest
+go install github.com/DrSkyle/cloudslash/v2/cmd/cloudslash-cli@latest
 ```
 
 ### From Source
@@ -41,6 +41,11 @@ make build
 # Automated Install (Legacy)
 curl -sL https://raw.githubusercontent.com/DrSkyle/CloudSlash/main/scripts/install.sh | bash
 ```
+
+### Prerequisites
+
+- **AWS CLI v2**: Required for executing generated remediation scripts (`safe_cleanup.sh`). CloudSlash will warn you if it's missing.
+- **Terraform**: Required for state analysis features.
 
 ### Windows Users
 
@@ -201,11 +206,24 @@ CloudSlash is built for speed and scale. We don't just "query APIs"; we model th
 
 #### Graph Ingestion: The Actor Model
 
-We migrated from a mutex-heavy design to a **Linear Pipeline Actor Model**.
+We migrated from a mutex-heavy design to a **Linear Pipeline Actor Model**, orchestrated by a precise **Scanner Registry** ensuring OCP (Open-Closed Principle) compliance.
 
+- **Scanner Registry:** Decouples detection logic from the core engine, seamlessly orchestrating thousands of concurrent checks.
 - **Scanning Swarm:** 500+ parallel goroutines fetch data.
 - **The Actor:** A single, high-speed goroutine ingests all nodes/edges via a buffered channel, eliminating lock contention entirely.
 - **Result:** Graph build times reduced by 90% on large accounts.
+
+#### Optimization: Disjoint Set Union (DSU)
+
+We replaced naive BFS connectivity checks with a **Disjoint Set Union (DSU)** data structure. This reduces graph connectivity queries (e.g., "Is this ENI connected to a running Instance?") from O(V+E) to near **O(1)** (inverse Ackermann function), enabling sub-second analysis of 100k+ node graphs.
+
+#### Transactional Remediation (Write-Ahead Log)
+
+Remediation is no longer a simple script generation. The engine now produces a **Transaction Manifest (WAL)**. Every proposed change includes:
+
+- **Pre-Conditions:** (e.g., "Volume must be in 'available' state").
+- **Post-Conditions:** (e.g., "Volume ID must not exist").
+- **Rollback Actions:** Explicit instructions to reverse the specific operation if a failure occurs mid-flight.
 
 ### 5. The Lazarus Protocol (Zero-Trust Remediation)
 
@@ -213,7 +231,10 @@ CloudSlash moves beyond "Delete & Pray" to "Freeze & Resurrect". We assume every
 
 #### Phase 1: The Tombstone Engine
 
-Before touching any resource, we serialize its "Soul" (Configuration, Tags, Relationships, Attachments) into a JSON artifact (`.cloudslash/tombstones/`). Even if AWS deletes the resource, we remember exactly how it was configured.
+Before touching any resource, we serialize its "Soul" (Configuration, Tags, Relationships, Attachments) into a JSON artifact. This utilizes a **Pluggable Storage Backend**:
+
+- **Local:** Default. Writes to `.cloudslash/tombstones/` for rapid local feedback loops.
+- **S3 Remote:** Configurable via `CLOUDSLASH_S3_BUCKET` (for tombstones) or by setting `--output-dir s3://...` (for reports). Writes to S3 for persistent state in ephemeral CI/CD runners (GitHub Actions/K8s Jobs), ensuring "Undo" capabilities survive container termination.
 
 #### Phase 2: Purgatory Mode (The Litigation Shield)
 
@@ -290,7 +311,7 @@ CloudSlash ships with a rigorous **End-to-End (E2E) Verification Framework** des
 
 ### 1. Governance as Code (Policy Engine)
 
-CloudSlash embeds a **Common Expression Language (CEL)** engine, enabling custom compliance policies that execute continuously during scans. Unlike static analysis tools, these rules operate on the _live_ dependency graph, utilizing an **Inverted Index** for O(1) performance even with thousands of policies.
+CloudSlash embeds a **Type-Safe Common Expression Language (CEL)** engine, enabling custom compliance policies that execute continuously during scans. We enforce strict **compile-time type checking** against Go structs, preventing runtime errors due to policy typos before any API call is made. These rules operate on the _live_ dependency graph, utilizing an **Inverted Index** for O(1) performance.
 
 > **Architecture Note:** CloudSlash includes powerful **Built-in Heuristics** (detailed in the Deep Dive below) for complex algorithmic analysis (e.g., detecting hollow NAT gateways or zombie clusters). The Policy Engine complements this by enabling you to define specific **Governance Rules** (e.g., "Ban gp2 volumes") without modifying the core codebase.
 
@@ -327,7 +348,9 @@ Beyond standard bin-packing, the **Heterogeneous Solver** implements a sophistic
 - **Formal IAM Verification**: Uses `iam:SimulatePrincipalPolicy` (Control Plane simulation) instead of brittle string matching to verify effective permissions. Catches "Admin" roles hidden behind innocuous names.
 - **Terraform State Locking**: Automatically detects `terraform.tfstate.lock.info` and strictly aborts operations to prevent race conditions in CI/CD pipelines.
 - **Input Sanitization**: All generated remediation scripts (`safe_cleanup.sh`) undergo rigorous Regex validation to prevent shell injection attacks from malicious upstream resource IDs.
-- **Structured Observability**: Full support for JSON structured logging via the `--json` flag, allowing direct ingestion into Datadog, Splunk, or ELK stacks without parsing logic.
+- **Sensitive Data Redaction**: Automatic middleware scrubs secrets (API keys, tokens, account IDs) from logs before they leave memory, preventing compliance leaks (SOC2/PCI) in downstream aggregators.
+- **Strict Sovereignty Checks**: S3 Scanner explicitly verifies regional location (`HeadBucket`) instead of guessing defaults, ensuring strict adherence to GDPR/Data Residency boundaries.
+- **Structured Observability**: Full support for JSON structured logging via the `--json` flag. All internal components (Pipeline, Heuristics, Remediation Generator) now emit strictly typed JSON events, guaranteeing zero log breakage in Datadog/Splunk pipelines.
 
 ### 4. Observability Integration (OpenTelemetry)
 
@@ -494,6 +517,44 @@ Resources matching the exclusion criteria are removed from the interactive TUI, 
 
 ---
 
+## Slack Integration (Real-Time Alerts)
+
+CloudSlash can notify your team directly when cost velocity anomalies are detected or when a scan completes.
+
+**Features:**
+
+- **Scan Summary:** Rich Block Kit summary of total waste and potential savings.
+- **Velocity Alerts:** Real-time notifications if spend acceleration exceeds safe thresholds.
+
+**Setup:**
+
+1.  **Create a Webhook:**
+    - Go to [Slack API: Incoming Webhooks](https://api.slack.com/messaging/webhooks).
+    - Create a new App -> "Incoming Webhooks" -> "Activate Incoming Webhooks".
+    - "Add New Webhook to Workspace" -> Select Channel -> Copy the URL.
+
+2.  **Configure CloudSlash:**
+
+    **Option A: Environment Variable (Recommended for CI/CD)**
+
+    ```bash
+    export CLOUDSLASH_SLACK_WEBHOOK="https://hooks.slack.com/services/T000.../B000.../XXXX"
+    ```
+
+    **Option B: Config File (`~/.cloudslash/cloudslash.yaml`)**
+
+    ```yaml
+    slack_webhook: "https://hooks.slack.com/services/T000.../B000.../XXXX"
+    ```
+
+    **Option C: CLI Flag**
+
+    ```bash
+    cloudslash scan --slack-webhook "https://hooks.slack.com/..."
+    ```
+
+---
+
 ## Usage Guide
 
 ### 1. Analysis Scan
@@ -507,17 +568,20 @@ cloudslash scan [flags]
 **Flags:**
 
 - `--headless`: Disables the TUI. Recommended for CI/CD pipelines.
-- `--region <list>`: Comma-separated target regions (e.g., `us-east-1,eu-central-1`).
+- `--region <str>`: AWS Region (e.g., `us-east-1`).
 - `--json`: Enable structured JSON logging for observability tools (Datadog, Splunk).
 - `--rules <file>`: Load custom policy rules (CEL) to flag specific violations.
 - `--no-metrics`: Skip CloudWatch API calls (faster, but less accurate).
+- `--otel-endpoint`: Push traces to OpenTelemetry collector (e.g. `http://jaeger:4318`).
+- `--history-url`: Sync cost history with S3 bucket (e.g. `s3://bucket/key`).
 
 **Interactive TUI Controls:**
 
 - `h` / `l`: Navigate hierarchy.
 - `t`: Toggle Topology Visualization.
-- `SPACE`: Mark resource for remediation.
-- `ENTER`: View detailed resource inspection (Cost, Tags, Provenance).
+- `ENTER` / `SPACE`: View detailed resource inspection (Cost, Tags, Provenance).
+- `i` (Ignore): Hide resource from view and add to `.ignore.yaml` (No audit log).
+- `m` (Mark): Soft-delete marker. Hides resource, adds to `.ignore.yaml`, and writes a `SOFT_DELETE` entry to the local audit log for traceability.
 
 ![Detailed Inspection](assets/cloudslashdetailview.png)
 
@@ -529,11 +593,27 @@ The interactive cleanup interface. Reads the graph and prompts for safe deletion
 cloudslash cleanup
 ```
 
-_Note: This command generates executable shell scripts (`safe_cleanup.sh`) in the `cloudslash-out/` directory for manual review before execution._
+> **Safety:** Generates `safe_cleanup.sh` and `undo_cleanup.sh` artifacts. Does not delete without explicit confirmation.
 
-![Optimization Engine](assets/cloudslashoptimization.png)
+### 3. Permissions Generator (Least Privilege)
 
-### 3. Executive Reporting
+Generate the exact IAM policy required for CloudSlash to run.
+
+```bash
+cloudslash permissions > cloudslash-policy.json
+```
+
+### 4. Forensic Export
+
+Run a headless scan and export all artifacts without launching the TUI.
+
+```bash
+cloudslash export --output-dir ./artifacts
+# Or export directly to S3 (Persistent Storage in Containers)
+cloudslash export --output-dir s3://my-audit-bucket/reports/2026-02-01
+```
+
+### 5. Executive Reporting
 
 CloudSlash generates a self-contained HTML dashboard for stakeholders, featuring financial projections and Sankey cost flow diagrams.
 
@@ -591,14 +671,19 @@ If your organization requires a commercial license for AGPL compliance (e.g., em
 To remove CloudSlash from your system:
 
 ```bash
-# 1. Remove binary
+# 1. Remove binary (choose based on install method)
+# If installed via script:
 sudo rm /usr/local/bin/cloudslash
 
-# 2. Remove configuration
-rm ~/.cloudslash.yaml
+# If installed via Go:
+rm $(go env GOPATH)/bin/cloudslash-cli
 
-# 3. Remove reports (optional)
-rm -rf cloudslash-out/
+# 2. Remove configuration and state
+rm -rf ~/.cloudslash
+rm ~/.cloudslash.yaml 2>/dev/null # Legacy config
+
+# 3. Remove artifacts (from current directory)
+rm -rf cloudslash-out/ .cloudslash/
 ```
 
 ---

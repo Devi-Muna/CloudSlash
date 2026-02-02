@@ -4,42 +4,46 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DrSkyle/cloudslash/pkg/graph"
+	"github.com/DrSkyle/cloudslash/v2/pkg/graph"
 )
 
-// EBSModernizerHeuristic identifies gp2 volumes upgradable to gp3.
+// EBSModernizerHeuristic identifies gp2 -> gp3.
 type EBSModernizerHeuristic struct{}
 
 func (h *EBSModernizerHeuristic) Name() string { return "EBSModernizer" }
 
-func (h *EBSModernizerHeuristic) Run(ctx context.Context, g *graph.Graph) error {
-	h.Analyze(g)
-	return nil
+func (h *EBSModernizerHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats, error) {
+	return h.Analyze(g), nil
 }
 
-func (h *EBSModernizerHeuristic) Analyze(g *graph.Graph) {
+func (h *EBSModernizerHeuristic) Analyze(g *graph.Graph) *HeuristicStats {
+	stats := &HeuristicStats{}
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, n := range g.Nodes {
-		if n.Type == "AWS::EC2::Volume" {
-			h.analyzeVolume(n)
+	for _, node := range g.GetNodes() {
+		if node.TypeStr() == "AWS::EC2::Volume" {
+			if h.analyzeVolume(node) {
+				stats.ItemsFound++
+				stats.ProjectedSavings += node.Cost
+			}
 		}
 	}
+	return stats
 }
 
-func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
+func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) bool {
 	if typ, _ := n.Properties["VolumeType"].(string); typ != "gp2" {
-		return
+		return false
 	}
 	if mod, _ := n.Properties["IsModifying"].(bool); mod {
-		return
+		return false
 	}
 
-	// Normalize size type.
+	// Normalize size.
 	raw := n.Properties["Size"]
 	sz := 0
-	
+
 	switch v := raw.(type) {
 	case int32:
 		sz = int(v)
@@ -50,23 +54,23 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 	}
 
 	if sz == 0 {
-		return
+		return false
 	}
 
-	// gp2 performance model (3 IOPS/GB).
+	// gp2 model.
 	curIOPS := sz * 3
 	if curIOPS < 100 {
 		curIOPS = 100
 	}
 
-	// gp3 baseline (3000 IOPS).
+	// gp3 baseline.
 	boost := 0.0
 	if curIOPS < 3000 {
 		boost = 3000.0 / float64(curIOPS)
 	}
 
 	n.IsWaste = true
-	// Assign priority score.
+	// Score.
 	n.RiskScore = 3
 	n.Cost = float64(sz) * 0.02 // Savings ($0.10 -> $0.08)
 
@@ -77,7 +81,8 @@ func (h *EBSModernizerHeuristic) analyzeVolume(n *graph.Node) {
 	rsn += fmt.Sprintf(" Save $%.2f/mo.", n.Cost)
 
 	n.Properties["Reason"] = rsn
-	// Suggest remediation.
+	// Remediation.
 	n.Properties["FixRecommendation"] = "Run 'cloudslash cleanup' to generate remediation scripts."
 	n.Properties["IsGP2"] = true
+	return true
 }

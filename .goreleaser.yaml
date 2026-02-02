@@ -1,0 +1,49 @@
+# .goreleaser.yaml
+project_name: cloudslash
+
+builds:
+  - main: ./cmd/cloudslash-cli/main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      # Inject version at build time.
+      # We use the v2 path as per the recent module update.
+      - -s -w -X github.com/DrSkyle/cloudslash/v2/pkg/version.Current={{.Version}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+brews:
+  - name: cloudslash
+
+    # Push the formula to the 'homebrew-tap' repo.
+    tap:
+      owner: DrSkyle
+      name: homebrew-tap
+
+    folder: Formula
+
+    homepage: "https://github.com/DrSkyle/cloudslash"
+    description: "CloudSlash - Infrastructure Optimization Tool"
+
+    # GoReleaser handles the SHA256 checksum verification automatically.
+    test: |
+      system "#{bin}/cloudslash --version"

@@ -9,13 +9,12 @@ import (
 // Triggers the Anomaly Detection engine for demonstration purposes.
 // SeedMockData populates the ledger with a synthetic cost anomaly scenario.
 // Pattern: 48h stable baseline followed by a significant spike in the last hour.
-// Triggers the Anomaly Detection engine for demonstration purposes.
 func (c *Client) SeedMockData() error {
 	now := time.Now().Unix()
-	
+
 	// 1. Reset ledger structure.
 	// Current implementation appends to existing history.
-	
+
 	// 2. Establish Stable Baseline (T-48h to T-2h).
 	// Target Run Rate: ~$1,000/mo.
 	baselineStart := now - (48 * 3600)
@@ -30,7 +29,7 @@ func (c *Client) SeedMockData() error {
 			return err
 		}
 	}
-	
+
 	// Anomaly: 4x cost spike (from $1,200/mo to $5,000/mo run rate).
 	spike := Snapshot{
 		Timestamp:        now - 3600,
@@ -39,6 +38,6 @@ func (c *Client) SeedMockData() error {
 		WasteCount:       1,
 	}
 	return c.Append(spike)
-	
+
 	// This ensures the Anomaly Detection engine identifies a high-velocity cost increase events.
 }

@@ -12,15 +12,14 @@ import (
 
 var specsMu sync.RWMutex
 
-// InstanceSpecs defines the compute capacity (vCPU, Memory) of an instance type.
+// InstanceSpecs contains hardware specifications.
 type InstanceSpecs struct {
 	VCPU   float64 // vCPUs (1 vCPU = 1000 mCPU roughly)
 	Memory float64 // MiB
 	Arch   string  // "x86_64" or "arm64"
 }
 
-// CandidateTypes lists modern instance types for optimization consideration.
-// Curated list of current-generation instances.
+// CandidateTypes is a list of modern instance types to prefer.
 var CandidateTypes = []string{
 	// General Purpose
 	"m5.large", "m5.xlarge", "m5.2xlarge",
@@ -39,49 +38,47 @@ var CandidateTypes = []string{
 	"r6g.large", "r6g.xlarge", "r6g.2xlarge",
 }
 
-// specsMap is a resilient cache for instance specifications.
-// Dynamically updated via API; falls back to static catalog.
+// specsMap is an in-memory cache of instance specifications.
 var specsMap = map[string]InstanceSpecs{
-	// T3 Family (Burstable)
-	"t3.nano":   {VCPU: 2, Memory: 512, Arch: "x86_64"},
-	"t3.micro":  {VCPU: 2, Memory: 1024, Arch: "x86_64"},
-	"t3.small":  {VCPU: 2, Memory: 2048, Arch: "x86_64"},
-	"t3.medium": {VCPU: 2, Memory: 4096, Arch: "x86_64"},
-	"t3.large":  {VCPU: 2, Memory: 8192, Arch: "x86_64"},
-	"t3.xlarge": {VCPU: 4, Memory: 16384, Arch: "x86_64"},
-	"t3.2xlarge":{VCPU: 8, Memory: 32768, Arch: "x86_64"},
+	// T3 (Burstable).
+	"t3.nano":    {VCPU: 2, Memory: 512, Arch: "x86_64"},
+	"t3.micro":   {VCPU: 2, Memory: 1024, Arch: "x86_64"},
+	"t3.small":   {VCPU: 2, Memory: 2048, Arch: "x86_64"},
+	"t3.medium":  {VCPU: 2, Memory: 4096, Arch: "x86_64"},
+	"t3.large":   {VCPU: 2, Memory: 8192, Arch: "x86_64"},
+	"t3.xlarge":  {VCPU: 4, Memory: 16384, Arch: "x86_64"},
+	"t3.2xlarge": {VCPU: 8, Memory: 32768, Arch: "x86_64"},
 
-	// M5 Family (General Purpose)
+	// M5 (GP).
 	"m5.large":   {VCPU: 2, Memory: 8192, Arch: "x86_64"},
 	"m5.xlarge":  {VCPU: 4, Memory: 16384, Arch: "x86_64"},
 	"m5.2xlarge": {VCPU: 8, Memory: 32768, Arch: "x86_64"},
 	"m5.4xlarge": {VCPU: 16, Memory: 65536, Arch: "x86_64"},
-	
-	// M6g Family (Graviton2)
-	"m6g.medium": {VCPU: 1, Memory: 4096, Arch: "arm64"},
-	"m6g.large":  {VCPU: 2, Memory: 8192, Arch: "arm64"},
-	"m6g.xlarge": {VCPU: 4, Memory: 16384, Arch: "arm64"},
-	"m6g.2xlarge":{VCPU: 8, Memory: 32768, Arch: "arm64"},
 
-	// C5 Family (Compute Optimized)
+	// M6g (Graviton).
+	"m6g.medium":  {VCPU: 1, Memory: 4096, Arch: "arm64"},
+	"m6g.large":   {VCPU: 2, Memory: 8192, Arch: "arm64"},
+	"m6g.xlarge":  {VCPU: 4, Memory: 16384, Arch: "arm64"},
+	"m6g.2xlarge": {VCPU: 8, Memory: 32768, Arch: "arm64"},
+
+	// C5 (Compute).
 	"c5.large":   {VCPU: 2, Memory: 4096, Arch: "x86_64"},
 	"c5.xlarge":  {VCPU: 4, Memory: 8192, Arch: "x86_64"},
 	"c5.2xlarge": {VCPU: 8, Memory: 16384, Arch: "x86_64"},
 
-	// C6g Family (Graviton2)
-	"c6g.medium": {VCPU: 1, Memory: 2048, Arch: "arm64"},
-	"c6g.large":  {VCPU: 2, Memory: 4096, Arch: "arm64"},
-	"c6g.xlarge": {VCPU: 4, Memory: 8192, Arch: "arm64"},
-	"c6g.2xlarge":{VCPU: 8, Memory: 16384, Arch: "arm64"},
+	// C6g (Graviton).
+	"c6g.medium":  {VCPU: 1, Memory: 2048, Arch: "arm64"},
+	"c6g.large":   {VCPU: 2, Memory: 4096, Arch: "arm64"},
+	"c6g.xlarge":  {VCPU: 4, Memory: 8192, Arch: "arm64"},
+	"c6g.2xlarge": {VCPU: 8, Memory: 16384, Arch: "arm64"},
 
-	// R5 Family (Memory Optimized)
+	// R5 (Memory).
 	"r5.large":   {VCPU: 2, Memory: 16384, Arch: "x86_64"},
 	"r5.xlarge":  {VCPU: 4, Memory: 32768, Arch: "x86_64"},
 	"r5.2xlarge": {VCPU: 8, Memory: 65536, Arch: "x86_64"},
 }
 
-// GetSpecs returns specifications for the given instance type.
-// Thread-safe access to the dynamic specification cache.
+// GetSpecs retrieves instance specifications, falling back to a baseline if unknown.
 func GetSpecs(instanceType string) InstanceSpecs {
 	specsMu.RLock()
 	specs, ok := specsMap[instanceType]
@@ -91,7 +88,7 @@ func GetSpecs(instanceType string) InstanceSpecs {
 		return specs
 	}
 
-	// Heuristic: Fallback to safe baseline to prevent division errors.
+	// Return fallback baseline if type is unknown.
 	return InstanceSpecs{
 		VCPU:   2,
 		Memory: 8192,
@@ -99,13 +96,13 @@ func GetSpecs(instanceType string) InstanceSpecs {
 	}
 }
 
-// UpdateSpecsCache synchronizes the internal catalog with live AWS data.
+// UpdateSpecsCache populates the specification cache.
 func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []string) error {
 	if len(instanceTypes) == 0 {
 		return nil
 	}
 
-	// Filter for unknown types to optimize API usage.
+	// Filter out types that are already cached.
 	unique := make(map[string]bool)
 	var unknownTypes []types.InstanceType
 
@@ -124,7 +121,7 @@ func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []str
 		return nil
 	}
 
-	// Batch fetch details from AWS.
+	// Batch fetch.
 	paginator := ec2.NewDescribeInstanceTypesPaginator(client, &ec2.DescribeInstanceTypesInput{
 		InstanceTypes: unknownTypes,
 	})
@@ -132,29 +129,29 @@ func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []str
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)
 		if err != nil {
-			// Log failure; system degrades gracefully to static mode.
+			// Log warning on failure but do not halt execution.
 			fmt.Printf("Warning: Failed to sync instance specs for %v: %v\n", unknownTypes, err)
 			return err
 		}
 
 		specsMu.Lock()
 		for _, info := range page.InstanceTypes {
-			// Extract vCPU count.
+			// vCPU.
 			vcpu := 0.0
 			if info.VCpuInfo != nil && info.VCpuInfo.DefaultVCpus != nil {
 				vcpu = float64(*info.VCpuInfo.DefaultVCpus)
 			}
 
-			// Extract memory size.
+			// Memory.
 			mem := 0.0
 			if info.MemoryInfo != nil && info.MemoryInfo.SizeInMiB != nil {
 				mem = float64(*info.MemoryInfo.SizeInMiB)
 			}
 
-			// Extract architecture.
+			// Arch.
 			arch := "x86_64"
 			if len(info.ProcessorInfo.SupportedArchitectures) > 0 {
-				// Prefer first reported architecture
+				// Prefer first.
 				arch = string(info.ProcessorInfo.SupportedArchitectures[0])
 			}
 
@@ -170,24 +167,24 @@ func UpdateSpecsCache(ctx context.Context, client EC2Client, instanceTypes []str
 	return nil
 }
 
-// PricingStrategy defines the interface for cost estimation.
+// PricingStrategy defines the interface for retrieving cost estimates.
 type PricingStrategy interface {
 	GetEstimatedCost(instanceType, region string) float64
 }
 
-// StaticCostEstimator provides fallback pricing when live data is unavailable.
+// StaticCostEstimator provides rough cost estimates.
 type StaticCostEstimator struct{}
 
 func (s *StaticCostEstimator) GetEstimatedCost(instanceType, region string) float64 {
-	// 1. Check family
+	// Check family.
 	if strings.HasPrefix(instanceType, "t") {
-		return 30.0 // Cheap burstable
+		return 30.0 // Cheap.
 	}
 	if strings.HasPrefix(instanceType, "m") {
 		if strings.Contains(instanceType, ".xlarge") {
 			return 140.0
 		}
-		return 70.0 // m5.large approx
+		return 70.0 // m5.large approx.
 	}
 	if strings.HasPrefix(instanceType, "c") {
 		if strings.Contains(instanceType, ".xlarge") {
@@ -201,7 +198,7 @@ func (s *StaticCostEstimator) GetEstimatedCost(instanceType, region string) floa
 		}
 		return 90.0
 	}
-	
-	// Default Fallback
-	return 50.0 
+
+	// Default.
+	return 50.0
 }

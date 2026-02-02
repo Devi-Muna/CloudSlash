@@ -3,70 +3,30 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*" # Trigger on version tags
 
 permissions:
-  contents: write
-  discussions: write
+  contents: write # Needed to upload binaries to the Release page
 
 jobs:
-  release:
-    name: Build & Publish
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Required for git history/changelog
 
-      - name: Setup Go
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
-          cache: true
+          go-version: stable
 
-      - name: Prepare Artifacts
-        run: mkdir -p dist
-
-      - name: Generate version.txt
-        run: echo "${{ github.ref_name }}" > dist/version.txt
-
-      - name: Build Cross-Platform Binaries
-        run: |
-          VERSION="${{ github.ref_name }}"
-          # Inject version into internal/version package
-          LDFLAGS="-s -w -X 'github.com/DrSkyle/cloudslash/internal/version.Current=${VERSION}'"
-
-          echo " -> Building Linux (amd64)..."
-          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_linux_amd64 cmd/cloudslash/main.go
-
-          echo " -> Building Linux (arm64)..."
-          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_linux_arm64 cmd/cloudslash/main.go
-
-          echo " -> Building macOS (amd64)..."
-          GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_darwin_amd64 cmd/cloudslash/main.go
-
-          echo " -> Building macOS (arm64/Apple Silicon)..."
-          GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_darwin_arm64 cmd/cloudslash/main.go
-
-          echo " -> Building Windows (amd64)..."
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/cloudslash_windows_amd64.exe cmd/cloudslash/main.go
-
-      - name: Copy Install Scripts
-        run: |
-          # Create dist folder if not exists
-          mkdir -p dist
-          # Copy install.sh if it exists (check root or scripts dir)
-          if [ -f "install.sh" ]; then cp install.sh dist/; fi
-          if [ -f "scripts/install.sh" ]; then cp scripts/install.sh dist/; fi
-
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          files: |
-            dist/*
-          body_path: docs/v2.1.0_RELEASE_NOTES.md
-          draft: false
-          prerelease: false
+          distribution: goreleaser
+          version: latest
+          args: release --clean --release-notes docs/v2.2_RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
