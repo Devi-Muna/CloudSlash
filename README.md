@@ -77,7 +77,110 @@ CloudSlash bridges this gap by combining **Linear Programming** (for fleet optim
 
 CloudSlash is engineered around four distinct intelligence engines:
 
-![Topology View](assets/cloudslashmap.png)
+```mermaid
+---
+config:
+  theme: dark
+---
+graph LR
+    classDef external fill:#1E293B,color:#fff,stroke:#334155,stroke-width:1px,stroke-dasharray: 5 5;
+    classDef ingestion fill:#0F172A,color:#38BDF8,stroke:#38BDF8,stroke-width:2px;
+    classDef kernel fill:#1E1B4B,color:#818CF8,stroke:#6366F1,stroke-width:2px;
+    classDef graphmem fill:#111827,color:#F9FAFB,stroke:#374151,stroke-width:1px;
+    classDef policy fill:#312E81,color:#C7D2FE,stroke:#4F46E5,stroke-width:2px;
+    classDef logic fill:#064E3B,color:#34D399,stroke:#059669,stroke-width:2px;
+    classDef risk fill:#450A0A,color:#FCA5A5,stroke:#EF4444,stroke-width:2px;
+    classDef lazarus fill:#4C1D95,color:#DDD6FE,stroke:#8B5CF6,stroke-width:2px;
+    classDef output fill:#171717,color:#A3A3A3,stroke:#525252,stroke-width:2px;
+
+    subgraph SOURCES ["DATA SOURCES"]
+        direction TB
+        AWS[("AWS Cloud API")]:::external
+        TF[("Terraform State")]:::external
+        Prom[("Prometheus/Metrics")]:::external
+        Git[("Git History")]:::external
+    end
+
+    subgraph INGEST ["PARALLEL INGESTION LAYER"]
+        direction TB
+        Swarm["Resource Scrapers (Swarm)"]:::ingestion
+        TagParser["Tag Normalizer"]:::ingestion
+    end
+
+    subgraph ENGINE ["OPTIMIZATION KERNEL"]
+        direction LR
+
+        subgraph GRAPH_DB ["DEPENDENCY GRAPH (DAG)"]
+            direction TB
+            NodeEC2((Compute Node)):::graphmem
+            NodeVol((Storage Node)):::graphmem
+            NodeNet((Network Node)):::graphmem
+            NodeIAM((Identity Node)):::graphmem
+            Edge1(AttachedTo):::graphmem
+            Edge2(SecuredBy):::graphmem
+
+            NodeEC2 --> Edge1 --> Edge2 --> NodeNet
+            NodeVol --> Edge1
+        end
+
+        CEL["CEL Policy Engine"]:::policy
+        MILP["MILP Cost Solver"]:::policy
+    end
+
+    subgraph ANALYSIS ["HEURISTIC ANALYSIS SUITE"]
+        direction TB
+        subgraph STORAGE_CHECKS
+            H_Vol["Unattached EBS"]:::logic
+            H_Snap["Stale Snapshots"]:::logic
+        end
+        subgraph COMPUTE_CHECKS
+            H_Idle["Idle Utilization"]:::logic
+            H_Zombie["Zombie Instances"]:::logic
+        end
+        subgraph CONTAINER_CHECKS
+            H_EKS["Ghost NodeGroups"]:::logic
+            H_ECS["Empty Clusters"]:::logic
+        end
+        Drift["TF State Drift"]:::risk
+    end
+
+    subgraph SAFETY ["LAZARUS PROTOCOL"]
+        Tombstone[("State Preservation DB")]:::lazarus
+        SnapShot["Snapshot Manager"]:::lazarus
+        UndoGen["Correctness Verifier"]:::lazarus
+    end
+
+    subgraph OUTPUT ["ACTUATION & REPORTING"]
+        direction TB
+        Dashboard["Audit Dashboard"]:::output
+        Script["Remediation Script"]:::output
+        CI["CI/CD Decorator"]:::output
+        Tele["OpenTelemetry Traces"]:::output
+    end
+    AWS ==> Swarm
+    TF ==> Swarm
+    Prom ==> Swarm
+    Git ==> Swarm
+    Swarm ==> TagParser
+    TagParser ==> GRAPH_DB
+
+    GRAPH_DB <--> CEL
+    GRAPH_DB --> MILP
+    NodeVol -.-> H_Vol
+    NodeEC2 -.-> H_Idle
+    NodeEC2 -.-> H_Zombie
+    NodeNet -.-> H_EKS
+    H_Vol --> Drift
+    H_Zombie --> Drift
+    H_EKS --> Drift
+    Drift ==> Tombstone
+    Tombstone --> SnapShot
+    Tombstone --> UndoGen
+    UndoGen ==> Script
+    Drift -.-> Dashboard
+    Drift -.-> CI
+    ENGINE -.-> Tele
+```
 
 ### 1. The Autonomy Engine (Optimization)
 

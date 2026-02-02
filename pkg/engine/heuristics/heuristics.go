@@ -421,6 +421,9 @@ func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph
 		}
 
 		// History Fetch (Safe to ignore error)
+		var maxCPU float64
+		var err error
+
 		if h.CW != nil {
 			cpuHistory, _ := h.CW.GetMetricHistory(ctx, "AWS/EC2", "CPUUtilization", dims, startTime, endTime)
 			node.Properties["MetricsHistoryCPU"] = cpuHistory
