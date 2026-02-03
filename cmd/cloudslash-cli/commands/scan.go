@@ -123,7 +123,8 @@ Example:
 		config.CacheDir = cacheDir
 
 		// Initialize pricing client.
-		pricingClient, err := pricing.NewClient(cmd.Context(), config.Logger, config.CacheDir, config.DiscountRate)
+		profile := os.Getenv("AWS_PROFILE")
+		pricingClient, err := pricing.NewClient(cmd.Context(), config.Logger, config.CacheDir, config.DiscountRate, profile)
 		if err != nil {
 			config.Logger.Debug("Pre-init pricing client failed", "error", err)
 		}
@@ -401,12 +402,13 @@ func runSolver(g *graph.Graph) {
 		}()
 
 		manualRate := 0.0
-		pc, err = pricing.NewClient(ctx, logger, cacheDir, manualRate)
+		profile := os.Getenv("AWS_PROFILE")
+		pc, err = pricing.NewClient(ctx, logger, cacheDir, manualRate, profile)
 		done <- true // Stop spinner
 		fmt.Printf("\r -> Connecting to AWS Pricing API... Done.\n")
 
 		if err != nil {
-			fmt.Printf("[WARN] Pricing API unavailable: %v. Using static estimation.\n", err)
+			fmt.Printf("[WARN] Pricing API unavailable: %v\n       (Region: us-east-1, Profile: %s). Using static estimation.\n", err, profile)
 		} else {
 			logger.Info("Pricing Client Initialized")
 		}

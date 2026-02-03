@@ -42,7 +42,7 @@ type Client struct {
 }
 
 // NewClient initializes the pricing client.
-func NewClient(ctx context.Context, logger *slog.Logger, cacheDir string, manualDiscountRate float64) (*Client, error) {
+func NewClient(ctx context.Context, logger *slog.Logger, cacheDir string, manualDiscountRate float64, profile string) (*Client, error) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
@@ -53,7 +53,14 @@ func NewClient(ctx context.Context, logger *slog.Logger, cacheDir string, manual
 	os.MkdirAll(cacheDir, 0755)
 
 	// Use us-east-1 for global pricing queries.
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
+	opts := []func(*config.LoadOptions) error{
+		config.WithRegion("us-east-1"),
+	}
+	if profile != "" {
+		opts = append(opts, config.WithSharedConfigProfile(profile))
+	}
+
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
