@@ -55,8 +55,42 @@ Example:
 			config.DisableCWMetrics = true
 		}
 
+
 		if headless, _ := cmd.Flags().GetBool("headless"); headless {
 			config.Headless = true
+		}
+
+		// Pre-flight: Validate AWS Credentials before starting engine.
+		// This prevents silent hanging/retrying if keys are missing.
+		if !config.MockMode {
+			regions := strings.Split(config.Region, ",")
+			primaryRegion := "us-east-1"
+			if len(regions) > 0 && regions[0] != "" {
+				primaryRegion = regions[0]
+			}
+
+			fmt.Printf(" -> Verifying AWS Credentials (%s)... ", primaryRegion)
+			
+			// Create a lightweight client just for verification.
+			verifClient, err := aws.NewClient(cmd.Context(), primaryRegion, "", false)
+			if err != nil {
+				fmt.Printf("\n[FATAL] Failed to initialize AWS client: %v\n", err)
+				os.Exit(1)
+			}
+
+			accountId, err := verifClient.VerifyIdentity(cmd.Context())
+			if err != nil {
+				// Graceful exit!
+				fmt.Printf("\n\n❌ AWS Authentication Failed.\n")
+				fmt.Printf("   Error: %v\n\n", err)
+				fmt.Println("   Typical causes:")
+				fmt.Println("   1. AWS CLI not configured (run 'aws configure')")
+				fmt.Println("   2. Expired SSO/MFA tokens")
+				fmt.Println("   3. Invalid environment variables")
+				fmt.Println("\n   (Use --mock to run without credentials)")
+				os.Exit(1)
+			}
+			fmt.Printf("OK (Account: %s)\n", accountId)
 		}
 
 		// Check for AWS CLI.
