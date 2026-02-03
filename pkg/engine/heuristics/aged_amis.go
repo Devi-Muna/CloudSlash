@@ -23,7 +23,7 @@ func (h *AgedAMIHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicS
 	cutoff := time.Now().AddDate(0, -3, 0)
 	timeLayout := "2006-01-02T15:04:05.000Z"
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() != "AWS::EC2::AMI" {
 			continue
 		}
