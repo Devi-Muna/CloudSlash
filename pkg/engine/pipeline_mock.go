@@ -74,6 +74,11 @@ func runMockMode(ctx context.Context, e *Engine) {
 		fmt.Printf("Failed to generate dashboard: %v\n", err)
 	}
 
+	// Generate static HTML report (CI Requirement).
+	if err := report.GenerateHTML(e.Graph, e.outputDir+"/report.html"); err != nil {
+		fmt.Printf("Failed to generate HTML report: %v\n", err)
+	}
+
 	// Generate remediation.
 	gen := tf.NewGenerator(e.Graph, nil)
 	gen.GenerateFixScript(e.outputDir + "/fix_terraform.sh")
