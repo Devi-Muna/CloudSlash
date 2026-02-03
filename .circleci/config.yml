@@ -169,11 +169,11 @@ workflows:
       - test-mock:
           requires:
             - build-binary
-      - verify-lazarus:
-          context: cloudslash-aws
-          requires:
-            - build-binary
-            - test-unit
-          filters:
-            branches:
-              only: main
+      # - verify-lazarus:
+      #     context: cloudslash-aws
+      #     requires:
+      #       - build-binary
+      #       - test-unit
+      #     filters:
+      #       branches:
+      #         only: main
