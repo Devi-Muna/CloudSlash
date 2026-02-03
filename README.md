@@ -690,6 +690,15 @@ If your organization requires a commercial license for AGPL compliance (e.g., em
 
 To remove CloudSlash from your system:
 
+### Homebrew Users
+
+```bash
+brew uninstall cloudslash
+brew untap DrSkyle/tap
+```
+
+### Manual / Script Users
+
 ```bash
 # 1. Remove binary (choose based on install method)
 # If installed via script:
@@ -700,9 +709,9 @@ rm $(go env GOPATH)/bin/cloudslash-cli
 
 # 2. Remove configuration and state
 rm -rf ~/.cloudslash
-rm ~/.cloudslash.yaml 2>/dev/null # Legacy config
+rm ~/.cloudslash.yaml 2>/dev/null
 
-# 3. Remove artifacts (from current directory)
+# 3. Remove local artifacts (from current directory)
 rm -rf cloudslash-out/ .cloudslash/
 ```
 
