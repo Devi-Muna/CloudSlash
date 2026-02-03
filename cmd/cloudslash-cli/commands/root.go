@@ -97,9 +97,17 @@ func init() {
 }
 
 func checkUpdate() {
-	latest, err := fetchLatestVersion()
-	if err == nil && strings.TrimSpace(latest) > version.Current {
-		fmt.Printf("\n[UPDATE] Available: %s -> %s\nRun 'cloudslash update' to upgrade.\n\n", version.Current, latest)
+	latestTag, err := fetchLatestVersion()
+	if err != nil {
+		return
+	}
+
+	// Normalize
+	current := strings.TrimPrefix(version.Current, "v")
+	latest := strings.TrimPrefix(latestTag, "v")
+
+	if latest != current {
+		fmt.Printf("\n[UPDATE] Available: v%s -> v%s\nRun 'brew upgrade cloudslash' to upgrade.\n\n", current, latest)
 	}
 }
 
