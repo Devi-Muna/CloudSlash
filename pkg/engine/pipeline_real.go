@@ -26,7 +26,8 @@ func runRealPipeline(ctx context.Context, e *Engine) <-chan struct{} {
 
 	// Init pricing.
 	if e.Pricing == nil {
-		e.Pricing, err = pricing.NewClient(ctx, e.Logger, e.config.CacheDir, e.config.DiscountRate)
+		profile := os.Getenv("AWS_PROFILE")
+		e.Pricing, err = pricing.NewClient(ctx, e.Logger, e.config.CacheDir, e.config.DiscountRate, profile)
 		if err != nil {
 			e.Logger.Warn("Pricing Client initialization failed", "error", err)
 		}
