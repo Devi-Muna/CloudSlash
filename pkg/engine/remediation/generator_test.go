@@ -94,6 +94,9 @@ func TestGenerateRemediationPlan_Golden(t *testing.T) {
 	content := string(contentBytes)
 	re := regexp.MustCompile(`"generated_at": ".*"`)
 	content = re.ReplaceAllString(content, `"generated_at": "2026-01-01T00:00:00Z"`)
+	
+	reExpiry := regexp.MustCompile(`"CloudSlash:ExpiryDate": ".*"`)
+	content = reExpiry.ReplaceAllString(content, `"CloudSlash:ExpiryDate": "2026-03-04"`)
 
 	// GOLDIE: Snapshot Testing
 	golder := goldie.New(t)

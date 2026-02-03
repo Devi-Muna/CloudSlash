@@ -105,7 +105,7 @@ func (g *Generator) GenerateRemediationPlan(path string) error {
 		}
 	}
 
-	for _, node := range g.Graph.GetNodes() {
+	for _, node := range g.Graph.Store.GetAllNodes() {
 		if !node.IsWaste {
 			continue
 		}
@@ -326,7 +326,7 @@ func (g *Generator) GenerateRestorationPlan(path string) error {
 	g.Graph.Mu.RLock()
 	defer g.Graph.Mu.RUnlock()
 
-	for _, node := range g.Graph.GetNodes() {
+	for _, node := range g.Graph.Store.GetAllNodes() {
 		if !node.IsWaste {
 			continue
 		}
@@ -389,7 +389,7 @@ func (g *Generator) GenerateIgnorePlan(path string) error {
 	}
 	var items []wasteItem
 
-	for _, node := range g.Graph.GetNodes() {
+	for _, node := range g.Graph.Store.GetAllNodes() {
 		if node.IsWaste && !node.Justified {
 			items = append(items, wasteItem{Node: node})
 		}
