@@ -28,7 +28,7 @@ func (h *IdleClusterHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heuris
 	// Index instances.
 	instancesByCluster := make(map[string][]*graph.Node)
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::ECS::Cluster" {
 			clusters = append(clusters, node)
 		}
@@ -122,7 +122,7 @@ func (h *EmptyServiceHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heuri
 	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var services []*graph.Node
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::ECS::Service" {
 			services = append(services, node)
 		}

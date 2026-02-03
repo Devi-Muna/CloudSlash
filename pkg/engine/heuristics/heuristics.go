@@ -27,7 +27,7 @@ func (h *NATGatewayHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heurist
 	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var natGateways []*graph.Node
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::NatGateway" {
 			natGateways = append(natGateways, node)
 		}
@@ -105,7 +105,7 @@ func (h *UnattachedVolumeHeuristic) Run(ctx context.Context, g *graph.Graph) (*H
 	}
 	var volumes []volumeData
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::Volume" {
 			sizeVal := 0
 			if s, ok := node.Properties["Size"].(int32); ok {
@@ -277,7 +277,7 @@ func (h *RDSHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats
 	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var rdsInstances []*graph.Node
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::RDS::DBInstance" {
 			rdsInstances = append(rdsInstances, node)
 		}
@@ -337,7 +337,7 @@ func (h *ELBHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats
 	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var elbs []*graph.Node
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::ElasticLoadBalancingV2::LoadBalancer" {
 			elbs = append(elbs, node)
 		}
@@ -391,7 +391,7 @@ func (h *UnderutilizedInstanceHeuristic) Run(ctx context.Context, g *graph.Graph
 	stats := &HeuristicStats{}
 	g.Mu.RLock()
 	var instances []*graph.Node
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::Instance" {
 			instances = append(instances, node)
 		}
@@ -531,7 +531,7 @@ func (h *IAMHeuristic) Run(ctx context.Context, g *graph.Graph) (*HeuristicStats
 
 	g.Mu.RLock()
 	var instances []*graph.Node
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::Instance" {
 			instances = append(instances, node)
 		}
@@ -584,7 +584,7 @@ func (h *SnapshotChildrenHeuristic) Run(ctx context.Context, g *graph.Graph) (*H
 	var snapshots []*graph.Node
 	wasteVolumes := make(map[string]bool)
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::Volume" && node.IsWaste {
 			parts := strings.Split(node.IDStr(), "/")
 			if len(parts) > 1 {

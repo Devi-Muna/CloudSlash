@@ -16,11 +16,14 @@ import (
 )
 
 func runMockMode(ctx context.Context, e *Engine) {
+	fmt.Println("DEBUG: Starting Mock Mode...")
 	mockScanner := aws.NewMockScanner(e.Graph)
 
 	// Seed data.
+	fmt.Println("DEBUG: Seeding mock data...")
 	e.History.SeedMockData()
 
+	fmt.Println("DEBUG: Running Mock Scanner...")
 	mockScanner.Scan(ctx)
 
 	// Register heuristics.
@@ -39,9 +42,11 @@ func runMockMode(ctx context.Context, e *Engine) {
 	heuristicEngine.Register(&heuristics.StorageOptimizationHeuristic{})
 	heuristicEngine.Register(&heuristics.EBSModernizerHeuristic{})
 
+	fmt.Println("DEBUG: Running Heuristics...")
 	if err := heuristicEngine.Run(ctx, e.Graph); err != nil {
 		e.Logger.Warn("Heuristic run failed", "error", err)
 	}
+	fmt.Println("DEBUG: Heuristics run complete.")
 
 	// Init policies.
 	if e.config.RulesFile != "" {
@@ -90,6 +95,7 @@ func runMockMode(ctx context.Context, e *Engine) {
 
 	// Report summary.
 	count := len(e.Graph.GetNodes())
+	
 	summary := report.Summary{
 		Region:       e.config.Region,
 		TotalScanned: count,
@@ -98,7 +104,8 @@ func runMockMode(ctx context.Context, e *Engine) {
 	}
 
 	e.Graph.Mu.RLock()
-	for _, n := range e.Graph.Store.GetAllNodes() {
+	nodes := e.Graph.Store.GetAllNodes()
+	for _, n := range nodes {
 		if n.IsWaste {
 			summary.TotalWaste++
 			summary.TotalSavings += n.Cost
@@ -126,7 +133,7 @@ func runMockMode(ctx context.Context, e *Engine) {
 	if os.Getenv("CLOUDSLASH_E2E") == "true" {
 		fmt.Println("[E2E] Verifying Graph Integrity...")
 		e.Graph.Mu.RLock()
-		nodeCount := len(e.Graph.GetNodes())
+		nodeCount := len(e.Graph.Store.GetAllNodes())
 		e.Graph.Mu.RUnlock()
 
 		// Expect at least 1 mock resource (we seed ~7 in mock.go)
