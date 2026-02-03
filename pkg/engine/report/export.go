@@ -99,7 +99,7 @@ func extractItems(g *graph.Graph) []ExportItem {
 	defer g.Mu.RUnlock()
 
 	var items []ExportItem
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.IsWaste {
 			region, _ := node.Properties["Region"].(string)
 			if region == "" {

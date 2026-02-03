@@ -735,7 +735,7 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 
 	// 2. Add graph nodes.
 	currentIndex := 1
-	for _, n := range g.GetNodes() {
+	for _, n := range g.Store.GetAllNodes() {
 		idToIndex[n.IDStr()] = currentIndex
 		name := extractID(n.IDStr())
 		nodes = append(nodes, SankeyNode{Name: name, Waste: n.IsWaste})
@@ -743,9 +743,9 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 	}
 
 	// Create links.
-	allNodes := g.GetNodes()
+	allNodes := g.Store.GetAllNodes()
 	for _, sourceNode := range allNodes {
-		edges := g.GetEdges(sourceNode.Index)
+		edges := g.Store.GetEdges(sourceNode.Index)
 
 		srcIdx, ok1 := idToIndex[sourceNode.IDStr()]
 		if !ok1 {
@@ -753,7 +753,7 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 		}
 
 		for _, e := range edges {
-			targetNode := g.GetNodeByID(e.TargetID)
+			targetNode := g.Store.GetNode(e.TargetID)
 			if targetNode == nil {
 				continue
 			}
@@ -781,7 +781,7 @@ func buildSankeyData(g *graph.Graph) ([]byte, error) {
 
 	// 4. Link gateways to Internet.
 	// Find IGWs and link INTERNET -> IGW
-	for _, n := range g.GetNodes() {
+	for _, n := range g.Store.GetAllNodes() {
 		if n.TypeStr() == "AWS::EC2::InternetGateway" {
 			links = append(links, SankeyLink{
 				Source: 0, // Internet

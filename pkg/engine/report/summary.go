@@ -27,7 +27,7 @@ func GenerateExecutiveSummary(g *graph.Graph, path string, scanID string, accoun
 	// Cost categories.
 
 	// Aggregate statistics.
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.IsWaste {
 			totalWasteCount++
 			totalWasteCost += node.Cost

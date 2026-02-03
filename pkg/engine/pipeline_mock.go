@@ -98,7 +98,7 @@ func runMockMode(ctx context.Context, e *Engine) {
 	}
 
 	e.Graph.Mu.RLock()
-	for _, n := range e.Graph.GetNodes() {
+	for _, n := range e.Graph.Store.GetAllNodes() {
 		if n.IsWaste {
 			summary.TotalWaste++
 			summary.TotalSavings += n.Cost
