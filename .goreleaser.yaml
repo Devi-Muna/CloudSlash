@@ -35,9 +35,9 @@ brews:
   - name: cloudslash
 
     # Push the formula to the 'homebrew-tap' repo.
-    tap:
-      owner: DrSkyle
-      name: homebrew-tap
+    # tap:
+    #   owner: DrSkyle
+    #   name: homebrew-tap
 
     folder: Formula
 

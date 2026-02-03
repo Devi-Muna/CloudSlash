@@ -18,7 +18,7 @@ func (h *LogHoardersHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heuris
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		// Respect ignore.
 		if node.Ignored {
 			continue

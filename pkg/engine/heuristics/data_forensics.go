@@ -24,7 +24,7 @@ func (h *DataForensicsHeuristic) Analyze(g *graph.Graph) *HeuristicStats {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		var isWaste bool
 		switch node.TypeStr() {
 		case "aws_elasticache_cluster":

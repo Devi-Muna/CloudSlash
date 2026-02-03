@@ -19,7 +19,7 @@ func (h *GhostNodeGroupHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heu
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() != "AWS::EKS::NodeGroup" {
 			continue
 		}

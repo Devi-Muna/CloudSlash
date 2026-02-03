@@ -22,7 +22,7 @@ func (h *StorageOptimizationHeuristic) Analyze(g *graph.Graph) *HeuristicStats {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		switch node.TypeStr() {
 		case "AWS::S3::MultipartUpload":
 			if h.analyzeMultipart(node) {

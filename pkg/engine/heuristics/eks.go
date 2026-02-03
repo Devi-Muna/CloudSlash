@@ -23,7 +23,8 @@ func (h *IdleEKSClusterHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heu
 
 	elbs := h.indexELBs(g)
 
-	for _, node := range g.GetNodes() {
+	// Fix: Access Store directly to avoid Deadlock (GetNodes tries to RLock, but we hold Lock)
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() != "AWS::EKS::Cluster" {
 			continue
 		}
@@ -42,7 +43,8 @@ type elbInfo struct {
 
 func (h *IdleEKSClusterHeuristic) indexELBs(g *graph.Graph) []elbInfo {
 	var elbs []elbInfo
-	for _, node := range g.GetNodes() {
+	// Fix: Access Store directly since we are already holding the Lock in Run()
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::ElasticLoadBalancingV2::LoadBalancer" || node.TypeStr() == "AWS::ElasticLoadBalancing::LoadBalancer" {
 			tags, _ := node.Properties["Tags"].(map[string]string)
 			elbs = append(elbs, elbInfo{Arn: node.IDStr(), Tags: tags})

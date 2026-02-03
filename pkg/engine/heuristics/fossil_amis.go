@@ -20,14 +20,14 @@ func (h *FossilAMIHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heuristi
 
 	// Collect active AMIs.
 	activeAMIs := make(map[string]bool)
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::AMI" {
 			activeAMIs[node.IDStr()] = true
 		}
 	}
 
 	// Scan snapshots.
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() != "AWS::EC2::Snapshot" {
 			continue
 		}

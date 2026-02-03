@@ -40,6 +40,7 @@ jobs:
     steps:
       - checkout
       - go/mod-download
+      - aws-cli/install
       - run:
           name: "Run Unit Tests"
           command: go test -v -race -short ./...
@@ -55,6 +56,13 @@ jobs:
       # 1. DOWNLOAD THE BINARY from Job 1
       - attach_workspace:
           at: .
+      - aws-cli/install
+      - run:
+          name: "Debug AWS CLI"
+          command: |
+            echo "PATH: $PATH"
+            which aws || echo "AWS CLI not found in PATH"
+            aws --version || echo "AWS CLI failed to run"
       - run:
           name: "Run Full Feature Mock Scan"
           command: |

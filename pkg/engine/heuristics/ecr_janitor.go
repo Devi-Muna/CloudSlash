@@ -17,7 +17,7 @@ func (h *ECRJanitorHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heurist
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.Ignored {
 			continue
 		}

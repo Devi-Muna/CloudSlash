@@ -21,7 +21,7 @@ func (h *EBSModernizerHeuristic) Analyze(g *graph.Graph) *HeuristicStats {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::EC2::Volume" {
 			if h.analyzeVolume(node) {
 				stats.ItemsFound++

@@ -196,7 +196,7 @@ func (h *ElasticIPHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heuristi
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() != "AWS::EC2::EIP" {
 			continue
 		}
@@ -246,7 +246,7 @@ func (h *S3MultipartHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heuris
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "AWS::S3::MultipartUpload" {
 			initiated, ok := node.Properties["Initiated"].(time.Time)
 			threshold := h.Config.AgeThreshold
@@ -479,7 +479,7 @@ func (h *TagComplianceHeuristic) Run(ctx context.Context, g *graph.Graph) (*Heur
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		tags, ok := node.Properties["Tags"].(map[string]string)
 		if !ok {
 			if node.TypeStr() == "AWS::EC2::Instance" || node.TypeStr() == "AWS::EC2::Volume" {

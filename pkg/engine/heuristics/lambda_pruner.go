@@ -23,7 +23,7 @@ func (h *LambdaHeuristic) Analyze(g *graph.Graph) *HeuristicStats {
 	g.Mu.Lock()
 	defer g.Mu.Unlock()
 
-	for _, node := range g.GetNodes() {
+	for _, node := range g.Store.GetAllNodes() {
 		if node.TypeStr() == "aws_lambda_function" {
 			if h.analyzeFunction(node) {
 				stats.ItemsFound++
