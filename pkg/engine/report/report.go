@@ -546,8 +546,8 @@ func GenerateHTML(g *graph.Graph, outputPath string) error {
 	costByType := make(map[string]float64)
 
 	g.Mu.RLock()
-	data.TotalResources = len(g.GetNodes())
-	for _, node := range g.GetNodes() {
+	data.TotalResources = len(g.Store.GetAllNodes())
+	for _, node := range g.Store.GetAllNodes() {
 		if node.IsWaste {
 			// Short Type Name
 			parts := strings.Split(node.TypeStr(), "::")
