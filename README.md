@@ -663,15 +663,6 @@ For maximum safety and data integrity, we recommend the following execution orde
 
 ---
 
-## Support the Project
-
-CloudSlash is open source and free. If you'd like to support development or need priority help:
-
-- **[Support ($9.99/mo)](https://checkout.freemius.com/app/22411/plan/37525/)** - Priority Support & Gratitude.
-- **[Super Support ($19.99/mo)](https://checkout.freemius.com/app/22411/plan/37513/)** - Prioritized Feature Requests & Sponsor Recognition.
-
----
-
 ## Enterprise Support & Licensing
 
 CloudSlash is released under the **AGPLv3** license.
@@ -720,5 +711,7 @@ rm -rf cloudslash-out/ .cloudslash/
 ## Acknowledgments
 
 CloudSlash v2.0 was developed with a philosophy of "Zero Waste." We acknowledge the open-source community for the robust libraries that make this engine possible.
+
+CloudSlash is a community-supported project by Devi & Muna.
 
 **Copyright © 2026 DrSkyle.**
